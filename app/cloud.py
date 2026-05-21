@@ -117,6 +117,8 @@ class ActiveServer:
         self.name = server.name
         self.spec_url = server.spec_url
         self.spec_data = server.spec_data
+        self.is_merged = server.is_merged
+        self.merge_config = server.merge_config
         self._transport = transport
         self.manager: MCPServerManager | None = None
         self.port: int | None = None
@@ -127,15 +129,36 @@ class ActiveServer:
         if self.uv_server is not None and not self.uv_server.should_exit:
             return
         spec_data = json.loads(self.spec_data) if self.spec_data else None
-        self.manager = MCPServerManager(
-            spec_url=self.spec_url,
-            name=self.name,
-            spec=spec_data,
-            server_id=self.server_id,
-            log_func=_make_log_func(self.server_id),
-        )
-        transport_type = transport or self._transport
-        self.sse_app = self.manager.mcp.http_app(transport=transport_type)
+        if self.is_merged and self.merge_config:
+            sources_raw = self.merge_config.get("sources", [])
+            if not sources_raw:
+                old_ss = json.loads(self.merge_config["source_spec_data"]) if isinstance(self.merge_config.get("source_spec_data"), str) else self.merge_config.get("source_spec_data")
+                sources_raw = [{"source_name": self.merge_config.get("source_name", "Source"), "namespace": self.merge_config.get("namespace", ""), "source_spec_data": old_ss}]
+            sources = []
+            for s in sources_raw:
+                ss = json.loads(s["source_spec_data"]) if isinstance(s.get("source_spec_data"), str) else s.get("source_spec_data")
+                sources.append({"name": s.get("source_name", "Source"), "namespace": s.get("namespace", ""), "spec": ss})
+            from openapi import create_merged_mcp_server
+            merged_mcp = create_merged_mcp_server(
+                base_spec_url=self.spec_url,
+                base_name=self.name,
+                base_spec=spec_data,
+                sources=sources,
+                server_id=self.server_id,
+                log_func=_make_log_func(self.server_id),
+            )
+            self.manager = merged_mcp._manager if hasattr(merged_mcp, '_manager') else None
+            self.sse_app = merged_mcp.http_app(transport=transport or self._transport)
+        else:
+            self.manager = MCPServerManager(
+                spec_url=self.spec_url,
+                name=self.name,
+                spec=spec_data,
+                server_id=self.server_id,
+                log_func=_make_log_func(self.server_id),
+            )
+            transport_type = transport or self._transport
+            self.sse_app = self.manager.mcp.http_app(transport=transport_type)
         self.port = _find_free_port()
 
         config = uvicorn.Config(
@@ -273,6 +296,15 @@ class ServerListItem(BaseModel):
     url_sse: str
     transport: str
     created_at: str
+    is_merged: bool = False
+    merge_info: str | None = None
+
+
+class MergeServerRequest(BaseModel):
+    source_server_id: str
+    target_server_id: str
+    namespace: str
+    merged_name: str
 
 
 class UpdateServerRequest(BaseModel):
@@ -394,6 +426,16 @@ async def list_servers(request: Request, db: Session = Depends(get_db)):
         t = s.transport or "http"
         suffix = "sse" if t == "sse" else "mcp"
         url = f"{PUBLIC_URL}/v1/{s.server_id}/{s.apikey}/{suffix}"
+        merge_info = None
+        if s.is_merged and s.merge_config:
+            src_list = s.merge_config.get("sources", [])
+            if not src_list and s.merge_config.get("namespace"):
+                src_list = [{"namespace": s.merge_config.get("namespace", "?")}]
+            if src_list:
+                labels = [f"{src.get('namespace', '?')}" for src in src_list]
+                merge_info = f"Merged: {', '.join(labels)}"
+            else:
+                merge_info = "Merged"
         result.append(
             ServerListItem(
                 server_id=s.server_id,
@@ -402,9 +444,186 @@ async def list_servers(request: Request, db: Session = Depends(get_db)):
                 transport=t,
                 url_sse=url,
                 created_at=s.created_at.isoformat(),
+                is_merged=bool(s.is_merged),
+                merge_info=merge_info,
             )
         )
     return result
+
+
+def _create_merged_server(
+    db: Session,
+    user_id: str,
+    name: str,
+    sources: list[dict],
+    target_spec_url: str,
+    target_spec_data: dict | str,
+    target_transport: str,
+    target_target_url: str | None,
+    target_server_id: str,
+    target_name: str,
+) -> ServerDB:
+    server_id = _generate_id()
+    apikey = _generate_apikey()
+    merge_config = {
+        "sources": sources,
+        "target_server_id": target_server_id,
+        "target_name": target_name,
+    }
+    t = target_transport or "http"
+    record = ServerDB(
+        server_id=server_id,
+        apikey=apikey,
+        name=name,
+        spec_url=target_spec_url,
+        spec_data=target_spec_data,
+        target_url=target_target_url,
+        transport=t,
+        is_active=True,
+        is_merged=True,
+        merge_config=merge_config,
+        user_id=user_id,
+    )
+    db.add(record)
+    return record
+
+
+@app.post("/v1/servers/merge", status_code=201)
+async def merge_servers(req: MergeServerRequest, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    logger.info(f"Merging servers: {req.source_server_id} -> {req.target_server_id} for user {user_id}")
+
+    source = db.query(ServerDB).filter(ServerDB.server_id == req.source_server_id, ServerDB.user_id == user_id).first()
+    target = db.query(ServerDB).filter(ServerDB.server_id == req.target_server_id, ServerDB.user_id == user_id).first()
+
+    if not source:
+        raise HTTPException(status_code=404, detail="Servidor fonte não encontrado")
+    if not target:
+        raise HTTPException(status_code=404, detail="Servidor alvo não encontrado")
+
+    if source.is_merged:
+        raise HTTPException(status_code=400, detail="Não é possível usar um servidor merged como fonte")
+
+    if not source.spec_data or not target.spec_data:
+        raise HTTPException(status_code=400, detail="Ambos servidores precisam ter spec_data carregada")
+
+    new_source_entry = {
+        "namespace": req.namespace,
+        "source_server_id": req.source_server_id,
+        "source_name": source.name,
+        "source_spec_data": source.spec_data,
+        "source_spec_url": source.spec_url,
+    }
+
+    if target.is_merged and target.merge_config:
+        existing_sources = target.merge_config.get("sources", [])
+        existing_sources.append(new_source_entry)
+        sources = existing_sources
+        base_spec_url = target.spec_url
+        base_spec_data = target.spec_data
+        base_transport = target.transport
+        base_target_url = target.target_url
+    else:
+        sources = [new_source_entry]
+        base_spec_url = target.spec_url
+        base_spec_data = target.spec_data
+        base_transport = target.transport
+        base_target_url = target.target_url
+
+    record = _create_merged_server(
+        db=db,
+        user_id=user_id,
+        name=req.merged_name,
+        sources=sources,
+        target_spec_url=base_spec_url,
+        target_spec_data=base_spec_data,
+        target_transport=base_transport,
+        target_target_url=base_target_url,
+        target_server_id=target.server_id,
+        target_name=target.name,
+    )
+
+    db.delete(source)
+    db.delete(target)
+
+    db.commit()
+
+    suffix = "sse" if record.transport == "sse" else "mcp"
+    url_sse = f"{PUBLIC_URL}/v1/{record.server_id}/{record.apikey}/{suffix}"
+    logger.info(f"Servidor merged criado: {record.server_id} ({len(sources)} fontes) -> {url_sse}")
+
+    return ServerResponse(
+        server_id=record.server_id,
+        apikey=record.apikey,
+        name=record.name,
+        status="active",
+        spec_url=record.spec_url,
+        transport=record.transport,
+        url_sse=url_sse,
+        created_at=record.created_at.isoformat(),
+    )
+
+
+@app.post("/v1/servers/{server_id}/unmerge")
+async def unmerge_server(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+    if not record.is_merged:
+        raise HTTPException(status_code=400, detail="Servidor não é merged")
+    mc = record.merge_config or {}
+    sources = mc.get("sources", [])
+    if not sources:
+        sources = [{
+            "source_server_id": mc.get("source_server_id", ""),
+            "source_name": mc.get("source_name", "Restaurado"),
+            "source_spec_data": mc.get("source_spec_data"),
+            "source_spec_url": mc.get("source_spec_url", ""),
+            "namespace": mc.get("namespace", ""),
+        }]
+        mc["target_name"] = mc.get("target_name", record.name)
+
+    restored = []
+    for s in sources:
+        restored.append(ServerDB(
+            server_id=s.get("source_server_id", _generate_id()),
+            apikey=_generate_apikey(),
+            name=s.get("source_name", "Restaurado"),
+            spec_url=s.get("source_spec_url", ""),
+            spec_data=s.get("source_spec_data"),
+            target_url="",
+            transport="http",
+            is_active=True,
+            is_merged=False,
+            merge_config=None,
+            user_id=user_id,
+        ))
+
+    target_name = mc.get("target_name", "Restaurado")
+    restored.append(ServerDB(
+        server_id=mc.get("target_server_id", _generate_id()),
+        apikey=_generate_apikey(),
+        name=target_name,
+        spec_url=record.spec_url,
+        spec_data=record.spec_data,
+        target_url=record.target_url,
+        transport=record.transport,
+        is_active=True,
+        is_merged=False,
+        merge_config=None,
+        user_id=user_id,
+    ))
+
+    for r in restored:
+        db.add(r)
+    db.delete(record)
+    db.commit()
+
+    logger.info(f"Unmerge {server_id}: {len(sources)} source(s) + target restaurados para user {user_id}")
+    return {"ok": True, "restored": len(restored)}
 
 
 @app.patch("/v1/servers/{server_id}")
