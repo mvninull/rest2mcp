@@ -1,0 +1,19 @@
+13:31:37 [vite-plugin-svelte] C:/Users/matias.fernando/Documents/case/rest2mcp/src/Landing.svelte:847:15 A11y: '#' is not a valid href attribute
+13:31:37 [vite-plugin-svelte] C:/Users/matias.fernando/Documents/case/rest2mcp/src/Landing.svelte:871:15 A11y: '#' is not a valid href attribute
+13:31:37 [vite-plugin-svelte] C:/Users/matias.fernando/Documents/case/rest2mcp/src/Landing.svelte:1316:17 A11y: '#' is not a valid href attribute
+13:31:37 [vite-plugin-svelte] C:/Users/matias.fernando/Documents/case/rest2mcp/src/Landing.svelte:1317:17 A11y: '#' is not a valid href attribute
+
+
+INFO:     127.0.0.1:52948 - "GET /v1/servers/srv_u5y9zvys/logs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58709 - "GET /v1/servers/srv_u5y9zvys/logs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52948 - "GET /v1/servers/srv_u5y9zvys/logs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52948 - "GET /v1/servers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58709 - "GET /v1/servers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58709 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58709 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:57424 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:55146 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:64865 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:56772 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51501 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49907 - "GET /v1/servers HTTP/1.1" 401 Unauthorized
