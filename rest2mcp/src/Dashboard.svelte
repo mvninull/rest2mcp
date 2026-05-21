@@ -40,8 +40,31 @@
         if (overlay) overlay.classList.remove("open");
       }
 
+      function showAppAlert(msg) {
+        const existing = document.getElementById("appAlertOverlay");
+        if (existing) existing.remove();
+        const overlay = document.createElement("div");
+        overlay.id = "appAlertOverlay";
+        overlay.className = "modal-overlay";
+        overlay.style.display = "flex";
+        overlay.innerHTML = `
+          <div class="modal-box" style="max-width:400px;text-align:center;padding:2rem;">
+            <div class="modal-header" style="margin-bottom:0;">
+              <h3 style="font-size:1rem;">⚠️</h3>
+              <p style="color:var(--ink);font-size:0.9rem;margin-top:1rem;line-height:1.5;">${escapeHtml(msg)}</p>
+            </div>
+            <div class="modal-actions" style="justify-content:center;border:none;margin-top:1.2rem;padding-top:0;">
+              <button class="btn-confirm" style="padding:0.6rem 2rem;">OK</button>
+            </div>
+          </div>
+        `;
+        overlay.querySelector(".btn-confirm").addEventListener("click", () => overlay.remove());
+        overlay.addEventListener("click", (e) => { if (e.target === e.currentTarget) overlay.remove(); });
+        document.body.appendChild(overlay);
+      }
+
       async function loginWith(provider) {
-        if (!supabaseClient) return alert("Supabase não configurado.");
+        if (!supabaseClient) return showAppAlert("Supabase não configurado.");
         showLoading("Redirecionando para " + provider + "...");
         const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
         if (error) {
@@ -167,12 +190,12 @@
               });
             },
             onApprove: function(data) {
-              alert("Subscrição ativada!");
-              setTimeout(fetchProfile, 3000);
+              showAppAlert("Subscrição ativada!");
+              document.getElementById("paypalModal").classList.remove("open");
             },
             onError: function(err) {
               console.error("PayPal error:", err);
-              alert("Erro ao processar pagamento.");
+              showAppAlert("Erro ao processar pagamento.");
             },
           }).render("#paypal-button-container");
         }
@@ -197,11 +220,42 @@
       // ─── Render Card ───────────────────────────────────────
       function renderServerCard(s) {
         const isActive = s.status === "active";
+        const isMerged = s.is_merged === true;
         const card = document.createElement("div");
-        card.className = `server-card${isActive ? " active-status" : ""}`;
+        let cls = `server-card${isActive ? " active-status" : ""}`;
+        if (isMerged) cls += " server-card-merged";
+        card.className = cls;
         card.dataset.serverId = s.server_id;
+        card.dataset.serverName = s.name;
         card.dataset.apikey = s.apikey || "";
         card.dataset.transport = s.transport || "http";
+        card.draggable = !isMerged;
+
+        card.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", s.server_id);
+          card.classList.add("dragging");
+        });
+        card.addEventListener("dragend", () => {
+          card.classList.remove("dragging");
+          document.querySelectorAll(".server-card").forEach((c) => c.classList.remove("drag-over"));
+        });
+        card.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          card.classList.add("drag-over");
+        });
+        card.addEventListener("dragleave", () => {
+          card.classList.remove("drag-over");
+        });
+        card.addEventListener("drop", (e) => {
+          e.preventDefault();
+          card.classList.remove("drag-over");
+          const srcId = e.dataTransfer.getData("text/plain");
+          if (!srcId || srcId === s.server_id) return;
+          document.querySelectorAll(".server-card").forEach((c) => c.classList.remove("drag-over"));
+          const srcCard = document.querySelector(`.server-card[data-server-id="${srcId}"]`);
+          const srcName = srcCard ? srcCard.dataset.serverName : srcId;
+          openMergeModal(srcId, s.server_id, s.name, srcName);
+        });
 
         const emoji = isActive
           ? `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#00d4aa"/><circle cx="8" cy="8" r="7" stroke="#00d4aa" stroke-width="1.5" stroke-opacity="0.3"/></svg>`
@@ -209,12 +263,14 @@
 
         card.addEventListener("click", () => selectServer(s.server_id));
 
+        const mergeLabel = isMerged ? `<span class="merge-badge"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l1.2 4.8L14 6l-4.8 1.2L8 12 6.8 7.2 2 6l4.8-1.2z"/></svg> Merged</span>` : "";
+
         card.innerHTML = `
           <div class="server-info">
             <div class="status-icon ${isActive ? "active" : "inactive"}">${emoji}</div>
             <div class="server-meta">
-              <div class="server-name">${escapeHtml(s.name)}</div>
-              <div class="server-url">${escapeHtml(s.url_sse || s.server_id)}</div>
+              <div class="server-name">${escapeHtml(s.name)} ${mergeLabel}</div>
+              <div class="server-url">${escapeHtml(s.url_sse || s.server_id)}${s.merge_info ? ' · ' + escapeHtml(s.merge_info) : ''}</div>
             </div>
           </div>
           <div class="server-actions">
@@ -243,6 +299,10 @@
                   <span class="menu-icon">${isActive ? `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>` : `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg>`}</span>
                   ${isActive ? "Desativar" : "Ativar"}
                 </button>
+                ${isMerged ? `<div class="menu-divider"></div>
+                <button onclick="unmergeServer('${s.server_id}'); closeMenu();">
+                  <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> Desfazer Merge
+                </button>` : ""}
                 <div class="menu-divider"></div>
                 <button class="menu-danger" onclick="deleteServer('${s.server_id}'); closeMenu();">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> Remover
@@ -360,7 +420,7 @@
         } catch (err) {
           card.style.opacity = "1";
           card.style.transform = "";
-          alert("Erro ao remover: " + err.message);
+          showAppAlert("Erro ao alterar status: " + err.message);
         }
       }
 
@@ -376,10 +436,22 @@
           });
           await loadServers();
         } catch (err) {
-          alert("Erro ao alterar status: " + err.message);
+          showAppAlert("Erro ao alterar status: " + err.message);
         }
       }
 
+      // ─── Unmerge ────────────────────────────────────────────
+      async function unmergeServer(serverId) {
+        if (!confirm("Desfazer merge deste servidor?")) return;
+        try {
+          await apiFetch(`/v1/servers/${serverId}/unmerge`, { method: "POST" });
+          await loadServers();
+        } catch (err) {
+          showAppAlert("Erro ao desfazer merge: " + err.message);
+        }
+      }
+
+      // ─── Menu Portal ───────────────────────────────────────
       // ─── Menu Portal ───────────────────────────────────────
       const portal = document.getElementById("menuPortal");
       let activeMenu = null;
@@ -441,6 +513,68 @@
       });
       window.addEventListener("scroll", closeAllMenus, true);
       window.addEventListener("resize", closeAllMenus);
+
+      // ─── Merge ─────────────────────────────────────────────
+      let mergeSourceId = null;
+      let mergeTargetId = null;
+
+      function openMergeModal(sourceId, targetId, targetName, sourceName) {
+        mergeSourceId = sourceId;
+        mergeTargetId = targetId;
+        const mm = document.getElementById("mergeModal");
+        const mn = document.getElementById("mergeName");
+        const me = document.getElementById("mergeError");
+        const bc = document.getElementById("btnMergeConfirm");
+        if (mn) {
+          mn.value = "";
+          mn.placeholder = `Ex: ${targetName} (Merged)`;
+        }
+        if (me) showModalError(me, "");
+        if (bc) {
+          bc.disabled = false;
+          bc.textContent = "Criar Servidor Merged";
+        }
+        if (mm) mm.classList.add("open");
+        setTimeout(() => { const f = document.getElementById("mergeName"); if (f) f.focus(); }, 120);
+      }
+
+      function closeMergeModal() {
+        const mm = document.getElementById("mergeModal");
+        if (mm) mm.classList.remove("open");
+        mergeSourceId = null;
+        mergeTargetId = null;
+      }
+
+      async function confirmMerge() {
+        const name = document.getElementById("mergeName")?.value?.trim();
+        const errorEl = document.getElementById("mergeError");
+        const btn = document.getElementById("btnMergeConfirm");
+        if (errorEl) showModalError(errorEl, "");
+        if (!name) { if (errorEl) showModalError(errorEl, "Informe o nome do servidor merged."); return; }
+        const srcCard = document.querySelector(`.server-card[data-server-id="${mergeSourceId}"]`);
+        const srcName = srcCard?.dataset?.serverName || mergeSourceId;
+        const namespace = String(srcName).toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "merged";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
+        try {
+          await apiFetch("/v1/servers/merge", {
+            method: "POST",
+            body: JSON.stringify({ source_server_id: mergeSourceId, target_server_id: mergeTargetId, namespace, merged_name: name }),
+          });
+          closeMergeModal();
+          showLoading("Servidor merged criado! Carregando...", false);
+          await loadServers();
+          hideLoading();
+        } catch (err) {
+          if (errorEl) showModalError(errorEl, err.message);
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
+        }
+      }
+
+      const mergeModal = document.getElementById("mergeModal");
+      if (mergeModal) mergeModal.addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) closeMergeModal();
+      });
 
       // ─── Edit ──────────────────────────────────────────────
       let editingServerId = null;
@@ -556,6 +690,7 @@
         if (e.key === "Escape") {
           closeCreateModal();
           closeEditModal();
+          closeMergeModal();
         }
         if (
           e.key === "Enter" &&
@@ -736,7 +871,7 @@
           await apiFetch(`/v1/servers/${activeServerId}/logs`, { method: "DELETE" });
           pollLogs();
         } catch (err) {
-          alert("Erro ao limpar logs: " + err.message);
+          showAppAlert("Erro ao limpar logs: " + err.message);
         }
       }
 
@@ -793,8 +928,43 @@
             }
           });
         }
+      })();
 
-        // ─── Profile Modal ─────────────────────────────────────
+      // Expose to window for inline HTML onclick handlers
+      window.loginWith = loginWith;
+      window.logout = logout;
+      window.showLoading = showLoading;
+      window.hideLoading = hideLoading;
+      window.openProfileModal = openProfileModal;
+      window.closeProfileModal = closeProfileModal;
+      window.copyToken = copyToken;
+      window.toggleTokenVisibility = toggleTokenVisibility;
+      window.logoutFromProfile = logoutFromProfile;
+      window.copyUrl = copyUrl;
+      window.toggleMenu = toggleMenu;
+      window.openInspector = openInspector;
+      window.editServer = editServer;
+      window.toggleServerStatus = toggleServerStatus;
+      window.deleteServer = deleteServer;
+      window.unmergeServer = unmergeServer;
+      window.openCreateModal = openCreateModal;
+      window.closeCreateModal = closeCreateModal;
+      window.createServer = createServer;
+      window.saveEdit = saveEdit;
+      window.closeEditModal = closeEditModal;
+      window.openMergeModal = openMergeModal;
+      window.closeMergeModal = closeMergeModal;
+      window.confirmMerge = confirmMerge;
+      window.closeLogDetail = closeLogDetail;
+      window.exportLogs = exportLogs;
+      window.clearLogs = clearLogs;
+      window.loadServers = loadServers;
+      window.switchLogServer = switchLogServer;
+      window.debouncePoll = debouncePoll;
+      window.showPayPal = showPayPal;
+      window.pollLogs = pollLogs;
+
+      // ─── Profile Modal ─────────────────────────────────────
         function openProfileModal() {
           if (!currentUser) return;
           const token = getAuthToken();
@@ -906,11 +1076,15 @@
         window.editServer = editServer;
         window.toggleServerStatus = toggleServerStatus;
         window.deleteServer = deleteServer;
+        window.unmergeServer = unmergeServer;
         window.openCreateModal = openCreateModal;
         window.closeCreateModal = closeCreateModal;
         window.createServer = createServer;
         window.saveEdit = saveEdit;
         window.closeEditModal = closeEditModal;
+        window.openMergeModal = openMergeModal;
+        window.closeMergeModal = closeMergeModal;
+        window.confirmMerge = confirmMerge;
         window.closeLogDetail = closeLogDetail;
         window.exportLogs = exportLogs;
         window.clearLogs = clearLogs;
@@ -919,7 +1093,6 @@
         window.debouncePoll = debouncePoll;
         window.showPayPal = showPayPal;
         window.pollLogs = pollLogs;
-      })();
     
   });
 </script>
@@ -1059,6 +1232,25 @@
               Aguardando atividade...
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MERGE MODAL ────────────────────────────────────────── -->
+    <div class="modal-overlay" id="mergeModal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Merge de Servidores</h3>
+          <p class="modal-sub">Fusão de dois servidores MCP com namespace automático</p>
+        </div>
+        <div class="form-group">
+          <label for="mergeName">Nome do Servidor Merged</label>
+          <input type="text" id="mergeName" placeholder="Ex: API Unificada" />
+        </div>
+        <div class="modal-error" id="mergeError"></div>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="closeMergeModal()">Cancelar</button>
+          <button class="btn-confirm" id="btnMergeConfirm" onclick="confirmMerge()">Criar Servidor Merged</button>
         </div>
       </div>
     </div>

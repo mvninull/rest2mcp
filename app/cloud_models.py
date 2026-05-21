@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
-
 from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text, create_engine, text
+from sqlalchemy import JSON as SA_JSON
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -24,6 +24,8 @@ class ServerDB(Base):
     target_url = Column(String(500), nullable=True)
     transport = Column(String(10), default="http")
     is_active = Column(Boolean, default=True)
+    is_merged = Column(Boolean, default=False)
+    merge_config = Column(SA_JSON, nullable=True)
     user_id = Column(String(100), nullable=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
@@ -63,6 +65,8 @@ def init_db():
         "servers",
         [
             ("user_id", "VARCHAR(100)"),
+            ("is_merged", "BOOLEAN DEFAULT 0"),
+            ("merge_config", "JSON"),
         ],
     )
 

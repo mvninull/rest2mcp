@@ -275,3 +275,33 @@ class MCPServerManager:
 def create_mcp_server(spec_url: str, name: str) -> FastMCP:
     manager = MCPServerManager(spec_url, name)
     return manager.mcp
+
+
+def create_merged_mcp_server(
+    base_spec_url: str,
+    base_name: str,
+    base_spec: dict,
+    sources: list[dict],
+    server_id: str = "",
+    log_func=None,
+) -> FastMCP:
+    """Cria um servidor MCP merged: monta múltiplas sources no base com namespace."""
+    base_manager = MCPServerManager(
+        spec_url=base_spec_url,
+        name=base_name,
+        spec=base_spec,
+        server_id=server_id,
+        log_func=log_func,
+    )
+
+    for i, src in enumerate(sources):
+        src_manager = MCPServerManager(
+            spec_url="",
+            name=src.get("name", f"Source {i}"),
+            spec=src["spec"],
+            server_id=f"{server_id}_src{i}",
+            log_func=log_func,
+        )
+        base_manager.mcp.mount(src_manager.mcp, namespace=src["namespace"])
+
+    return base_manager.mcp

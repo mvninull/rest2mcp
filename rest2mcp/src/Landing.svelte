@@ -28,6 +28,35 @@
         if (text) text.style.opacity = '1';
       }
 
+      function escapeHtml(str) {
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      function showAppAlert(msg) {
+        const existing = document.getElementById("appAlertOverlay");
+        if (existing) existing.remove();
+        const overlay = document.createElement("div");
+        overlay.id = "appAlertOverlay";
+        overlay.className = "modal-overlay";
+        overlay.style.display = "flex";
+        overlay.innerHTML = `
+          <div class="modal-box" style="max-width:400px;text-align:center;padding:2rem;">
+            <div class="modal-header" style="margin-bottom:0;">
+              <h3 style="font-size:1rem;">⚠️</h3>
+              <p style="color:var(--ink);font-size:0.9rem;margin-top:1rem;line-height:1.5;">${escapeHtml(msg)}</p>
+            </div>
+            <div class="modal-actions" style="justify-content:center;border:none;margin-top:1.2rem;padding-top:0;">
+              <button class="btn-confirm" style="padding:0.6rem 2rem;">OK</button>
+            </div>
+          </div>
+        `;
+        overlay.querySelector(".btn-confirm").addEventListener("click", () => overlay.remove());
+        overlay.addEventListener("click", (e) => { if (e.target === e.currentTarget) overlay.remove(); });
+        document.body.appendChild(overlay);
+      }
+
       // Função de Login com Provedor Social
       async function loginWith(provider) {
         const btn = document.querySelector(`.${provider}-btn`);
@@ -40,7 +69,7 @@
         });
         if (error) {
           hideLoading(btn);
-          alert("Erro no login: " + error.message);
+          showAppAlert("Erro no login: " + error.message);
         }
       }
 
@@ -64,12 +93,12 @@
               password
             });
             if (signUpError) {
-               alert("Erro no registo/login: " + signUpError.message);
+               showAppAlert("Erro no registo/login: " + signUpError.message);
             } else {
-               alert("Registo efetuado! Verifique o seu email para confirmar a conta (caso exigido), ou tente fazer login novamente.");
+               showAppAlert("Registo efetuado! Verifique o seu email para confirmar a conta (caso exigido), ou tente fazer login novamente.");
             }
           } else {
-            alert("Erro no login: " + error.message);
+            showAppAlert("Erro no login: " + error.message);
           }
         } else {
           closeLoginModal();
@@ -155,12 +184,12 @@
               });
             },
             onApprove: function(data) {
-              alert("Subscrição ativada!");
+              showAppAlert("Subscrição ativada!");
               document.getElementById("paypalModal").classList.remove("open");
             },
             onError: function(err) {
               console.error("PayPal error:", err);
-              alert("Erro ao processar pagamento.");
+              showAppAlert("Erro ao processar pagamento.");
             }
           }).render("#paypal-button-container-landing");
         }
