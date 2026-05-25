@@ -126,6 +126,56 @@
       // Inicializa sessão
       restoreSession();
 
+      // ─── Esqueci a palavra-passe ────────────────────────────
+      function openForgotPasswordModal() {
+        closeLoginModal();
+        setTimeout(() => {
+          const fm = document.getElementById("forgotPasswordModal");
+          if (fm) fm.classList.add("open");
+          const fi = document.getElementById("forgotEmailInput");
+          if (fi) {
+            fi.value = document.getElementById("loginEmail")?.value || "";
+            setTimeout(() => fi.focus(), 120);
+          }
+        }, 200);
+      }
+      window.openForgotPasswordModal = openForgotPasswordModal;
+
+      function closeForgotPasswordModal() {
+        const fm = document.getElementById("forgotPasswordModal");
+        if (fm) fm.classList.remove("open");
+      }
+      window.closeForgotPasswordModal = closeForgotPasswordModal;
+
+      async function sendForgotPasswordEmail() {
+        const email = document.getElementById("forgotEmailInput")?.value?.trim();
+        const btn = document.getElementById("btnForgotSend");
+        const errorEl = document.getElementById("forgotError");
+        if (errorEl) errorEl.textContent = "";
+        if (!email || !email.includes('@')) {
+          if (errorEl) errorEl.textContent = "Insira um email válido.";
+          return;
+        }
+        if (btn) { btn.disabled = true; btn.textContent = "A enviar..."; }
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + '?page=dashboard&reset=password'
+        });
+        if (btn) { btn.disabled = false; btn.textContent = "Enviar Email"; }
+        if (error) {
+          if (errorEl) errorEl.textContent = error.message;
+          window.showAppAlert("Erro ao enviar email: " + error.message);
+        } else {
+          window.showAppAlert("Email enviado! Verifique a sua caixa de entrada (e spam).");
+          closeForgotPasswordModal();
+        }
+      }
+      window.sendForgotPasswordEmail = sendForgotPasswordEmail;
+
+      const forgotModal = document.getElementById("forgotPasswordModal");
+      if (forgotModal) forgotModal.addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) closeForgotPasswordModal();
+      });
+
       // Modal de login dinâmico
       function openLoginModal() {
         if (localStorage.getItem("supabase_token")) {
@@ -654,6 +704,9 @@
           <form class="email-login-form" onsubmit="loginWithEmail(event)">
             <input type="email" id="loginEmail" placeholder="O seu email" required class="auth-input" />
             <input type="password" id="loginPassword" placeholder="Palavra-passe" required class="auth-input" />
+            <div style="text-align: right; margin-top: -8px; margin-bottom: 8px;">
+              <a href="#" onclick="openForgotPasswordModal(); return false;" style="font-size: 0.8rem; color: var(--accent); text-decoration: none;">Esqueci a minha palavra-passe</a>
+            </div>
             <button type="submit" class="btn-primary auth-submit"><span class="btn-text">Entrar / Registar</span><span class="spinner" style="display:none;"><svg class="spinner-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span></button>
           </form>
         </div>
@@ -675,6 +728,25 @@
         </div>
         <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: center;">
           <button class="btn-cancel" onclick="closePayPalModal()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL ESQUECI A PALAVRA-PASSE -->
+    <div class="modal-overlay" id="forgotPasswordModal">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-header">
+          <h3>Redefinir Palavra-passe</h3>
+          <p class="modal-sub">Receberá um email com instruções para redefinir a sua palavra-passe</p>
+        </div>
+        <div class="form-group">
+          <label for="forgotEmailInput">Email</label>
+          <input type="email" id="forgotEmailInput" placeholder="O seu email" class="auth-input" />
+        </div>
+        <div class="modal-error" id="forgotError"></div>
+        <div class="modal-actions" style="flex-direction:column;gap:8px;">
+          <button class="btn-confirm" id="btnForgotSend" onclick="sendForgotPasswordEmail()" style="width:100%;">Enviar Email</button>
+          <button class="btn-cancel" onclick="closeForgotPasswordModal()" style="width:100%;">Cancelar</button>
         </div>
       </div>
     </div>

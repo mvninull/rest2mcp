@@ -1163,6 +1163,12 @@
             if (session?.access_token) {
               localStorage.setItem("supabase_token", session.access_token);
               currentUser = session.user;
+
+              if (event === "PASSWORD_RECOVERY") {
+                openResetPasswordModal();
+                return;
+              }
+
               fetchProfile();
               loadServers();
             } else if (event === "SIGNED_OUT") {
@@ -1207,12 +1213,17 @@
       window.loadServers = loadServers;
       window.switchLogServer = switchLogServer;
       window.debouncePoll = debouncePoll;
-      window.showPayPal = showPayPal;
-      window.pollLogs = pollLogs;
-      window.setMergeTab = setMergeTab;
-      window.openMergeModalFromMenu = openMergeModalFromMenu;
-      window.openRemoteMergeModal = openRemoteMergeModal;
-      window.showConfirmDialog = showConfirmDialog;
+        window.showPayPal = showPayPal;
+        window.pollLogs = pollLogs;
+        window.setMergeTab = setMergeTab;
+        window.openMergeModalFromMenu = openMergeModalFromMenu;
+        window.openRemoteMergeModal = openRemoteMergeModal;
+        window.showConfirmDialog = showConfirmDialog;
+        window.openResetPasswordModal = openResetPasswordModal;
+        window.closeResetPasswordModal = closeResetPasswordModal;
+        window.confirmResetPassword = confirmResetPassword;
+        window.toggleChangePassword = toggleChangePassword;
+        window.saveNewPassword = saveNewPassword;
 
       // ─── Profile Modal ─────────────────────────────────────
         function openProfileModal() {
@@ -1310,6 +1321,94 @@
           await logout();
         }
 
+        // ─── Reset Password (recovery flow) ──────────────────
+        function openResetPasswordModal() {
+          const rm = document.getElementById("resetPasswordModal");
+          const rp = document.getElementById("resetPasswordInput");
+          const re = document.getElementById("resetPasswordError");
+          const rb = document.getElementById("btnResetPassword");
+          if (rp) rp.value = "";
+          if (re) re.textContent = "";
+          if (rb) { rb.disabled = false; rb.textContent = "Redefinir Palavra-passe"; }
+          if (rm) rm.classList.add("open");
+          setTimeout(() => { if (rp) rp.focus(); }, 120);
+        }
+
+        function closeResetPasswordModal() {
+          const rm = document.getElementById("resetPasswordModal");
+          if (rm) rm.classList.remove("open");
+        }
+
+        async function confirmResetPassword() {
+          const password = document.getElementById("resetPasswordInput")?.value;
+          const errorEl = document.getElementById("resetPasswordError");
+          const btn = document.getElementById("btnResetPassword");
+          if (errorEl) errorEl.textContent = "";
+          if (!password || password.length < 6) {
+            if (errorEl) errorEl.textContent = "A palavra-passe deve ter pelo menos 6 caracteres.";
+            return;
+          }
+          if (btn) { btn.disabled = true; btn.textContent = "A redefinir..."; }
+          try {
+            const { error } = await supabaseClient.auth.updateUser({ password });
+            if (error) {
+              if (errorEl) errorEl.textContent = error.message;
+              window.showAppAlert("Erro ao redefinir: " + error.message);
+            } else {
+              window.showAppAlert("Palavra-passe redefinida com sucesso!");
+              closeResetPasswordModal();
+              fetchProfile();
+              loadServers();
+            }
+          } catch (err) {
+            if (errorEl) errorEl.textContent = err.message;
+            window.showAppAlert("Erro ao redefinir: " + err.message);
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Redefinir Palavra-passe"; }
+          }
+        }
+
+        // ─── Change Password (profile) ────────────────────────
+        function toggleChangePassword() {
+          const section = document.getElementById("changePasswordSection");
+          const btn = document.getElementById("toggleChangePasswordBtn");
+          if (!section) return;
+          const isHidden = section.style.display === "none" || !section.style.display;
+          section.style.display = isHidden ? "block" : "none";
+          if (btn) btn.textContent = isHidden ? "Cancelar" : "Alterar Palavra-passe";
+          if (isHidden) {
+            const np = document.getElementById("newPasswordInput");
+            if (np) { np.value = ""; setTimeout(() => np.focus(), 100); }
+          }
+        }
+
+        async function saveNewPassword() {
+          const password = document.getElementById("newPasswordInput")?.value;
+          const errorEl = document.getElementById("changePasswordError");
+          const btn = document.getElementById("btnSavePassword");
+          if (errorEl) errorEl.textContent = "";
+          if (!password || password.length < 6) {
+            if (errorEl) errorEl.textContent = "A nova palavra-passe deve ter pelo menos 6 caracteres.";
+            return;
+          }
+          if (btn) { btn.disabled = true; btn.textContent = "A guardar..."; }
+          try {
+            const { error } = await supabaseClient.auth.updateUser({ password });
+            if (error) {
+              if (errorEl) errorEl.textContent = error.message;
+              window.showAppAlert("Erro ao alterar: " + error.message);
+            } else {
+              window.showAppAlert("Palavra-passe alterada com sucesso!");
+              toggleChangePassword();
+            }
+          } catch (err) {
+            if (errorEl) errorEl.textContent = err.message;
+            window.showAppAlert("Erro ao alterar: " + err.message);
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Guardar"; }
+          }
+        }
+
         // Expose to window for inline HTML onclick handlers
         window.loginWith = loginWith;
         window.logout = logout;
@@ -1344,6 +1443,11 @@
         window.debouncePoll = debouncePoll;
         window.showPayPal = showPayPal;
         window.pollLogs = pollLogs;
+        window.openResetPasswordModal = openResetPasswordModal;
+        window.closeResetPasswordModal = closeResetPasswordModal;
+        window.confirmResetPassword = confirmResetPassword;
+        window.toggleChangePassword = toggleChangePassword;
+        window.saveNewPassword = saveNewPassword;
     
   });
 </script>
@@ -1702,6 +1806,25 @@
           </div>
         </div>
 
+        <!-- Change Password -->
+        <div class="profile-section">
+          <div class="profile-section-title" style="cursor:pointer;" onclick="toggleChangePassword()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Palavra-passe
+            <button class="profile-token-btn" id="toggleChangePasswordBtn" style="margin-left:auto;font-size:0.72rem;padding:4px 10px;">Alterar Palavra-passe</button>
+          </div>
+          <div id="changePasswordSection" style="display:none;margin-top:10px;">
+            <div class="profile-token-field" style="margin-bottom:8px;">
+              <input type="password" id="newPasswordInput" class="profile-token-input" placeholder="Nova palavra-passe (mín. 6 caracteres)" style="width:100%;" />
+            </div>
+            <div class="modal-error" id="changePasswordError" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-confirm" id="btnSavePassword" onclick="saveNewPassword()" style="flex:1;">Guardar</button>
+              <button class="btn-cancel" onclick="toggleChangePassword()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div class="profile-modal-actions">
           <button class="btn-cancel" onclick="closeProfileModal()">Fechar</button>
@@ -1709,6 +1832,24 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Terminar Sessão
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RESET PASSWORD MODAL (recovery flow) ────────────────── -->
+    <div class="modal-overlay" id="resetPasswordModal">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-header">
+          <h3>Redefinir Palavra-passe</h3>
+          <p class="modal-sub">Escolha uma nova palavra-passe para a sua conta</p>
+        </div>
+        <div class="form-group">
+          <label for="resetPasswordInput">Nova Palavra-passe</label>
+          <input type="password" id="resetPasswordInput" placeholder="Mínimo 6 caracteres" />
+        </div>
+        <div class="modal-error" id="resetPasswordError"></div>
+        <div class="modal-actions">
+          <button class="btn-confirm" id="btnResetPassword" onclick="confirmResetPassword()">Redefinir Palavra-passe</button>
         </div>
       </div>
     </div>
