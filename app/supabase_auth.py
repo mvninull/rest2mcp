@@ -3,6 +3,7 @@ import time
 
 import httpx
 from fastapi import HTTPException, Request
+from pydantic import BaseModel
 
 try:
     from .config import (
@@ -26,10 +27,54 @@ except ImportError:
     )
 
 
-
 JWKS_CACHE = None
 JWKS_CACHE_EXPIRY = 0
 PROFILE_CACHE: dict[str, tuple[dict, float]] = {}
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+async def login_with_email(email: str, password: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+            json={"email": email, "password": password},
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Content-Type": "application/json",
+            },
+        )
+
+        if resp.status_code == 200:
+            return resp.json()
+
+        error_body = resp.json() if resp.text else {}
+        error_desc = error_body.get("error_description", "")
+
+        if "Email not confirmed" in error_desc:
+            raise HTTPException(status_code=401, detail="Email não confirmado")
+
+        try:
+            profile_resp = await client.get(
+                f"{SUPABASE_URL}/rest/v1/profiles",
+                params={"email": f"eq.{email}"},
+                headers={
+                    "apikey": SUPABASE_SERVICE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                },
+            )
+            rows = profile_resp.json() if profile_resp.status_code == 200 else []
+            user_exists = len(rows) > 0
+        except Exception:
+            user_exists = True
+
+        if not user_exists:
+            raise HTTPException(status_code=401, detail="Email não encontrado")
+
+        raise HTTPException(status_code=401, detail="Senha incorreta")
 
 
 async def _fetch_jwks() -> dict:
@@ -145,9 +190,16 @@ def get_tier_limits(plan_tier: str) -> dict:
 
 async def require_auth(request: Request):
     auth = request.headers.get("Authorization", "")
-    token = auth.replace("Bearer ", "") if auth.startswith("Bearer ") else auth
-    payload = await validate_jwt(token)
+    if not auth:
+        raise HTTPException(status_code=401, detail="Token não fornecido")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Formato de token inválido")
+    token = auth.replace("Bearer ", "")
+    payload = _decode_jwt_payload(token)
     if not payload:
-        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+        raise HTTPException(status_code=401, detail="Token inválido")
+    exp = payload.get("exp", 0)
+    if time.time() > exp:
+        raise HTTPException(status_code=401, detail="Token expirado")
     request.state.user_id = payload.get("sub", "")
     request.state.jwt_payload = payload

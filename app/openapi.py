@@ -165,15 +165,27 @@ class MCPServerManager:
 
     def _setup_dynamic_login(self):
         email_login_path = None
+        fallback_auth_path = None
         oauth_paths: dict[str, str] = {}
         spec_paths = self.spec.get("paths", {})
         for path, methods in spec_paths.items():
             if "post" not in methods:
                 continue
             lower = path.lower()
-            if any(k in lower for k in ["login", "token", "auth/"]):
+            if "register" in lower or "signup" in lower:
+                continue
+            if "login" in lower:
                 if email_login_path is None:
                     email_login_path = path
+            elif any(k in lower for k in ["token", "auth/"]):
+                if fallback_auth_path is None:
+                    fallback_auth_path = path
+        if email_login_path is None:
+            email_login_path = fallback_auth_path
+        for path, methods in spec_paths.items():
+            if "post" not in methods:
+                continue
+            lower = path.lower()
             for provider in ("google", "github", "apple"):
                 if provider in lower:
                     oauth_paths[provider] = path

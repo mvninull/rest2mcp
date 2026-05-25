@@ -44,41 +44,84 @@
         }
       }
 
-      // Função de Login com Email/Senha
+      // Alternar entre modo Entrar e Registar
+      let isRegisterMode = false;
+
+      function toggleAuthMode() {
+        isRegisterMode = !isRegisterMode;
+        const title = document.querySelector(".modal-header h3");
+        const sub = document.querySelector(".modal-sub");
+        const btnText = document.querySelector(".auth-submit .btn-text");
+        const toggleEl = document.getElementById("authToggle");
+        const forgotLink = document.getElementById("forgotLink");
+        const confirmInput = document.getElementById("loginPasswordConfirm");
+        if (isRegisterMode) {
+          if (title) title.textContent = "Criar Conta";
+          if (sub) sub.textContent = "Registe-se para começar a usar";
+          if (btnText) btnText.textContent = "Registar";
+          if (toggleEl) toggleEl.innerHTML = 'Já tem conta? <a href="#" onclick="toggleAuthMode(); return false;">Entrar</a>';
+          if (forgotLink) forgotLink.style.display = "none";
+          if (confirmInput) confirmInput.style.display = "block";
+        } else {
+          if (title) title.textContent = "Entrar na sua Conta";
+          if (sub) sub.textContent = "Selecione o seu provedor favorito para continuar";
+          if (btnText) btnText.textContent = "Entrar";
+          if (toggleEl) toggleEl.innerHTML = 'Não tem conta? <a href="#" onclick="toggleAuthMode(); return false;">Registar-se</a>';
+          if (forgotLink) forgotLink.style.display = "";
+          if (confirmInput) confirmInput.style.display = "none";
+        }
+      }
+      window.toggleAuthMode = toggleAuthMode;
+
+      // Função de Login/Registo com Email/Senha
       async function loginWithEmail(e) {
         e.preventDefault();
         const btn = e.target.querySelector('.auth-submit');
         showLoading(btn);
-        const email = document.getElementById("loginEmail").value;
-        const password = document.getElementById("loginPassword").value;
-        
-        const { error } = await supabaseClient.auth.signInWithPassword({
-          email,
-          password
-        });
-        if (error) {
-          hideLoading(btn);
-          if (error.message.includes("Invalid login credentials") || error.message.includes("not found")) {
-            const { error: signUpError } = await supabaseClient.auth.signUp({
-              email,
-              password
-            });
-            if (signUpError) {
-               window.showAppAlert("Erro no registo/login: " + signUpError.message);
-            } else {
-               window.showAppAlert("Registo efetuado! Verifique o seu email para confirmar a conta (caso exigido), ou tente fazer login novamente.");
+        try {
+          const email = document.getElementById("loginEmail").value;
+          const password = document.getElementById("loginPassword").value;
+          if (!email || !password) {
+            hideLoading(btn);
+            window.showAppAlert("Preencha o email e a palavra-passe.");
+            return;
+          }
+          if (isRegisterMode) {
+            const confirmPw = document.getElementById("loginPasswordConfirm").value;
+            if (password !== confirmPw) {
+              hideLoading(btn);
+              window.showAppAlert("As palavras-passe não coincidem.");
+              return;
             }
-          } else {
-            window.showAppAlert("Erro no login: " + error.message);
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            hideLoading(btn);
+            if (error) {
+              window.showAppAlert(error.message);
+            } else if (data?.user && !data?.session) {
+              window.showAppAlert("Confirme o seu email. Verifique a caixa de entrada (e spam).");
+              toggleAuthMode();
+            } else {
+              window.showAppAlert("Registo efetuado com sucesso!");
+              toggleAuthMode();
+            }
+            return;
           }
-        } else {
-          closeLoginModal();
-          if (localStorage.getItem("pending_pro")) {
-            localStorage.removeItem("pending_pro");
-            setTimeout(showPayPalModal, 300);
+          const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          hideLoading(btn);
+          if (error) {
+            window.showAppAlert(error.message);
           } else {
-            window.history.pushState({}, '', '?page=dashboard'); window.dispatchEvent(new PopStateEvent('popstate'));
+            closeLoginModal();
+            if (localStorage.getItem("pending_pro")) {
+              localStorage.removeItem("pending_pro");
+              setTimeout(showPayPalModal, 300);
+            } else {
+              window.history.pushState({}, '', '?page=dashboard'); window.dispatchEvent(new PopStateEvent('popstate'));
+            }
           }
+        } catch (err) {
+          hideLoading(btn);
+          window.showAppAlert("Erro inesperado: " + (err.message || err));
         }
       }
 
@@ -292,13 +335,12 @@
       <div class="hero-grid"></div>
       <div class="hero-inner">
         <div class="hero-tag"><span></span>v1.0.0 · Matias Fernando</div>
-        <h1>Converte <em>qualquer</em><br />API em MCP</h1>
+        <h1>Converte <em>qualquer</em><br />API REST em MCP</h1>
 <p class="hero-sub">
-           Conecte suas APIs REST ao Claude ou GPT em segundos. Sem servidor local, sem complexidade, 100% Stateless.
+           Conecte as suas APIs REST ao Claude, GPT ou qualquer cliente MCP em segundos. 100% na nuvem, sem servidor local.
          </p>
         <div class="hero-ctas">
-<a href="?page=dashboard" class="btn-primary" id="createServerBtn">Criar Servidor Grátis</a>
-
+<a href="javascript:void(0)" class="btn-primary" id="createServerBtn">Criar Servidor Grátis</a>
         </div>
         <div class="hero-badges">
           <div class="badge">
@@ -306,7 +348,10 @@
           </div>
           <div class="badge"><span class="svg-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0l1.2 4.8L12 6l-4.8 1.2L6 12 4.8 7.2 0 6l4.8-1.2z"/></svg></span> <b>Zero</b> código necessário</div>
           <div class="badge">
-            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M13 8A5 5 0 112 5.5"/><path d="M2 2v4h4"/></svg></span> <b>Swagger 2.0</b> → OpenAPI 3.0
+            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M13 8A5 5 0 112 5.5"/><path d="M2 2v4h4"/></svg></span> <b>Suporta</b> OpenAPI 3.0 + Swagger 2.0
+          </div>
+          <div class="badge">
+            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 5l4 4 8-8"/></svg></span> <b>Auth</b> automática (login MCP)
           </div>
         </div>
       </div>
@@ -315,32 +360,27 @@
     <!-- ABOUT -->
     <section class="section" id="about">
       <div class="section-label">// 01 — Sobre o projeto</div>
-      <h2>Por que este<br />projecto existe?</h2>
+      <h2>Por que este<br />projeto existe?</h2>
       <div class="about-layout">
         <div>
           <p style="color: var(--muted); margin-bottom: 1rem; font-weight: 300">
-            LLMs modernos têm capacidades incríveis, mas não conseguem interagir
-            diretamente com APIs REST existentes. O Protocolo MCP resolve isso,
-            mas exige que cada API tenha um servidor dedicado.
+            LLMs modernos como Claude e GPT têm capacidades incríveis, mas não conseguem interagir
+            diretamente com APIs REST. O Protocolo MCP (Model Context Protocol) resolve isso,
+            mas exige que cada API tenha um servidor MCP dedicado.
           </p>
-          <p
-            style="color: var(--muted); margin-bottom: 1.5rem; font-weight: 300"
-          >
-            O
-            <strong style="color: var(--ink)">rest2mcp</strong>
-            elimina essa barreira: forneces a URL da spec OpenAPI/Swagger, e o
-            servidor gera automaticamente as ferramentas MCP correspondentes.
+          <p style="color: var(--muted); margin-bottom: 1.5rem; font-weight: 300">
+            O <strong style="color: var(--ink)">rest2mcp</strong>
+            elimina essa barreira: fornece a URL da spec OpenAPI/Swagger, e o
+            servidor gera automaticamente as ferramentas MCP — sem escrever uma única linha de código.
           </p>
 
           <div class="callout problem">
             <strong><span style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#ff5c35" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg> Problema</span></strong>
-            LLMs não conseguem chamar endpoints REST diretamente, e cada API
-            precisaria de um servidor MCP dedicado.
+            Cada API REST precisa de um servidor MCP dedicado. Criar um à mão para cada endpoint é inviável.
           </div>
           <div class="callout solution">
             <strong><span style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#00d4aa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8l4 4 8-8"/></svg> Solução</span></strong>
-            Conversão automática de specs OpenAPI/Swagger para ferramentas MCP —
-            sem código adicional.
+            Conversão automática de specs OpenAPI/Swagger para ferramentas MCP — 100% na nuvem, sem instalação local.
           </div>
 
           <div class="highlights-box">
@@ -348,22 +388,25 @@
             <div class="hl-item">
               <span class="hl-num">01</span>
               <p>
-                <strong>Zero código</strong> — Apenas configure a URL da spec no
-                cliente MCP.
+                <strong>Zero código</strong> — Basta colar a URL da spec OpenAPI no dashboard.
               </p>
             </div>
             <div class="hl-item">
               <span class="hl-num">02</span>
               <p>
-                <strong>Múltiplas APIs</strong> — Configure várias APIs no mesmo
-                cliente simultaneamente.
+                <strong>Múltiplas APIs</strong> — Combine várias APIs no mesmo servidor MCP com namespaces.
               </p>
             </div>
             <div class="hl-item">
               <span class="hl-num">03</span>
               <p>
-                <strong>Conversão automática</strong> — Swagger 2.0 é convertido
-                para OpenAPI 3.0 automaticamente.
+                <strong>Auth automática</strong> — O servidor detecta endpoints de login e gere tokens JWT por si.
+              </p>
+            </div>
+            <div class="hl-item">
+              <span class="hl-num">04</span>
+              <p>
+                <strong>Logs em tempo real</strong> — Monitore cada chamada das IAs às suas ferramentas.
               </p>
             </div>
           </div>
@@ -371,9 +414,11 @@
 
         <div class="how-it-works">
           <h3>Como funciona?</h3>
-            O rest2mcp corre na nossa infraestrutura na nuvem. Forneces a URL da
+            O rest2mcp corre na nossa infraestrutura na nuvem. Fornece a URL da
             spec OpenAPI/Swagger e o servidor gera automaticamente as ferramentas
-            MCP correspondentes — sem instalar nada localmente.
+            MCP correspondentes — sem instalar nada localmente. O LLM pode
+            chamar endpoints, fazer login, e interagir com a API como se fosse
+            uma extensão nativa.
         </div>
       </div>
     </section>
@@ -407,7 +452,7 @@
         <div class="section-label">// 03 — Recursos</div>
         <h2 style="color: white">Tudo o que precisas,<br />pronto a usar.</h2>
         <p class="section-desc">
-          Seis recursos que tornam o rest2mcp a escolha mais rápida para
+          Oito recursos que tornam o rest2mcp a escolha mais rápida para
           conectar LLMs às tuas APIs.
         </p>
 
@@ -416,25 +461,24 @@
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></div>
             <h3>Qualquer API, Zero Código</h3>
             <p>
-              Apenas configura a URL da spec. Sem desenvolver servidores MCP
-              individuais para cada API.
+              Apenas configura a URL da spec OpenAPI. O servidor gera automaticamente
+              todas as ferramentas MCP — sem desenvolver nada.
             </p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
-            <h3>Gestão de Sessão</h3>
+            <h3>Auth Automática (Login MCP)</h3>
             <p>
-              O servidor detecta automaticamente endpoints de login na
-              especificação. O LLM faz autenticação uma vez, e o token é
-              injetado em todas as chamadas seguintes — sem intervenção manual.
+              O servidor deteta endpoints de login na spec. O LLM faz autenticação uma vez,
+              e o token JWT é injetado automaticamente em todas as chamadas seguintes.
             </p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg></div>
-            <h3>Múltiplas APIs Simultâneas</h3>
+            <h3>Múltiplas APIs + Merge</h3>
             <p>
-              Configura várias APIs no mesmo cliente MCP, cada uma com o seu
-              próprio servidor.
+              Combina várias APIs num único servidor MCP com namespaces.
+              Suporta merge de servidores locais e remotos.
             </p>
           </div>
           <div class="feat-card">
@@ -442,15 +486,39 @@
             <h3>Conversão Automática</h3>
             <p>
               Swagger 2.0 desatualizado? Convertido automaticamente para OpenAPI
-              3.0 via swagger2openapi.
+              3.0 via swagger2openapi. Aceitamos qualquer formato.
             </p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg></div>
-            <h3>Modo Inspector</h3>
+            <h3>Logs em Tempo Real</h3>
             <p>
-              Testa e depura as ferramentas geradas com o MCP Inspector
-              integrado no próprio servidor.
+              Monitoriza todas as chamadas das IAs às tuas ferramentas: método,
+              status, duração, request e response completos.
+            </p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+            <h3>Proxy SSE + HTTP</h3>
+            <p>
+              Suporta Server-Sent Events (SSE) e Streamable HTTP. Ligações
+              persistentes e contínuas com a tua API.
+            </p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <h3>Autenticação Supabase</h3>
+            <p>
+              Login com Google, GitHub ou email/senha. Gestão de sessão,
+              recuperação de palavra-passe e perfis de utilizador.
+            </p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div>
+            <h3>Subscrições PayPal</h3>
+            <p>
+              Plano Pro com pagamentos recorrentes via PayPal. Gestão automática
+              de planos, limites e notificações webhook.
             </p>
           </div>
         </div>
@@ -463,7 +531,7 @@
         <div class="section-label">// Planos</div>
         <h2 style="color: white">Escolha o<br />melhor plano.</h2>
         <p class="section-desc">
-          Do hobby ao enterprise — o rest2mcp se adapta às suas necessidades.
+          Do hobby ao enterprise — o rest2mcp adapta-se às suas necessidades.
         </p>
         <div class="pricing-grid">
           <div class="feat-card pricing-card">
@@ -473,20 +541,22 @@
             <ul class="pricing-features">
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 1 Servidor Ativo</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs das últimas 24h</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Rate limiting padrão</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 requisições/minuto</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Transporte SSE + HTTP</li>
             </ul>
             <button class="btn-ghost" style="display: block; text-align: center; color: white; border-color: rgba(255,255,255,0.2); width: 100%; cursor: pointer;" onclick="handleFreePlan()">Começar Grátis</button>
           </div>
           <div class="feat-card pricing-card popular">
             <span class="pricing-popular-badge">POPULAR</span>
             <div class="pricing-name">Pro</div>
-            <div class="pricing-price">$ <span style="font-size: 1.5rem;">/mês</span></div>
+            <div class="pricing-price">$9.90<span style="font-size: 0.9rem;">/mês</span></div>
             <div class="pricing-desc">Para uso profissional</div>
             <ul class="pricing-features">
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Servidores Ilimitados</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs completos</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Alta prioridade (sem cold-start)</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Suporte a APIs privadas via Tunneling</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 Servidores Ativos</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs completos (sem expiração)</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 100 requisições/minuto</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Prioridade alta (sem cold-start)</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Suporte a APIs privadas via Tunnel</li>
             </ul>
             <button class="btn-primary" style="display: block; text-align: center; width: 100%; cursor: pointer;" onclick="handleProPlan()">Assinar Pro</button>
           </div>
@@ -495,10 +565,12 @@
             <div class="pricing-price" style="font-size: 1.8rem;">Sob Consulta</div>
             <div class="pricing-desc">Para organizações</div>
             <ul class="pricing-features">
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Suporte dedicado</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> SLAs de disponibilidade</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Servidores Ilimitados</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs completos + exportação</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Rate limits personalizados</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Suporte dedicado + SLA</li>
             </ul>
-            <button class="btn-ghost" style="display: block; width: 100%; text-align: center; color: white; border-color: rgba(255,255,255,0.2); cursor: pointer;" onclick="top.location.href='mailto:sales@rest2mcp.com'">Falar com Vendas</button>
+            <button class="btn-ghost" style="display: block; width: 100%; text-align: center; color: white; border-color: rgba(255,255,255,0.2); cursor: pointer;" onclick="window.location.href='mailto:m4codexp@gmail.com?subject=Consultar%20Vendas%20-%20rest2mcp&body=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20os%20planos%20e%20funcionalidades%20do%20rest2mcp.'">Consultar Vendas</button>
           </div>
         </div>
       </div>
@@ -509,7 +581,7 @@
       <div class="section-label">// Dashboard</div>
       <h2>Gerencie seus<br />servidores em tempo real.</h2>
       <p class="section-desc">
-        Interface simples e direta para monitorar e gerenciar suas pontes MCP.
+        Interface simples e direta para criar, monitorar e gerenciar as suas pontes MCP.
       </p>
       <div style="background: var(--ink); border-radius: 16px; padding: 2rem; border: 1px solid rgba(255,255,255,0.08);">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
@@ -526,17 +598,17 @@
               <span style="font-family: var(--display); font-weight: 600; color: white; font-size: 0.9rem;">Minha API Principal</span>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
-              <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--accent2);">Online</span>
+              <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--accent2);">SSE · Online</span>
               <button class="dash-copy-btn">Copy Connection URL</button>
             </div>
           </div>
           <div class="dash-card">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="dash-status-dot online"></span>
-              <span style="font-family: var(--display); font-weight: 600; color: white; font-size: 0.9rem;">Loja API (Teste)</span>
+              <span style="font-family: var(--display); font-weight: 600; color: white; font-size: 0.9rem;">Loja API (Merge)</span>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
-              <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--accent2);">Online</span>
+              <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--accent2);">HTTP · Online</span>
               <button class="dash-copy-btn">Copy Connection URL</button>
             </div>
           </div>
@@ -557,10 +629,10 @@
             <span style="font-family: var(--mono); font-size: 0.7rem; color: rgba(255,255,255,0.4);">Live Logs</span>
           </div>
           <div class="dash-logs-body">
-            <div class="info-line">[INFO] IA chamou tool: 'get_user_by_id'</div>
-            <div>[200 OK] Resposta enviada em 145ms</div>
-            <div class="info-line" style="margin-top: 4px;">[INFO] IA chamou tool: 'list_products'</div>
-            <div>[200 OK] Resposta enviada em 89ms</div>
+            <div class="info-line">[INFO] IA chamou tool: 'get_user_by_id' — 145ms</div>
+            <div>[200 OK] Resposta: &#123;"id": 1, "nome": "João"&#125;</div>
+            <div class="info-line" style="margin-top: 4px;">[INFO] IA chamou tool: 'list_products' — 89ms</div>
+            <div>[200 OK] Resposta: [&#123;"id": 1, "nome": "Produto A"&#125;, ...]</div>
           </div>
         </div>
       </div>
@@ -579,7 +651,47 @@
             <h3>Quais especificações são aceitas?</h3>
           </div>
           <div class="qs-step-body">
-            <p>Suporte total a OpenAPI 3.0 e conversão automática de Swagger 2.0.</p>
+            <p>OpenAPI 3.0 e 3.1 nativamente. Swagger 2.0 é convertido automaticamente via swagger2openapi.</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-step-head">
+            <h3>Preciso instalar alguma coisa?</h3>
+          </div>
+          <div class="qs-step-body">
+            <p>Não. O rest2mcp corre 100% na nuvem. Apenas precisa de um cliente MCP (VS Code, Claude Desktop, Cursor, etc.).</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-step-head">
+            <h3>Como funciona a autenticação?</h3>
+          </div>
+          <div class="qs-step-body">
+            <p>O servidor deteta automaticamente endpoints de login na spec. O LLM pode fazer login via ferramenta MCP e o token é gerido automaticamente. Também suportamos OAuth (Google, GitHub).</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-step-head">
+            <h3>Posso combinar várias APIs?</h3>
+          </div>
+          <div class="qs-step-body">
+            <p>Sim. Pode fazer merge de várias APIs num único servidor MCP com namespaces. Cada API mantém o seu contexto separado.</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-step-head">
+            <h3>O que são logs em tempo real?</h3>
+          </div>
+          <div class="qs-step-body">
+            <p>Cada chamada das IAs às ferramentas é registada: método, status, duração, request e response. Pode filtrar, exportar (JSON/CSV) e inspecionar detalhes.</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-step-head">
+            <h3>Como funciona o plano Pro?</h3>
+          </div>
+          <div class="qs-step-body">
+            <p>O plano Pro custa $9.90/mês e dá acesso a 10 servidores, logs completos, 100 req/min, prioridade alta e suporte a APIs privadas via tunnel. Pagamento via PayPal com subscrição mensal.</p>
           </div>
         </div>
       </div>
@@ -590,7 +702,7 @@
       <div class="section-label">// 04 — Exemplo prático</div>
       <h2>Uma API,<br />um servidor.</h2>
       <p class="section-desc">
-        Configura a tua API no servidor MCP cloud. Basta definir a URL da spec.
+        Cria o teu servidor MCP na cloud em segundos. Basta definir a URL da spec.
       </p>
 
       <div class="apis-grid">
@@ -606,29 +718,40 @@
 <span class="hl">MCP_SERVER_NAME</span>=PetStore API</pre>
             </div>
             <div class="api-note warn">
-              <span style="display:inline-flex;align-items:center;gap:5px;vertical-align:middle;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#a05020" stroke-width="1.8" stroke-linecap="round"><path d="M8 1.5L1 14h14L8 1.5z"/><path d="M8 6v4"/><circle cx="8" cy="12" r=".7" fill="#a05020"/></svg></span> <strong>Swagger 2.0 desatualizado</strong> — O servidor
-              converte automaticamente para OpenAPI 3.0 usando swagger2openapi.
+              <span style="display:inline-flex;align-items:center;gap:5px;vertical-align:middle;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#a05020" stroke-width="1.8" stroke-linecap="round"><path d="M8 1.5L1 14h14L8 1.5z"/><path d="M8 6v4"/><circle cx="8" cy="12" r=".7" fill="#a05020"/></svg></span> <strong>Swagger 2.0</strong> — O servidor converte automaticamente para OpenAPI 3.0.
             </div>
           </div>
         </div>
 
+        <div class="api-card">
+          <div class="api-card-head">
+            <span class="api-head-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></span>
+            <h3>Loja API (Exemplo incluído)</h3>
+            <span class="api-badge" style="background: rgba(0,212,170,0.15); color: var(--accent2);">OpenAPI 3.0</span>
+          </div>
+          <div class="api-card-body">
+            <div class="code-block">
+              <pre><span class="hl">MCP_SPEC_URL</span>=https://rest2mcp.com/examples/loja-api/openapi.json
+<span class="hl">MCP_SERVER_NAME</span>=Loja API</pre>
+            </div>
+            <div class="api-note" style="background: rgba(0,212,170,0.08); border-color: rgba(0,212,170,0.2);">
+              <span style="display:inline-flex;align-items:center;gap:5px;vertical-align:middle;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#00d4aa" stroke-width="1.8" stroke-linecap="round"><path d="M2 8l4 4 8-8"/></svg></span> <strong>OpenAPI 3.0 nativo</strong> — Pronto a usar com autenticação JWT incluída.
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="multi-config">
         <div class="multi-config-head">
           <span class="tip-dot"></span>
-          <h4>Configuração no VS Code</h4>
+          <h4>Configuração no Cliente MCP</h4>
         </div>
         <div class="code-block" style="border-radius: 0; margin: 0">
           <pre>&#123;
   <span class="hl">"mcp.servers"</span>: &#123;
-    "petstore": &#123;
-      "command": ".../venv/Scripts/python.exe",
-      "args": ["main.py"],
-      "env": &#123;
-        "MCP_SPEC_URL": "https://petstore.swagger.io/v2/swagger.json",
-        "MCP_SERVER_NAME": "PetStore API"
-      &#125;
+    "minha-api": &#123;
+      "url": "https://rest2mcp.com/v1/servers/SEU_ID",
+      "transport": "streamable-http"
     &#125;
   &#125;
 &#125;</pre>
@@ -645,6 +768,15 @@
       <p class="section-desc">
         O rest2mcp funciona com qualquer cliente MCP. Basta apontar para a nossa ponte na nuvem.
       </p>
+      <div style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-top: 2rem;">
+        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">VS Code</span>
+        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Claude Desktop</span>
+        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Cursor</span>
+        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Windsurf</span>
+        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Cline</span>
+        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Antigravity</span>
+        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Qualquer cliente MCP</span>
+      </div>
     </section>
 
     <!-- FOOTER -->
@@ -668,10 +800,13 @@
               >OpenAPI Spec</a
             >
           </li>
-          <li><a href="https://rest2mcp.com/privacy" target="_blank">Termos de Privacidade</a></li>
+          <li>
+            <a href="https://supabase.com/docs" target="_blank">Supabase Auth</a>
+          </li>
+          <li><a href="mailto:m4codexp@gmail.com">Suporte</a></li>
         </ul>
         <p class="footer-copy">
-          © 2026 rest2mcp. Todos os direitos reservados. Nenhum dado é retido em nossos servidores.
+          © 2026 rest2mcp. Todos os direitos reservados. Nenhum dado é retido nos nossos servidores.
         </p>
       </div>
     </footer>
@@ -704,10 +839,14 @@
           <form class="email-login-form" onsubmit="loginWithEmail(event)">
             <input type="email" id="loginEmail" placeholder="O seu email" required class="auth-input" />
             <input type="password" id="loginPassword" placeholder="Palavra-passe" required class="auth-input" />
+            <input type="password" id="loginPasswordConfirm" placeholder="Confirmar palavra-passe" class="auth-input" style="display:none;" onpaste="return false;" />
             <div style="text-align: right; margin-top: -8px; margin-bottom: 8px;">
-              <a href="#" onclick="openForgotPasswordModal(); return false;" style="font-size: 0.8rem; color: var(--accent); text-decoration: none;">Esqueci a minha palavra-passe</a>
+              <a href="javascript:void(0)" id="forgotLink" onclick="openForgotPasswordModal(); return false;" style="font-size: 0.8rem; color: var(--accent); text-decoration: none;">Esqueci a minha palavra-passe</a>
             </div>
-            <button type="submit" class="btn-primary auth-submit"><span class="btn-text">Entrar / Registar</span><span class="spinner" style="display:none;"><svg class="spinner-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span></button>
+            <button type="submit" class="btn-primary auth-submit"><span class="btn-text">Entrar</span><span class="spinner" style="display:none;"><svg class="spinner-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span></button>
+            <div style="text-align: center; margin-top: 12px; font-size: 0.85rem; color: var(--muted);">
+              <span id="authToggle">Não tem conta? <a href="#" onclick="toggleAuthMode(); return false;">Registar-se</a></span>
+            </div>
           </form>
         </div>
         <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: center;">
