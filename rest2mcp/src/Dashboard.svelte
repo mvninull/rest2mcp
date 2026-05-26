@@ -1587,6 +1587,39 @@
               Aguardando atividade...
             </div>
           </div>
+          <div class="sidebar-logs" style="margin-top: 12px;">
+            <div class="sidebar-logs-header">
+              <div class="logs-header-left">
+                <span class="log-title" style="font-size:0.7rem;">Clientes MCP</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 4px;">
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/vscode-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                VS Code
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/claude-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Claude
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="https://cdn.simpleicons.org/cursor/00C2FF" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Cursor
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="https://cdn.simpleicons.org/cline/EC4899" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Cline
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/windsurf-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Windsurf
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/opencode-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                OpenCode
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

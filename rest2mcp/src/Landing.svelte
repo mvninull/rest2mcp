@@ -2,6 +2,15 @@
   import { onMount } from 'svelte';
   import './Landing.css';
 
+  window.sendContactEmail = function() {
+    const name = document.getElementById('contact-name')?.value || '';
+    const email = document.getElementById('contact-email')?.value || '';
+    const subject = document.getElementById('contact-subject')?.value || '';
+    const message = document.getElementById('contact-message')?.value || '';
+    const body = `Nome: ${name}\nEmail de resposta: ${email}\n\nMensagem:\n${message}`;
+    window.location.href = `mailto:m4codexp@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
   onMount(() => {
 
 
@@ -10,6 +19,9 @@
       const SUPABASE_URL = "https://zcfrbhrqvneomseqmqam.supabase.co";
       const SUPABASE_ANON_KEY = "sb_publishable_mF0UgfLvgZN5OupdpsSa0A_ibOcfzq4";
       const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const API_BASE = (
+        localStorage.getItem("api_base") || "http://localhost:8080"
+      ).replace(/\/+$/, "");
 
       function showLoading(btn) {
         if (!btn) return;
@@ -311,17 +323,6 @@
         const el = document.getElementById(id);
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       };
-      
-      async function sendContactEmail(event) {
-        event.preventDefault();
-        const name = document.getElementById('contact-name')?.value || '';
-        const email = document.getElementById('contact-email')?.value || '';
-        const subject = document.getElementById('contact-subject')?.value || '';
-        const message = document.getElementById('contact-message')?.value || '';
-        const body = `Nome: ${name}\nEmail: ${email}\n\nMensagem:\n${message}`;
-        window.location.href = `mailto:m4codexp@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      }
-      window.sendContactEmail = sendContactEmail;
     
   });
 </script>
@@ -334,8 +335,9 @@
         <ul class="nav-links">
           <li><button class="nav-link-btn" onclick="scrollToSection('about')">Sobre</button></li>
           <li><button class="nav-link-btn" onclick="scrollToSection('features')">Recursos</button></li>
+          <li><button class="nav-link-btn" onclick="scrollToSection('pricing')">Preços</button></li>
+          <li><button class="nav-link-btn" onclick="scrollToSection('faq')">FAQ</button></li>
           <li><button class="nav-link-btn" onclick="scrollToSection('contacts')">Contacto</button></li>
-
         </ul>
         <div class="nav-actions">
           <button class="nav-btn" id="dashboardBtn">Entrar com Google</button>
@@ -397,33 +399,6 @@
             Conversão automática de specs OpenAPI/Swagger para ferramentas MCP — 100% na nuvem, sem instalação local.
           </div>
 
-          <div class="highlights-box">
-            <h4><span style="display:inline-flex;align-items:center;gap:6px;"><svg width="13" height="13" viewBox="0 0 16 16" fill="#1a56ff"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z"/></svg> Destaques fundamentais</span></h4>
-            <div class="hl-item">
-              <span class="hl-num">01</span>
-              <p>
-                <strong>Zero código</strong> — Basta colar a URL da spec OpenAPI no dashboard.
-              </p>
-            </div>
-            <div class="hl-item">
-              <span class="hl-num">02</span>
-              <p>
-                <strong>Múltiplas APIs</strong> — Combine várias APIs no mesmo servidor MCP com namespaces.
-              </p>
-            </div>
-            <div class="hl-item">
-              <span class="hl-num">03</span>
-              <p>
-                <strong>Auth automática</strong> — O servidor detecta endpoints de login e gere tokens JWT por si.
-              </p>
-            </div>
-            <div class="hl-item">
-              <span class="hl-num">04</span>
-              <p>
-                <strong>Logs em tempo real</strong> — Monitore cada chamada das IAs às suas ferramentas.
-              </p>
-            </div>
-          </div>
         </div>
 
         <div class="how-it-works">
@@ -554,6 +529,7 @@
             <div class="pricing-desc">Para testes e experimentação</div>
             <ul class="pricing-features">
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 1 Servidor Ativo</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 1 Servidor Merge</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs das últimas 24h</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 requisições/minuto</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Transporte SSE + HTTP</li>
@@ -567,6 +543,7 @@
             <div class="pricing-desc">Para uso profissional</div>
             <ul class="pricing-features">
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 Servidores Ativos</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 Servidores Merge</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs completos (sem expiração)</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 100 requisições/minuto</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Prioridade alta (sem cold-start)</li>
@@ -580,6 +557,7 @@
             <div class="pricing-desc">Para organizações</div>
             <ul class="pricing-features">
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Servidores Ilimitados</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Merge Ilimitado</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs completos + exportação</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Rate limits personalizados</li>
               <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Suporte dedicado + SLA</li>
@@ -689,7 +667,7 @@
             <h3>Posso combinar várias APIs?</h3>
           </div>
           <div class="qs-step-body">
-            <p>Sim. Pode combinar várias APIs num único servidor MCP com namespaces. Cada API mantém o seu contexto separado.</p>
+            <p>Sim. Pode combinar várias APIs num único servidor MCP. Cada API mantém o seu contexto separado.</p>
           </div>
         </div>
         <div class="qs-step">
@@ -728,17 +706,17 @@
       </p>
 
       <div style="margin-top: 2.5rem; display: flex; flex-direction: column; gap: 2rem;">
-        <form class="contact-form" onsubmit="sendContactEmail(event)">
+        <div class="contact-form">
           <div class="contact-row">
-            <input type="text" id="contact-name" placeholder="O seu nome" required class="contact-input" />
-            <input type="email" id="contact-email" placeholder="O seu e-mail" required class="contact-input" />
+            <input type="text" id="contact-name" placeholder="O seu nome" class="contact-input" />
+            <input type="email" id="contact-email" placeholder="O seu e-mail" class="contact-input" />
           </div>
-          <input type="text" id="contact-subject" placeholder="Assunto da mensagem" required class="contact-input" />
-          <textarea id="contact-message" placeholder="Escreva a sua mensagem aqui..." required class="contact-textarea"></textarea>
-          <button type="submit" class="btn-primary" style="align-self: flex-start; padding: 12px 30px; cursor: pointer; border: none;">
+          <input type="text" id="contact-subject" placeholder="Assunto da mensagem" class="contact-input" />
+          <textarea id="contact-message" placeholder="Escreva a sua mensagem aqui..." class="contact-textarea"></textarea>
+          <button type="button" class="btn-primary" style="align-self: flex-start; padding: 12px 30px; cursor: pointer; border: none;" onclick="sendContactEmail()">
             Enviar Mensagem
           </button>
-        </form>
+        </div>
         
         <div style="font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 1.5rem;">
           <p>Se preferir, pode enviar um e-mail diretamente para: <strong><a href="mailto:m4codexp@gmail.com" style="color: var(--accent); text-decoration: none;">m4codexp@gmail.com</a></strong></p>
@@ -755,35 +733,51 @@
       <p class="section-desc">
         O rest2mcp funciona com qualquer cliente MCP. Basta apontar para a nossa ponte na nuvem.
       </p>
-      <div style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-top: 2rem;">
-        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #007ACC; flex-shrink: 0;"><path d="M23.98 6.64L16.27.35a1 1 0 00-1.12.06l-5.69 4.34-4.83-3.66a.5.5 0 00-.77.4v19.02a.5.5 0 00.77.4l4.83-3.66 5.69 4.34a1 1 0 001.12.06l7.71-6.29a1 1 0 00.02-1.57L23.98 6.64zM16 17.5v-11L21.5 12 16 17.5z"/></svg>
-          VS Code
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #d97736; flex-shrink: 0;"><circle cx="12" cy="12" r="4"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24"/></svg>
-          Claude Desktop
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #FFFFFF; flex-shrink: 0;"><line x1="18" y1="6" x2="6" y2="18"/><polyline points="9 6 18 6 18 15"/></svg>
-          Cursor
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #00C2FF; flex-shrink: 0;"><path d="M2 8h16a4 4 0 1 1-4 4M2 12h12a3 3 0 1 0-3-3M2 16h18a3 3 0 1 1-3 3"/></svg>
-          Windsurf
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4F46E5; flex-shrink: 0;"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4M8 16h.01M16 16h.01"/></svg>
-          Cline
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #EC4899; flex-shrink: 0;"><circle cx="12" cy="10" r="4"/><path d="M4 12c0 2.2 3.6 4 8 4s8-1.8 8-4M2 12h3M19 12h3"/></svg>
-          Antigravity
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10B981; flex-shrink: 0;"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-          Qualquer cliente MCP
-        </span>
+      <div class="mcp-clients">
+        <div class="mcp-client" title="Visual Studio Code — suporte MCP via GitHub Copilot">
+          <img src="/logos/vscode-icon.svg" alt="VS Code" />
+          <span>VS Code</span>
+        </div>
+        <div class="mcp-client" title="Claude Desktop by Anthropic">
+          <img src="/logos/claude-icon.svg" alt="Claude Desktop" />
+          <span>Claude Desktop</span>
+        </div>
+        <div class="mcp-client" title="Cursor — AI Code Editor">
+          <img src="https://cdn.simpleicons.org/cursor/00C2FF" alt="Cursor" />
+          <span>Cursor</span>
+        </div>
+        <div class="mcp-client" title="Cline — MCP Client">
+          <img src="https://cdn.simpleicons.org/cline/EC4899" alt="Cline" />
+          <span>Cline</span>
+        </div>
+        <div class="mcp-client" title="Continue.dev — Open-source AI code assistant">
+          <img src="https://unpkg.com/@lobehub/icons-static-svg@latest/icons/continue.svg" alt="Continue" />
+          <span>Continue</span>
+        </div>
+        <div class="mcp-client" title="Windsurf — AI Code Editor">
+          <img src="/logos/windsurf-icon.svg" alt="Windsurf" />
+          <span>Windsurf</span>
+        </div>
+        <div class="mcp-client" title="Claude Code — Terminal AI agent by Anthropic">
+          <img src="https://unpkg.com/@lobehub/icons-static-svg@latest/icons/claude.svg" alt="Claude Code" />
+          <span>Claude Code</span>
+        </div>
+        <div class="mcp-client" title="Gemini CLI — Google AI assistant">
+          <img src="/logos/gemini-cli-icon.svg" alt="Gemini CLI" />
+          <span>Gemini CLI</span>
+        </div>
+        <div class="mcp-client" title="OpenCode — CLI AI coding agent">
+          <img src="/logos/opencode-icon.svg" alt="OpenCode" />
+          <span>OpenCode</span>
+        </div>
+        <div class="mcp-client" title="Antigravity — MCP client by Google">
+          <img src="/logos/antigravity-icon.png" alt="Antigravity" />
+          <span>Antigravity</span>
+        </div>
+        <div class="mcp-client" title="Qualquer cliente compatível com MCP">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          <span>E mais...</span>
+        </div>
       </div>
     </section>
 
@@ -803,6 +797,9 @@
           </li>
           <li>
             <a href="javascript:void(0)" onclick="scrollToSection('pricing')">Preços</a>
+          </li>
+          <li>
+            <a href="javascript:void(0)" onclick="scrollToSection('faq')">Perguntas Frequentes</a>
           </li>
           <li>
             <a href="javascript:void(0)" onclick="scrollToSection('contacts')">Contacto</a>
