@@ -507,10 +507,10 @@
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-            <h3>Autenticação Supabase</h3>
+            <h3>Autenticação Segura</h3>
             <p>
-              Login com Google, GitHub ou email/senha. Gestão de sessão,
-              recuperação de palavra-passe e perfis de utilizador.
+              Login seguro com Google, GitHub ou e-mail/senha. Gestão de sessão,
+              recuperação de senha e perfis de utilizador protegidos.
             </p>
           </div>
           <div class="feat-card">
@@ -788,20 +788,16 @@
         </p>
         <ul class="footer-links">
           <li>
-            <a href="https://gofastmcp.com" target="_blank">FastMCP Docs</a>
+            <a href="javascript:void(0)" onclick="scrollTo('about')">Sobre o Projeto</a>
           </li>
           <li>
-            <a href="https://modelcontextprotocol.io" target="_blank"
-              >MCP Protocol</a
-            >
+            <a href="javascript:void(0)" onclick="scrollTo('features')">Recursos</a>
           </li>
           <li>
-            <a href="https://swagger.io/specification/" target="_blank"
-              >OpenAPI Spec</a
-            >
+            <a href="javascript:void(0)" onclick="scrollTo('pricing')">Preços</a>
           </li>
           <li>
-            <a href="https://supabase.com/docs" target="_blank">Supabase Auth</a>
+            <a href="mailto:m4codexp@gmail.com">Contacto</a>
           </li>
           <li><a href="mailto:m4codexp@gmail.com">Suporte</a></li>
         </ul>
