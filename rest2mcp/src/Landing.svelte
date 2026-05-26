@@ -307,7 +307,21 @@
       window.closePayPalModal = closePayPalModal;
       window.handleFreePlan = handleFreePlan;
       window.handleProPlan = handleProPlan;
-      window.scrollTo = (id) => document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+      window.scrollToSection = (id) => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      };
+      
+      async function sendContactEmail(event) {
+        event.preventDefault();
+        const name = document.getElementById('contact-name')?.value || '';
+        const email = document.getElementById('contact-email')?.value || '';
+        const subject = document.getElementById('contact-subject')?.value || '';
+        const message = document.getElementById('contact-message')?.value || '';
+        const body = `Nome: ${name}\nEmail: ${email}\n\nMensagem:\n${message}`;
+        window.location.href = `mailto:m4codexp@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      }
+      window.sendContactEmail = sendContactEmail;
     
   });
 </script>
@@ -318,9 +332,9 @@
       <div class="nav-inner">
         <div class="logo"><span class="logo-dot"></span>rest2mcp</div>
         <ul class="nav-links">
-          <li><button class="nav-link-btn" onclick="scrollTo('about')">Sobre</button></li>
-          <li><button class="nav-link-btn" onclick="scrollTo('features')">Recursos</button></li>
-          <li><button class="nav-link-btn" onclick="scrollTo('examples')">Exemplos</button></li>
+          <li><button class="nav-link-btn" onclick="scrollToSection('about')">Sobre</button></li>
+          <li><button class="nav-link-btn" onclick="scrollToSection('features')">Recursos</button></li>
+          <li><button class="nav-link-btn" onclick="scrollToSection('contacts')">Contacto</button></li>
 
         </ul>
         <div class="nav-actions">
@@ -483,10 +497,10 @@
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-            <h3>Conversão Automática</h3>
+            <h3>Compatibilidade Total</h3>
             <p>
-              Swagger 2.0 desatualizado? Convertido automaticamente para OpenAPI
-              3.0 via swagger2openapi. Aceitamos qualquer formato.
+              Totalmente compatível com especificações OpenAPI 3.0 e 3.1, bem como com
+              o formato clássico Swagger 2.0.
             </p>
           </div>
           <div class="feat-card">
@@ -651,7 +665,7 @@
             <h3>Quais especificações são aceitas?</h3>
           </div>
           <div class="qs-step-body">
-            <p>OpenAPI 3.0 e 3.1 nativamente. Swagger 2.0 é convertido automaticamente via swagger2openapi.</p>
+            <p>Aceitamos especificações OpenAPI 3.0 e 3.1 nativamente, e também oferecemos total compatibilidade com Swagger 2.0.</p>
           </div>
         </div>
         <div class="qs-step">
@@ -675,7 +689,15 @@
             <h3>Posso combinar várias APIs?</h3>
           </div>
           <div class="qs-step-body">
-            <p>Sim. Pode fazer merge de várias APIs num único servidor MCP com namespaces. Cada API mantém o seu contexto separado.</p>
+            <p>Sim. Pode combinar várias APIs num único servidor MCP com namespaces. Cada API mantém o seu contexto separado.</p>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-step-head">
+            <h3>O que é o recurso de Merge Server?</h3>
+          </div>
+          <div class="qs-step-body">
+            <p>O Merge Server permite unificar múltiplos servidores MCP (sejam locais ou remotos na nuvem) sob um único ponto de acesso. A IA interage com todas as ferramentas de forma integrada.</p>
           </div>
         </div>
         <div class="qs-step">
@@ -697,64 +719,29 @@
       </div>
     </section>
 
-    <!-- EXAMPLES -->
-    <section class="section" id="examples">
-      <div class="section-label">// 04 — Exemplo prático</div>
-      <h2>Uma API,<br />um servidor.</h2>
+    <!-- CONTACTS -->
+    <section class="section" id="contacts">
+      <div class="section-label">// 04 — Contacto e Suporte</div>
+      <h2>Entre em contacto<br />connosco.</h2>
       <p class="section-desc">
-        Cria o teu servidor MCP na cloud em segundos. Basta definir a URL da spec.
+        Tem alguma dúvida, feedback ou precisa de suporte personalizado? Envie-nos uma mensagem diretamente.
       </p>
 
-      <div class="apis-grid">
-        <div class="api-card">
-          <div class="api-card-head">
-            <span class="api-head-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></span>
-            <h3>PetStore API (Externa)</h3>
-            <span class="api-badge warn">Swagger 2.0</span>
+      <div style="margin-top: 2.5rem; display: flex; flex-direction: column; gap: 2rem;">
+        <form class="contact-form" onsubmit="sendContactEmail(event)">
+          <div class="contact-row">
+            <input type="text" id="contact-name" placeholder="O seu nome" required class="contact-input" />
+            <input type="email" id="contact-email" placeholder="O seu e-mail" required class="contact-input" />
           </div>
-          <div class="api-card-body">
-            <div class="code-block">
-              <pre><span class="hl">MCP_SPEC_URL</span>=https://petstore.swagger.io/v2/swagger.json
-<span class="hl">MCP_SERVER_NAME</span>=PetStore API</pre>
-            </div>
-            <div class="api-note warn">
-              <span style="display:inline-flex;align-items:center;gap:5px;vertical-align:middle;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#a05020" stroke-width="1.8" stroke-linecap="round"><path d="M8 1.5L1 14h14L8 1.5z"/><path d="M8 6v4"/><circle cx="8" cy="12" r=".7" fill="#a05020"/></svg></span> <strong>Swagger 2.0</strong> — O servidor converte automaticamente para OpenAPI 3.0.
-            </div>
-          </div>
-        </div>
-
-        <div class="api-card">
-          <div class="api-card-head">
-            <span class="api-head-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></span>
-            <h3>Loja API (Exemplo incluído)</h3>
-            <span class="api-badge" style="background: rgba(0,212,170,0.15); color: var(--accent2);">OpenAPI 3.0</span>
-          </div>
-          <div class="api-card-body">
-            <div class="code-block">
-              <pre><span class="hl">MCP_SPEC_URL</span>=https://rest2mcp.com/examples/loja-api/openapi.json
-<span class="hl">MCP_SERVER_NAME</span>=Loja API</pre>
-            </div>
-            <div class="api-note" style="background: rgba(0,212,170,0.08); border-color: rgba(0,212,170,0.2);">
-              <span style="display:inline-flex;align-items:center;gap:5px;vertical-align:middle;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#00d4aa" stroke-width="1.8" stroke-linecap="round"><path d="M2 8l4 4 8-8"/></svg></span> <strong>OpenAPI 3.0 nativo</strong> — Pronto a usar com autenticação JWT incluída.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="multi-config">
-        <div class="multi-config-head">
-          <span class="tip-dot"></span>
-          <h4>Configuração no Cliente MCP</h4>
-        </div>
-        <div class="code-block" style="border-radius: 0; margin: 0">
-          <pre>&#123;
-  <span class="hl">"mcp.servers"</span>: &#123;
-    "minha-api": &#123;
-      "url": "https://rest2mcp.com/v1/servers/SEU_ID",
-      "transport": "streamable-http"
-    &#125;
-  &#125;
-&#125;</pre>
+          <input type="text" id="contact-subject" placeholder="Assunto da mensagem" required class="contact-input" />
+          <textarea id="contact-message" placeholder="Escreva a sua mensagem aqui..." required class="contact-textarea"></textarea>
+          <button type="submit" class="btn-primary" style="align-self: flex-start; padding: 12px 30px; cursor: pointer; border: none;">
+            Enviar Mensagem
+          </button>
+        </form>
+        
+        <div style="font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 1.5rem;">
+          <p>Se preferir, pode enviar um e-mail diretamente para: <strong><a href="mailto:m4codexp@gmail.com" style="color: var(--accent); text-decoration: none;">m4codexp@gmail.com</a></strong></p>
         </div>
       </div>
     </section>
@@ -769,13 +756,34 @@
         O rest2mcp funciona com qualquer cliente MCP. Basta apontar para a nossa ponte na nuvem.
       </p>
       <div style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-top: 2rem;">
-        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">VS Code</span>
-        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Claude Desktop</span>
-        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Cursor</span>
-        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Windsurf</span>
-        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Cline</span>
-        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Antigravity</span>
-        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">Qualquer cliente MCP</span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #007ACC; flex-shrink: 0;"><path d="M23.98 6.64L16.27.35a1 1 0 00-1.12.06l-5.69 4.34-4.83-3.66a.5.5 0 00-.77.4v19.02a.5.5 0 00.77.4l4.83-3.66 5.69 4.34a1 1 0 001.12.06l7.71-6.29a1 1 0 00.02-1.57L23.98 6.64zM16 17.5v-11L21.5 12 16 17.5z"/></svg>
+          VS Code
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #d97736; flex-shrink: 0;"><circle cx="12" cy="12" r="4"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24"/></svg>
+          Claude Desktop
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #FFFFFF; flex-shrink: 0;"><line x1="18" y1="6" x2="6" y2="18"/><polyline points="9 6 18 6 18 15"/></svg>
+          Cursor
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #00C2FF; flex-shrink: 0;"><path d="M2 8h16a4 4 0 1 1-4 4M2 12h12a3 3 0 1 0-3-3M2 16h18a3 3 0 1 1-3 3"/></svg>
+          Windsurf
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4F46E5; flex-shrink: 0;"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4M8 16h.01M16 16h.01"/></svg>
+          Cline
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #EC4899; flex-shrink: 0;"><circle cx="12" cy="10" r="4"/><path d="M4 12c0 2.2 3.6 4 8 4s8-1.8 8-4M2 12h3M19 12h3"/></svg>
+          Antigravity
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; color: rgba(255,255,255,0.7);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10B981; flex-shrink: 0;"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          Qualquer cliente MCP
+        </span>
       </div>
     </section>
 
@@ -788,16 +796,16 @@
         </p>
         <ul class="footer-links">
           <li>
-            <a href="javascript:void(0)" onclick="scrollTo('about')">Sobre o Projeto</a>
+            <a href="javascript:void(0)" onclick="scrollToSection('about')">Sobre o Projeto</a>
           </li>
           <li>
-            <a href="javascript:void(0)" onclick="scrollTo('features')">Recursos</a>
+            <a href="javascript:void(0)" onclick="scrollToSection('features')">Recursos</a>
           </li>
           <li>
-            <a href="javascript:void(0)" onclick="scrollTo('pricing')">Preços</a>
+            <a href="javascript:void(0)" onclick="scrollToSection('pricing')">Preços</a>
           </li>
           <li>
-            <a href="mailto:m4codexp@gmail.com">Contacto</a>
+            <a href="javascript:void(0)" onclick="scrollToSection('contacts')">Contacto</a>
           </li>
           <li><a href="mailto:m4codexp@gmail.com">Suporte</a></li>
         </ul>

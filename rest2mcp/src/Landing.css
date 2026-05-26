@@ -901,9 +901,9 @@
       /* ─── PRICING ─── */
       .pricing-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 1.5rem;
-        max-width: 800px;
+        max-width: 1100px;
         margin: 0 auto;
       }
       .pricing-card {
@@ -971,8 +971,10 @@
       /* ─── FAQ ─── */
       .faq-grid {
         display: grid;
-        gap: 1rem;
-        max-width: 800px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        max-width: 1100px;
+        margin: 0 auto;
       }
 
       @media (max-width: 768px) {
@@ -980,7 +982,8 @@
         .apis-grid,
         .config-grid,
         .features-grid,
-        .pricing-grid {
+        .pricing-grid,
+        .faq-grid {
           grid-template-columns: 1fr;
         }
         .sec-grid {
