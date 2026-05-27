@@ -316,9 +316,10 @@ def create_merged_mcp_server(
             remote_url = src["remote_url"]
             try:
                 from fastmcp import Client
+                from fastmcp.server import create_proxy
 
                 remote_client = Client(remote_url)
-                remote_proxy = FastMCP.as_proxy(remote_client, name=src.get("name", f"Remote {i}"))
+                remote_proxy = create_proxy(remote_client, name=src.get("name", f"Remote {i}"))
                 base_manager.mcp.mount(remote_proxy, namespace=src.get("namespace", ""))
             except Exception as e:
                 logger.warning(f"Falha ao montar remoto {remote_url}: {e}")

@@ -130,6 +130,24 @@ class ActiveServer:
             return
         spec_data = json.loads(self.spec_data) if self.spec_data else None
         if self.is_merged and self.merge_config:
+            # Restart sandbox bridge if it died (e.g. server restart)
+            bridge_id = self.merge_config.get("_bridge_id")
+            if bridge_id and bridge_id not in stdio_bridges:
+                stdio_cfg = self.merge_config.get("_stdio_config")
+                if not stdio_cfg:
+                    import re as _re
+                    src_list = self.merge_config.get("sources", [])
+                    sn = src_list[0].get("source_name", "") if src_list else ""
+                    m = _re.match(r"^Sandbox\s*\((.+)\)$", sn)
+                    if m:
+                        stdio_cfg = {"command": m.group(1).strip(), "args": []}
+                if stdio_cfg:
+                    try:
+                        new_url = await _start_stdio_bridge(stdio_cfg, bridge_id)
+                        logger.info(f"Bridge {bridge_id} restarted at {new_url}")
+                    except Exception as e:
+                        logger.error(f"Failed to restart bridge {bridge_id}: {e}")
+
             sources_raw = self.merge_config.get("sources", [])
             if not sources_raw:
                 old_ss = (
@@ -145,13 +163,15 @@ class ActiveServer:
                     }
                 ]
             sources = []
+            bridge_info = stdio_bridges.get(bridge_id) if bridge_id else None
             for s in sources_raw:
                 if s.get("remote_url"):
+                    runtime_url = bridge_info["url"] if bridge_info else s["remote_url"]
                     sources.append(
                         {
                             "name": s.get("source_name", "Remote Source"),
                             "namespace": s.get("namespace", ""),
-                            "remote_url": s["remote_url"],
+                            "remote_url": runtime_url,
                         }
                     )
                 else:
@@ -228,7 +248,88 @@ class ActiveServer:
 
 active_servers: dict[str, ActiveServer] = {}
 
+stdio_bridges: dict[str, dict] = {}
+
+direct_inspectors: dict[str, dict] = {}
+
 sse_sessions: dict[str, list[asyncio.Event]] = {}
+
+
+async def _start_stdio_bridge(stdio_config: dict, bridge_id: str) -> str:
+    """Start a stdio MCP bridge and return its SSE URL.
+
+    Creates a subprocess from stdio_config (command/args/env), wraps it
+    with FastMCP, and serves it via SSE on a local port.
+    """
+    from fastmcp.server import create_proxy
+
+    if "mcpServers" not in stdio_config:
+        cmd_name = os.path.basename(stdio_config.get("command", "sandbox"))
+        stdio_config = {
+            "mcpServers": {
+                cmd_name: {
+                    "command": stdio_config["command"],
+                    "args": stdio_config.get("args", []),
+                    **({"env": stdio_config["env"]} if stdio_config.get("env") else {}),
+                }
+            }
+        }
+
+    port = _find_free_port()
+
+    proxy = create_proxy(stdio_config)
+    app = proxy.http_app(transport="sse")
+
+    uv_config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="error")
+    uv_server = uvicorn.Server(uv_config)
+
+    def _run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(uv_server.serve())
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if getattr(uv_server, "started", False):
+            try:
+                s = socket.create_connection(("127.0.0.1", port), timeout=1)
+                s.close()
+                break
+            except (ConnectionRefusedError, OSError):
+                pass
+        await asyncio.sleep(0.2)
+
+    url = f"http://127.0.0.1:{port}/sse"
+    stdio_bridges[bridge_id] = {"server": uv_server, "port": port, "thread": t, "url": url, "stdio_config": stdio_config}
+    logger.info(f"Stdio bridge {bridge_id} started on {url}")
+    return url
+
+
+def _stop_stdio_bridge(bridge_id: str):
+    bridge = stdio_bridges.pop(bridge_id, None)
+    if not bridge:
+        return
+    bridge["server"].should_exit = True
+    logger.info(f"Stdio bridge {bridge_id} stopped")
+
+
+def _stop_direct_inspector(server_id: str):
+    entry = direct_inspectors.pop(server_id, None)
+    if not entry:
+        return
+    proc = entry.get("proc")
+    if proc:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    logger.info(f"Direct inspector {server_id} stopped")
+
+
+
 
 
 def register_sse_session(user_id: str) -> asyncio.Event:
@@ -331,6 +432,7 @@ class MergeServerRequest(BaseModel):
     target_server_id: str | None = None
     remote_url: str | None = None
     remote_transport: str = "http"
+    stdio_config: dict | None = None
     namespace: str
     merged_name: str
 
@@ -579,9 +681,72 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
             created_at=record.created_at.isoformat(),
         )
 
+    # ── STDIO MERGE: merge local server with sandbox stdio MCP ──────
+    if req.stdio_config:
+        if not source.spec_data:
+            raise HTTPException(status_code=400, detail="Servidor fonte precisa ter spec_data carregada")
+        if "command" not in req.stdio_config:
+            raise HTTPException(status_code=400, detail="stdio_config precisa de 'command'")
+
+        logger.info(f"Stdio merge: {req.source_server_id} + stdio config for user {user_id}")
+
+        bridge_id = _generate_id(prefix="bridge", length=12)
+        try:
+            bridge_url = await _start_stdio_bridge(req.stdio_config, bridge_id)
+        except Exception as e:
+            logger.error(f"Falha ao iniciar bridge stdio: {e}")
+            raise HTTPException(status_code=500, detail=f"Erro ao iniciar servidor sandbox: {e}")
+
+        cmd_name = os.path.basename(req.stdio_config.get("command", "sandbox"))
+        sources = [
+            {
+                "namespace": req.namespace,
+                "remote_url": bridge_url,
+                "remote_transport": "sse",
+                "source_name": f"Sandbox ({cmd_name})",
+                "source_server_id": "",
+                "source_spec_data": None,
+                "source_spec_url": "",
+            }
+        ]
+
+        record = _create_merged_server(
+            db=db,
+            user_id=user_id,
+            name=req.merged_name,
+            sources=sources,
+            target_spec_url=source.spec_url,
+            target_spec_data=source.spec_data,
+            target_transport=source.transport,
+            target_target_url=source.target_url,
+            target_server_id=source.server_id,
+            target_name=source.name,
+        )
+
+        record.merge_config["_bridge_id"] = bridge_id
+        record.merge_config["_stdio_config"] = req.stdio_config
+        db.add(record)
+        db.delete(source)
+        db.commit()
+
+        suffix = "sse" if record.transport == "sse" else "mcp"
+        url_sse = f"{PUBLIC_URL}/v1/{record.server_id}/{record.apikey}/{suffix}"
+        logger.info(f"Servidor merged (stdio) criado: {record.server_id} -> {url_sse}")
+
+        return ServerResponse(
+            server_id=record.server_id,
+            apikey=record.apikey,
+            name=record.name,
+            status="active",
+            spec_url=record.spec_url,
+            transport=record.transport,
+            url_sse=url_sse,
+            created_at=record.created_at.isoformat(),
+        )
+
     # ── LOCAL MERGE: merge two existing servers ──────────────────────
-    if not req.target_server_id:
-        raise HTTPException(status_code=400, detail="Informe target_server_id ou remote_url")
+    if not req.target_server_id and not req.remote_url:
+        raise HTTPException(status_code=400, detail="Informe target_server_id, remote_url ou stdio_config")
 
     logger.info(f"Merging servers: {req.source_server_id} -> {req.target_server_id} for user {user_id}")
 
@@ -657,6 +822,10 @@ async def unmerge_server(server_id: str, request: Request, db: Session = Depends
         raise HTTPException(status_code=404, detail="Servidor não encontrado")
     if not record.is_merged:
         raise HTTPException(status_code=400, detail="Servidor não é merged")
+
+    bridge_id = (record.merge_config or {}).get("_bridge_id")
+    if bridge_id:
+        _stop_stdio_bridge(bridge_id)
     mc = record.merge_config or {}
     sources = mc.get("sources", [])
     if not sources:
@@ -760,6 +929,8 @@ async def update_server(server_id: str, req: UpdateServerRequest, request: Reque
     )
 
 
+
+
 @app.delete("/v1/servers/{server_id}", status_code=204)
 async def delete_server(server_id: str, request: Request, db: Session = Depends(get_db)):
     await require_auth(request)
@@ -767,6 +938,12 @@ async def delete_server(server_id: str, request: Request, db: Session = Depends(
     record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    _stop_direct_inspector(server_id)
+
+    bridge_id = (record.merge_config or {}).get("_bridge_id")
+    if bridge_id:
+        _stop_stdio_bridge(bridge_id)
 
     key = f"{record.server_id}:{record.apikey}"
     if key in active_servers:

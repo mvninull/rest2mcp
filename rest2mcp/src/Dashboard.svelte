@@ -362,6 +362,7 @@
                 <button onclick="openInspector('${escapeHtml(s.url_sse || "")}', '${s.transport || "http"}'); closeMenu();">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
                 </button>
+
                 <button onclick="editServer('${s.server_id}', '${escapeHtml(s.name || "")}', '${s.transport || "http"}'); closeMenu();">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> Editar
                 </button>
@@ -662,17 +663,20 @@
         mergeMode = mode;
         const localTab = document.getElementById("mergeTabLocal");
         const remoteTab = document.getElementById("mergeTabRemote");
+        const sandboxTab = document.getElementById("mergeTabSandbox");
         const localFields = document.getElementById("mergeLocalFields");
         const remoteFields = document.getElementById("mergeRemoteFields");
+        const sandboxFields = document.getElementById("mergeSandboxFields");
         if (localTab) localTab.classList.toggle("active", mode === "local");
         if (remoteTab) remoteTab.classList.toggle("active", mode === "remote");
+        if (sandboxTab) sandboxTab.classList.toggle("active", mode === "sandbox");
         if (localFields) localFields.style.display = mode === "local" ? "" : "none";
         if (remoteFields) remoteFields.style.display = mode === "remote" ? "" : "none";
+        if (sandboxFields) sandboxFields.style.display = mode === "sandbox" ? "" : "none";
         const mergeSub = document.getElementById("mergeSub");
         if (mergeSub) {
-          mergeSub.textContent = mode === "local"
-            ? "Fusão de servidores no rest2mcp com namespace automático"
-            : "Fusão de um servidor local com um servidor MCP remoto";
+          const labels = { local: "Fusão de servidores no rest2mcp com namespace automático", remote: "Fusão de um servidor local com um servidor MCP remoto", sandbox: "Instalação temporária de um servidor MCP via npx, pipx ou uv" };
+          mergeSub.textContent = labels[mode] || "";
         }
       }
       window.setMergeTab = setMergeTab;
@@ -688,11 +692,15 @@
         const me = document.getElementById("mergeError");
         const bc = document.getElementById("btnMergeConfirm");
         const mr = document.getElementById("mergeRemoteUrl");
+        const sj = document.getElementById("mergeStdioJson");
+        const sns = document.getElementById("mergeStdioNamespace");
         if (mn) {
           mn.value = "";
           mn.placeholder = `Ex: ${serverName} (Merged)`;
         }
         if (mr) mr.value = "";
+        if (sj) sj.value = "";
+        if (sns) sns.value = "";
         if (me) showModalError(me, "");
         if (bc) {
           bc.disabled = false;
@@ -728,6 +736,19 @@
       }
       window.openRemoteMergeModal = openRemoteMergeModal;
 
+      function fillSandbox(command, args, extra) {
+        const cfg = { command, args: args.split(" ").filter(Boolean) };
+        if (extra) cfg.args.push(extra);
+        const ta = document.getElementById("mergeStdioJson");
+        if (ta) ta.value = JSON.stringify(cfg, null, 2);
+        const ns = document.getElementById("mergeStdioNamespace");
+        if (ns) {
+          const name = command === "npx" ? args.split("/").pop() || args : args.split(" ")[0] || command;
+          ns.value = name.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+        }
+      }
+      window.fillSandbox = fillSandbox;
+
       function autoNamespaceFromUrl(url) {
         try {
           const u = new URL(url);
@@ -752,6 +773,37 @@
         const btn = document.getElementById("btnMergeConfirm");
         if (errorEl) showModalError(errorEl, "");
         if (!name) { if (errorEl) showModalError(errorEl, "Informe o nome do servidor merged."); return; }
+
+        if (mergeMode === "sandbox") {
+          const jsonText = document.getElementById("mergeStdioJson")?.value?.trim();
+          if (!jsonText) { if (errorEl) showModalError(errorEl, "Informe a configuração JSON do servidor."); return; }
+          let stdioConfig;
+          try { stdioConfig = JSON.parse(jsonText); } catch {
+            if (errorEl) showModalError(errorEl, "JSON inválido. Verifique a sintaxe.");
+            return;
+          }
+          if (!stdioConfig.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command'."); return; }
+          const namespace = document.getElementById("mergeStdioNamespace")?.value?.trim() ||
+            stdioConfig.command.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+          if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
+          try {
+            await apiFetch("/v1/servers/merge", {
+              method: "POST",
+              body: JSON.stringify({ source_server_id: mergeSourceId, stdio_config: stdioConfig, namespace, merged_name: name }),
+            });
+            closeMergeModal();
+            showLoading("Servidor merged criado! Carregando...", false);
+            await loadServers();
+            hideLoading();
+            window.showAppAlert("Servidor merged (sandbox) criado com sucesso.");
+          } catch (err) {
+            if (errorEl) showModalError(errorEl, err.message);
+            window.showAppAlert("Erro no merge sandbox: " + err.message);
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
+          }
+          return;
+        }
 
         if (mergeMode === "remote") {
           const remoteUrl = document.getElementById("mergeRemoteUrl")?.value?.trim();
@@ -1448,6 +1500,9 @@
         window.confirmResetPassword = confirmResetPassword;
         window.toggleChangePassword = toggleChangePassword;
         window.saveNewPassword = saveNewPassword;
+
+        const _stdioTa = document.getElementById("mergeStdioJson");
+        if (_stdioTa) _stdioTa.placeholder = '{\n  "command": "uvx",\n  "args": ["mcp-excel-server"]\n}';
     
   });
 </script>
@@ -1640,6 +1695,10 @@
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M3 8h10M8 3a11 11 0 010 10M3.5 5.5A11 11 0 0012.5 5.5M3.5 10.5a11 11 0 019 0"/></svg>
             Servidor remoto MCP
           </button>
+          <button class="merge-tab" id="mergeTabSandbox" onclick="setMergeTab('sandbox')">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M8 5v6"/></svg>
+            Sandbox / JSON
+          </button>
         </div>
         <div class="form-group">
           <label for="mergeName">Nome do Servidor Merged</label>
@@ -1657,6 +1716,27 @@
             <label for="mergeRemoteUrl">URL do Servidor MCP Remoto</label>
             <input type="url" id="mergeRemoteUrl" placeholder="https://servidor-mcp.exemplo.com/mcp" />
             <p class="form-hint">A URL deve terminar com <strong>/mcp</strong> (Streamable HTTP) ou <strong>/sse</strong> (SSE)</p>
+          </div>
+        </div>
+        <div id="mergeSandboxFields" style="display:none">
+          <div class="form-group">
+            <label>Quick-select</label>
+            <div class="sandbox-presets" aria-label="Quick-select de servidores MCP populares">
+              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-excel-server')">📊 Excel</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('npx', '@modelcontextprotocol/server-filesystem', '.')">📁 File System</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('pipx', 'mcp-server-sqlite')">🗄️ SQLite</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-server-pdf')">📄 PDF</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="mergeStdioJson">Config JSON</label>
+            <textarea id="mergeStdioJson" rows="5" class="code-textarea"></textarea>
+            <p class="form-hint">Comando e args do servidor MCP stdio. O ambiente é herdado do gateway.</p>
+          </div>
+          <div class="form-group">
+            <label for="mergeStdioNamespace">Namespace (prefixo das ferramentas)</label>
+            <input type="text" id="mergeStdioNamespace" placeholder="excel, fs, sqlite..." />
+            <p class="form-hint">Ex: namespace "excel" → ferramentas como <strong>excel_read_cells</strong>, <strong>excel_write_row</strong></p>
           </div>
         </div>
         <div class="modal-error" id="mergeError"></div>
