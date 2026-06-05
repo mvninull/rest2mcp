@@ -245,30 +245,37 @@
       }
 
       let paypalRendered = false;
-      function showPayPalModal() {
+      async function showPayPalModal() {
         document.getElementById("paypalModal").classList.add("open");
         const ppc = document.getElementById("paypal-button-container-landing");
         if (!ppc) return;
         ppc.style.display = "block";
-        if (typeof paypal !== "undefined" && !paypalRendered) {
-          paypalRendered = true;
-          paypal.Buttons({
-            createSubscription: function(data, actions) {
-              return actions.subscription.create({
-                plan_id: "P-26B313696D799031LNIFNUDQ",
-                custom_id: localStorage.getItem("supabase_user_id") || ""
-              });
-            },
-            onApprove: function(data) {
-              window.showAppAlert("Subscrição ativada!");
-              document.getElementById("paypalModal").classList.remove("open");
-            },
-            onError: function(err) {
-              console.error("PayPal error:", err);
-              window.showAppAlert("Erro ao processar pagamento.");
-            }
-          }).render("#paypal-button-container-landing");
-        }
+        if (typeof paypal === "undefined" || paypalRendered) return;
+        paypalRendered = true;
+        const API_BASE = (localStorage.getItem("api_base") || "http://localhost:8080").replace(/\/+$/, "");
+        const token = localStorage.getItem("supabase_token") || "";
+        paypal.Buttons({
+          createSubscription: async function () {
+            const resp = await fetch(`${API_BASE}/v1/paypal/subscription`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            });
+            if (!resp.ok) throw new Error("Falha ao criar subscrição");
+            const sub = await resp.json();
+            return sub.id;
+          },
+          onApprove: function(data) {
+            window.showAppAlert("Subscrição ativada!");
+            document.getElementById("paypalModal").classList.remove("open");
+          },
+          onError: function(err) {
+            console.error("PayPal error:", err);
+            window.showAppAlert("Erro ao processar pagamento.");
+          }
+        }).render("#paypal-button-container-landing");
       }
       function closePayPalModal() {
         document.getElementById("paypalModal").classList.remove("open");
