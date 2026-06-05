@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import secrets
 import socket
 import string
@@ -25,12 +26,21 @@ try:
         FREE_TIER_RPM,
         GATEWAY_HOST,
         GATEWAY_PORT,
+        NGROK_AUTH_TOKEN,
+        PAYPAL_SANDBOX,
         PRO_TIER_MAX_SERVERS,
         PRO_TIER_RPM,
         PUBLIC_URL,
     )
     from .openapi import MCPServerManager, create_mcp_server
-    from .paypal import parse_webhook_event, verify_webhook_signature
+    from .paypal import (
+        create_paypal_billing_plan,
+        create_paypal_product,
+        create_paypal_subscription,
+        get_paypal_config,
+        parse_webhook_event,
+        verify_webhook_signature,
+    )
     from .supabase_auth import (
         get_cached_profile,
         get_tier_limits,
@@ -44,10 +54,19 @@ except ImportError:
     from config import (
         GATEWAY_HOST,
         GATEWAY_PORT,
+        NGROK_AUTH_TOKEN,
+        PAYPAL_SANDBOX,
         PUBLIC_URL,
     )
     from openapi import MCPServerManager
-    from paypal import parse_webhook_event, verify_webhook_signature
+    from paypal import (
+        create_paypal_billing_plan,
+        create_paypal_product,
+        create_paypal_subscription,
+        get_paypal_config,
+        parse_webhook_event,
+        verify_webhook_signature,
+    )
     from supabase_auth import (
         get_cached_profile,
         get_tier_limits,
@@ -164,16 +183,21 @@ class ActiveServer:
                 ]
             sources = []
             bridge_info = stdio_bridges.get(bridge_id) if bridge_id else None
+            bridge_clients = {}
             for s in sources_raw:
                 if s.get("remote_url"):
-                    runtime_url = bridge_info["url"] if bridge_info else s["remote_url"]
-                    sources.append(
-                        {
-                            "name": s.get("source_name", "Remote Source"),
-                            "namespace": s.get("namespace", ""),
-                            "remote_url": runtime_url,
-                        }
-                    )
+                    is_bridge = bool(bridge_id and bridge_info and bridge_info.get("client"))
+                    runtime_url = bridge_info["url"] if is_bridge else s["remote_url"]
+                    src_entry = {
+                        "name": s.get("source_name", "Remote Source"),
+                        "namespace": s.get("namespace", ""),
+                    }
+                    if is_bridge:
+                        src_entry["_bridge_id"] = bridge_id
+                        bridge_clients[bridge_id] = bridge_info["client"]
+                    else:
+                        src_entry["remote_url"] = runtime_url
+                    sources.append(src_entry)
                 else:
                     ss = (
                         json.loads(s["source_spec_data"])
@@ -185,13 +209,14 @@ class ActiveServer:
                     )
             from openapi import create_merged_mcp_server
 
-            merged_mcp = create_merged_mcp_server(
+            merged_mcp = await create_merged_mcp_server(
                 base_spec_url=self.spec_url,
                 base_name=self.name,
                 base_spec=spec_data,
                 sources=sources,
                 server_id=self.server_id,
                 log_func=_make_log_func(self.server_id),
+                bridge_clients=bridge_clients or None,
             )
             self.manager = merged_mcp._manager if hasattr(merged_mcp, "_manager") else None
             self.sse_app = merged_mcp.http_app(transport=transport or self._transport)
@@ -250,21 +275,109 @@ active_servers: dict[str, ActiveServer] = {}
 
 stdio_bridges: dict[str, dict] = {}
 
+sse_sessions: dict[str, list[asyncio.Event]] = {}
+
+# ─── Per-server Inspector ──────────────────────────────────
 direct_inspectors: dict[str, dict] = {}
 
-sse_sessions: dict[str, list[asyncio.Event]] = {}
+
+def _stop_direct_inspector(server_id: str):
+    entry = direct_inspectors.pop(server_id, None)
+    if not entry:
+        return
+    proc = entry.get("proc")
+    if proc:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    logger.info(f"Direct inspector {server_id} stopped")
+
+
+async def _start_inspector_for_server(server_id: str, url: str, transport: str = "http") -> str:
+    _stop_direct_inspector(server_id)
+
+    client_port = _find_free_port()
+    server_port = _find_free_port()
+
+    env = os.environ.copy()
+    env["CLIENT_PORT"] = str(client_port)
+    env["SERVER_PORT"] = str(server_port)
+    env["DANGEROUSLY_OMIT_AUTH"] = "true"
+
+    proc = await asyncio.create_subprocess_exec(
+        "npx.cmd", "-y", "@modelcontextprotocol/inspector", env=env,
+    )
+
+    inspector_url = f"http://localhost:{client_port}"
+
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        try:
+            s = socket.create_connection(("localhost", client_port), timeout=1)
+            s.close()
+            logger.info(f"Inspector {server_id} pronto em {inspector_url}")
+            return inspector_url
+        except Exception:
+            await asyncio.sleep(0.5)
+
+    logger.warning(f"Inspector {server_id} started but port {client_port} not ready yet")
+    return inspector_url
 
 
 async def _start_stdio_bridge(stdio_config: dict, bridge_id: str) -> str:
     """Start a stdio MCP bridge and return its SSE URL.
 
-    Creates a subprocess from stdio_config (command/args/env), wraps it
-    with FastMCP, and serves it via SSE on a local port.
+    Creates a subprocess from stdio_config (command/args/env), stores a
+    long-lived fastmcp Client in stdio_bridges for the merge code to reuse.
+    Also creates a FastMCPProxy SSE endpoint for the inspector.
     """
-    from fastmcp.server import create_proxy
+    from fastmcp.client.client import Client
+
+    raw_stdio = dict(stdio_config)
+
+    # 1. Connect a long-lived fastmcp Client (single subprocess, reused by merge)
+    stdio_bridges[bridge_id] = {"client": None, "session": None}
+
+    cmd = raw_stdio.get("command") or raw_stdio.get("cmd", "")
+    args = raw_stdio.get("args", [])
+
+    # Pre-warm: ensure npx package is cached before creating the Client.
+    # Run `npx --yes <package>` briefly to trigger download; ignore output.
+    if "npx" in cmd:
+        try:
+            pre_proc = await asyncio.create_subprocess_exec(
+                cmd, *args,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            try:
+                await asyncio.wait_for(pre_proc.wait(), timeout=60)
+            except asyncio.TimeoutError:
+                pre_proc.kill()
+                await pre_proc.wait()
+        except Exception as exc:
+            logger.warning("Bridge %s pre-warm failed (non-fatal): %s", bridge_id, exc)
+
+    cmd_name = os.path.basename(stdio_config.get("command", "sandbox"))
+    transport = {
+        "mcpServers": {
+            cmd_name: {
+                "command": raw_stdio["command"],
+                "args": raw_stdio.get("args", []),
+                **({"env": raw_stdio["env"]} if raw_stdio.get("env") else {}),
+            }
+        }
+    }
+    client = Client(transport=transport)
+    await client.__aenter__()
+    stdio_bridges[bridge_id]["client"] = client
+    logger.info("Bridge %s client connected", bridge_id)
+
+    # 2. Create SSE endpoint for inspector (via FastMCPProxy, separate subprocess)
+    from fastmcp import FastMCP
 
     if "mcpServers" not in stdio_config:
-        cmd_name = os.path.basename(stdio_config.get("command", "sandbox"))
         stdio_config = {
             "mcpServers": {
                 cmd_name: {
@@ -276,8 +389,7 @@ async def _start_stdio_bridge(stdio_config: dict, bridge_id: str) -> str:
         }
 
     port = _find_free_port()
-
-    proxy = create_proxy(stdio_config)
+    proxy = FastMCP.as_proxy(stdio_config)
     app = proxy.http_app(transport="sse")
 
     uv_config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="error")
@@ -303,30 +415,74 @@ async def _start_stdio_bridge(stdio_config: dict, bridge_id: str) -> str:
         await asyncio.sleep(0.2)
 
     url = f"http://127.0.0.1:{port}/sse"
-    stdio_bridges[bridge_id] = {"server": uv_server, "port": port, "thread": t, "url": url, "stdio_config": stdio_config}
+    bridge = stdio_bridges[bridge_id]
+    bridge.update({
+        "server": uv_server, "port": port, "thread": t, "url": url,
+        "stdio_config": raw_stdio, "proxy": proxy,
+    })
     logger.info(f"Stdio bridge {bridge_id} started on {url}")
     return url
+
+
+async def _start_mcp_inspector(bridge_id: str) -> str:
+    bridge = stdio_bridges.get(bridge_id)
+    if not bridge:
+        raise ValueError(f"Bridge {bridge_id} not found")
+
+    insp_proc = bridge.get("inspector_proc")
+    if insp_proc:
+        try:
+            insp_proc.kill()
+        except Exception:
+            pass
+
+    client_port = _find_free_port()
+    server_port = _find_free_port()
+
+    env = os.environ.copy()
+    env["CLIENT_PORT"] = str(client_port)
+    env["SERVER_PORT"] = str(server_port)
+    env["DANGEROUSLY_OMIT_AUTH"] = "true"
+
+    proc = await asyncio.create_subprocess_exec(
+        "npx.cmd", "-y", "@modelcontextprotocol/inspector", env=env,
+    )
+
+    bridge["inspector_proc"] = proc
+    inspector_url = f"http://localhost:{client_port}"
+
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        try:
+            s = socket.create_connection(("localhost", client_port), timeout=1)
+            s.close()
+            logger.info(f"MCP Inspector {bridge_id} pronto em {inspector_url}")
+            return inspector_url
+        except Exception:
+            await asyncio.sleep(0.5)
+
+    logger.warning(f"MCP Inspector {bridge_id} started but port {client_port} not ready yet")
+    return inspector_url
 
 
 def _stop_stdio_bridge(bridge_id: str):
     bridge = stdio_bridges.pop(bridge_id, None)
     if not bridge:
         return
-    bridge["server"].should_exit = True
-    logger.info(f"Stdio bridge {bridge_id} stopped")
-
-
-def _stop_direct_inspector(server_id: str):
-    entry = direct_inspectors.pop(server_id, None)
-    if not entry:
-        return
-    proc = entry.get("proc")
-    if proc:
+    insp_proc = bridge.get("inspector_proc")
+    if insp_proc:
         try:
-            proc.kill()
+            insp_proc.kill()
         except Exception:
             pass
-    logger.info(f"Direct inspector {server_id} stopped")
+    session = bridge.get("client")
+    if session is not None and hasattr(session, '__aexit__'):
+        try:
+            asyncio.ensure_future(session.__aexit__(None, None, None))
+        except Exception:
+            pass
+    bridge["server"].should_exit = True
+    logger.info(f"Stdio bridge {bridge_id} stopped")
 
 
 
@@ -371,14 +527,48 @@ async def cascade_guard(server_id: str, apikey: str, db: Session) -> ServerDB | 
     return server
 
 
-@asynccontextmanager
+def _start_ngrok():
+    if not (PAYPAL_SANDBOX and "localhost" in PUBLIC_URL):
+        return
+    try:
+        from pyngrok import ngrok, conf
+
+        if NGROK_AUTH_TOKEN:
+            ngrok.set_auth_token(NGROK_AUTH_TOKEN)
+
+        ngrok_url = None
+        tunnel = ngrok.connect(GATEWAY_PORT, bind_tls=True)
+        ngrok_url = tunnel.public_url.replace("http://", "https://")
+
+        import sys as _sys
+
+        _cfg_mod = _sys.modules.get("app.config") or _sys.modules.get("config")
+        if _cfg_mod:
+            _cfg_mod.PUBLIC_URL = ngrok_url
+
+        logger.info(
+            f"\n{'='*60}\n"
+            f"  Ngrok tunnel : {ngrok_url}\n"
+            f"  Webhook URL  : {ngrok_url}/v1/webhooks/paypal\n"
+            f"  Usa esta URL no PayPal Developer Dashboard para criar o webhook\n"
+            f"{'='*60}"
+        )
+    except ImportError:
+        logger.warning("pyngrok não instalado. Instala com: pip install pyngrok")
+    except Exception as e:
+        logger.warning(f"Não foi possível iniciar ngrok: {e}")
+
+
 async def lifespan(app: FastAPI):
+    _start_ngrok()
     init_db()
     logger.info("Cloud Gateway iniciado com banco de dados SQLite")
     yield
     for key in list(active_servers.keys()):
         await active_servers[key].stop()
     active_servers.clear()
+    for sid in list(direct_inspectors.keys()):
+        _stop_direct_inspector(sid)
 
 
 app = FastAPI(
@@ -683,8 +873,6 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
 
     # ── STDIO MERGE: merge local server with sandbox stdio MCP ──────
     if req.stdio_config:
-        if not source.spec_data:
-            raise HTTPException(status_code=400, detail="Servidor fonte precisa ter spec_data carregada")
         if "command" not in req.stdio_config:
             raise HTTPException(status_code=400, detail="stdio_config precisa de 'command'")
 
@@ -929,6 +1117,56 @@ async def update_server(server_id: str, req: UpdateServerRequest, request: Reque
     )
 
 
+@app.post("/v1/servers/{server_id}/inspector")
+async def start_server_inspector(server_id: str, request: Request, db: Session = Depends(get_db)):
+    """Start the MCP Inspector for any server (sandbox or regular)."""
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    # Sandbox/merged server flow
+    if record.is_merged and record.merge_config:
+        bridge_id = record.merge_config.get("_bridge_id")
+        if not bridge_id:
+            raise HTTPException(status_code=400, detail="Servidor não é sandbox")
+        if bridge_id not in stdio_bridges:
+            stdio_cfg = record.merge_config.get("_stdio_config")
+            if not stdio_cfg:
+                sources = record.merge_config.get("sources", [])
+                import re as _re
+                src_name = sources[0].get("source_name", "") if sources else ""
+                m = _re.match(r"^Sandbox\s*\((.+)\)$", src_name)
+                if m:
+                    cmd = m.group(1).strip()
+                    stdio_cfg = {"command": cmd, "args": []}
+                    logger.info(f"Reconstructed stdio_cfg for bridge {bridge_id}: {cmd}")
+                else:
+                    raise HTTPException(status_code=400, detail="Configuração sandbox perdida. Recrie o merge.")
+            try:
+                await _start_stdio_bridge(stdio_cfg, bridge_id)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Falha ao reiniciar sandbox: {e}")
+
+        try:
+            inspector_url = await _start_mcp_inspector(bridge_id)
+            return {"inspector_url": inspector_url}
+        except Exception as e:
+            logger.error(f"Falha ao iniciar inspector para {bridge_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Falha ao iniciar inspector: {e}")
+
+    # Regular server flow — start a direct inspector with server URL pre-configured
+    suffix = "mcp" if record.transport == "http" else "sse"
+    server_url = f"http://127.0.0.1:{GATEWAY_PORT}/v1/{record.server_id}/{record.apikey}/{suffix}"
+    logger.info(f"Starting direct inspector for {server_id} -> {server_url}")
+
+    try:
+        inspector_url = await _start_inspector_for_server(record.server_id, server_url, record.transport)
+        return {"inspector_url": inspector_url}
+    except Exception as e:
+        logger.error(f"Falha ao iniciar inspector para {server_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Falha ao iniciar inspector: {e}")
 
 
 @app.delete("/v1/servers/{server_id}", status_code=204)
@@ -940,7 +1178,6 @@ async def delete_server(server_id: str, request: Request, db: Session = Depends(
         raise HTTPException(status_code=404, detail="Servidor não encontrado")
 
     _stop_direct_inspector(server_id)
-
     bridge_id = (record.merge_config or {}).get("_bridge_id")
     if bridge_id:
         _stop_stdio_bridge(bridge_id)
@@ -1400,6 +1637,84 @@ async def reactivate_user_servers(user_id: str):
         db.commit()
     finally:
         db.close()
+
+
+# ─── PayPal Config / Setup ─────────────────────────────────────────────────────
+
+
+@app.get("/v1/paypal/config")
+async def paypal_config():
+    return await get_paypal_config()
+
+
+@app.post("/v1/paypal/subscription")
+async def paypal_create_subscription(request: Request):
+    await require_auth(request)
+    user_id = request.state.user_id
+    config = await get_paypal_config()
+    sub = await create_paypal_subscription(config["plan_id"], user_id)
+    logger.info(f"Subscrição PayPal criada: {sub['id']} para user {user_id}")
+    return sub
+
+
+class PayPalSetupRequest(BaseModel):
+    price: float = 9.90
+    currency: str = "USD"
+
+
+@app.post("/v1/paypal/setup")
+async def paypal_setup(req: PayPalSetupRequest):
+    logger.info("Criando produto PayPal...")
+    product_id = await create_paypal_product(
+        name="rest2mcp",
+        description="Subscrição do rest2mcp Cloud Gateway",
+    )
+    logger.info(f"Produto criado: {product_id}")
+
+    logger.info("Criando plano de billing PayPal...")
+    plan_id = await create_paypal_billing_plan(
+        product_id=product_id,
+        name="Pro Monthly",
+        description="Plano Pro mensal do rest2mcp",
+        price=req.price,
+        currency=req.currency,
+    )
+    logger.info(f"Plano criado: {plan_id}")
+
+    return {
+        "product_id": product_id,
+        "plan_id": plan_id,
+        "price": req.price,
+        "currency": req.currency,
+    }
+
+
+# ─── Store (Glama proxy) ─────────────────────────────────────────────────────
+
+_store_cache: list | None = None
+_store_cache_time: float = 0
+
+
+@app.get("/v1/store/servers")
+async def list_store_servers(request: Request):
+    global _store_cache, _store_cache_time
+    now = time.time()
+    if _store_cache is not None and now - _store_cache_time < 120:
+        return _store_cache
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get("https://glama.ai/api/mcp/v1/servers")
+            r.raise_for_status()
+            data = r.json()
+            servers = data if isinstance(data, list) else data.get("servers", [])
+            _store_cache = servers
+            _store_cache_time = now
+            return servers
+    except Exception as e:
+        logger.error(f"Glama API error: {e}")
+        if _store_cache is not None:
+            return _store_cache
+        return []
 
 
 # ─── Profile / Auth ───────────────────────────────────────────────────────────

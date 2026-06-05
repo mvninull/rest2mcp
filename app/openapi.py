@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import time
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 import httpx
@@ -288,21 +289,189 @@ class MCPServerManager:
             return f"Autenticado: {bool(self.token)} | API: {self.base_url}"
 
 
-# ESTA FUNÇÃO PRECISA ESTAR FORA DA CLASSE (NA RAIZ DO ARQUIVO)
+# -----------------------------------------------------------
+# Helpers for connecting to source MCP servers directly via mcp
+# (no FastMCPProxy, no proxy-to-proxy SSE issues)
+# -----------------------------------------------------------
+
+@asynccontextmanager
+async def _stdio_session(stdio_cfg: dict):
+    """Connect to a stdio MCP subprocess and yield a ClientSession."""
+    from mcp.client.session import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+
+    cmd = stdio_cfg.get("command") or stdio_cfg.get("cmd", "")
+    args = stdio_cfg.get("args", [])
+    env = stdio_cfg.get("env", None)
+    cwd = stdio_cfg.get("cwd", None)
+
+    params = StdioServerParameters(command=cmd, args=args, env=env, cwd=cwd)
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            yield session
+
+
+@asynccontextmanager
+async def _sse_session(url: str):
+    """Connect to an MCP server via SSE and yield a ClientSession."""
+    from mcp.client.session import ClientSession
+    from mcp.client.sse import sse_client
+
+    async with sse_client(url) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            yield session
+
+
+async def _add_source_tools_to_server(
+    base_mcp: FastMCP,
+    source_name: str,
+    namespace: str,
+    stdio_cfg: dict | None = None,
+    remote_url: str | None = None,
+    client: object | None = None,
+):
+    """Connect to a source MCP server, list tools, and register forwarding
+    functions as native tools on base_mcp.  Returns the list of registered
+    tool names.
+
+    If *client* is provided (fastmcp.client.Client from a bridge), it is
+    reused — no new connection is created.
+    """
+    from fastmcp.tools.function_tool import FunctionTool
+
+    registered = []
+
+    if client is not None:
+        # Reuse an existing long-lived client (from stdio_bridge)
+        tools_result = await client.list_tools()
+        tools_list = tools_result.tools if hasattr(tools_result, 'tools') else tools_result
+        logger.info("Source %s has %d tools", source_name, len(tools_list))
+
+        for src_tool in tools_list:
+            tool_name = src_tool.name
+            qualified_name = f"{namespace}/{tool_name}" if namespace else tool_name
+
+            def _make_handler(tname: str, cl):
+                async def handler(**kwargs):
+                    result = await cl.call_tool(tname, kwargs)
+                    if hasattr(result, 'content'):
+                        blocks = []
+                        for block in result.content:
+                            if hasattr(block, "text"):
+                                blocks.append(block.text)
+                            elif hasattr(block, "data"):
+                                blocks.append(str(block.data))
+                            else:
+                                blocks.append(str(block))
+                        return "\n".join(blocks)
+                    return str(result)
+                return handler
+
+            handler_fn = _make_handler(tool_name, client)
+
+            input_schema = src_tool.inputSchema if hasattr(src_tool, 'inputSchema') else getattr(src_tool, 'input_schema', {})
+
+            fn_tool = FunctionTool(
+                fn=handler_fn,
+                name=qualified_name,
+                description=src_tool.description or "",
+                parameters=dict(
+                    type="object",
+                    properties=dict(input_schema.get("properties", {})),
+                    required=list(input_schema.get("required", [])),
+                ),
+            )
+
+            base_mcp.add_tool(fn_tool)
+            registered.append(qualified_name)
+
+        return registered
+
+    # No client provided — create a short-lived connection
+    if stdio_cfg:
+        cm = _stdio_session
+        cm_args = (stdio_cfg,)
+    elif remote_url:
+        cm = _sse_session
+        cm_args = (remote_url,)
+    else:
+        logger.warning("Source %s has no client/stdio_cfg/remote_url, skipping", source_name)
+        return []
+
+    async with cm(*cm_args) as sess:
+        tools_result = await sess.list_tools()
+        tools_list = tools_result.tools if hasattr(tools_result, 'tools') else tools_result
+        logger.info("Source %s has %d tools", source_name, len(tools_list))
+
+        for src_tool in tools_list:
+            tool_name = src_tool.name
+            qualified_name = f"{namespace}/{tool_name}" if namespace else tool_name
+
+            def _make_handler(tname: str, s):
+                async def handler(**kwargs):
+                    async with cm(*cm_args) as ss:
+                        result = await ss.call_tool(tname, kwargs)
+                        if hasattr(result, 'content'):
+                            blocks = []
+                            for block in result.content:
+                                if hasattr(block, "text"):
+                                    blocks.append(block.text)
+                                elif hasattr(block, "data"):
+                                    blocks.append(str(block.data))
+                                else:
+                                    blocks.append(str(block))
+                            return "\n".join(blocks)
+                        return str(result)
+                return handler
+
+            handler_fn = _make_handler(tool_name, sess)
+
+            input_schema = src_tool.inputSchema if hasattr(src_tool, 'inputSchema') else getattr(src_tool, 'input_schema', {})
+
+            fn_tool = FunctionTool(
+                fn=handler_fn,
+                name=qualified_name,
+                description=src_tool.description or "",
+                parameters=dict(
+                    type="object",
+                    properties=dict(input_schema.get("properties", {})),
+                    required=list(input_schema.get("required", [])),
+                ),
+            )
+
+            base_mcp.add_tool(fn_tool)
+            registered.append(qualified_name)
+
+    return registered
+
+
+# -----------------------------------------------------------
+# Public helpers
+# -----------------------------------------------------------
+
 def create_mcp_server(spec_url: str, name: str) -> FastMCP:
     manager = MCPServerManager(spec_url, name)
     return manager.mcp
 
 
-def create_merged_mcp_server(
+async def create_merged_mcp_server(
     base_spec_url: str,
     base_name: str,
     base_spec: dict,
     sources: list[dict],
     server_id: str = "",
     log_func=None,
+    bridge_clients: dict[str, object] | None = None,
 ) -> FastMCP:
-    """Cria um servidor MCP merged: monta múltiplas sources no base com namespace."""
+    """Cria um servidor MCP merged unificado.
+
+    Em vez de usar FastMCPProxy (que falha com Connection closed), reusa o
+    `fastmcp.client.Client` guardado no stdio_bridge para listar tools e criar
+    handlers que chamam `client.call_tool()` directamente — sem SSE, sem novo
+    subprocesso.
+    """
     base_manager = MCPServerManager(
         spec_url=base_spec_url,
         name=base_name,
@@ -312,17 +481,41 @@ def create_merged_mcp_server(
     )
 
     for i, src in enumerate(sources):
-        if src.get("remote_url"):
-            remote_url = src["remote_url"]
-            try:
-                from fastmcp import Client
-                from fastmcp.server import create_proxy
+        namespace = src.get("namespace", "")
 
-                remote_client = Client(remote_url)
-                remote_proxy = create_proxy(remote_client, name=src.get("name", f"Remote {i}"))
-                base_manager.mcp.mount(remote_proxy, namespace=src.get("namespace", ""))
+        bridge_id = src.get("_bridge_id")
+        remote_url = src.get("remote_url")
+
+        # -- Bridge source (sandbox/remote-to-local via stdio) --
+        if bridge_id and bridge_clients and bridge_id in bridge_clients:
+            client = bridge_clients[bridge_id]
+            logger.info("Using stored client for bridge %s (namespace=%s)", bridge_id, namespace)
+            try:
+                tools_added = await _add_source_tools_to_server(
+                    base_manager.mcp,
+                    source_name=src.get("name", f"Bridge {i}"),
+                    namespace=namespace,
+                    client=client,
+                )
+                logger.info("Registered %d tools from bridge %s", len(tools_added), bridge_id)
             except Exception as e:
-                logger.warning(f"Falha ao montar remoto {remote_url}: {e}")
+                logger.exception("Failed to add tools from bridge %s: %s", bridge_id, e)
+
+        # -- Remote SSE source --
+        elif remote_url:
+            logger.info("Connecting to remote %s at %s (namespace=%s)", src.get("name"), remote_url, namespace)
+            try:
+                tools_added = await _add_source_tools_to_server(
+                    base_manager.mcp,
+                    source_name=src.get("name", f"Remote {i}"),
+                    namespace=namespace,
+                    remote_url=remote_url,
+                )
+                logger.info("Registered %d tools from remote %s", len(tools_added), remote_url)
+            except Exception as e:
+                logger.exception("Failed to add tools from remote %s: %s", remote_url, e)
+
+        # -- Spec-based source (same API, just MCP from spec) --
         else:
             src_manager = MCPServerManager(
                 spec_url="",
@@ -331,6 +524,6 @@ def create_merged_mcp_server(
                 server_id=f"{server_id}_src{i}",
                 log_func=log_func,
             )
-            base_manager.mcp.mount(src_manager.mcp, namespace=src.get("namespace", ""))
+            base_manager.mcp.mount(src_manager.mcp, namespace=namespace)
 
     return base_manager.mcp
