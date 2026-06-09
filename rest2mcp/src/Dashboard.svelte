@@ -819,9 +819,14 @@
         const catBar = document.getElementById("storeCategoryBar");
         if (!bar) return;
 
-        const hostLabels = { "remote-capable": "☁️ Remoto", "hybrid": "🔄 Híbrido", "local-only": "💻 Local" };
+        const hostIcons = {
+          "remote-capable": '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11 2h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h2"/><path d="M8 11v1"/><path d="M5 5.5 8 2l3 3.5"/></svg>',
+          "hybrid": '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13 8A5 5 0 1 1 8 3"/><path d="M13 3v3h-3"/><path d="M3 8A5 5 0 1 0 8 3"/></svg>',
+          "local-only": '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M6 14h4"/><path d="M8 12v2"/></svg>',
+        };
+        const hostLabels = { "remote-capable": "Remoto", "hybrid": "Híbrido", "local-only": "Local" };
         bar.innerHTML = _storeFacets.hostingTypes.map(t =>
-          `<button class="store-filter-btn${_storeFilterHosting === t ? " active" : ""}" onclick="setStoreFilterHosting('${_escHtml(t)}')">${hostLabels[t] || t}</button>`
+          `<button class="store-filter-btn${_storeFilterHosting === t ? " active" : ""}" onclick="setStoreFilterHosting('${_escHtml(t)}')">${hostIcons[t] || ""}<span>${hostLabels[t] || t}</span></button>`
         ).join("");
 
         if (catBar) {
@@ -885,24 +890,29 @@
           grid.innerHTML = "<div class='store-loading'>Nenhum servidor encontrado.</div>";
           return;
         }
+        const hostBadges = {
+          "remote-capable": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11 2h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h2"/><path d="M8 11v1"/><path d="M5 5.5 8 2l3 3.5"/></svg> Remoto',
+          "hybrid": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13 8A5 5 0 1 1 8 3"/><path d="M13 3v3h-3"/><path d="M3 8A5 5 0 1 0 8 3"/></svg> Híbrido',
+          "local-only": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M6 14h4"/><path d="M8 12v2"/></svg> Local',
+        };
         grid.innerHTML = servers.map(s => {
           const name = s.name || s.slug || "MCP Server";
           const desc = s.description || "";
           const hostType = (s.attributes || []).find(a => a.startsWith("hosting:"))?.split(":")[1] || "";
-          const badge = hostType === "remote-capable" ? "☁️" : hostType === "hybrid" ? "🔄" : "💻";
+          const badge = hostBadges[hostType] || "";
           const namespace = s.namespace || "";
           const toolCount = (s.tools || []).length;
           const stars = s.stars || 0;
           return `<div class="store-card" onclick="installFromStore('${_escHtml(s.id || "")}', '${_escHtml(namespace)}', '${_escHtml(s.slug || "")}', '${_escHtml(name)}', '${_escHtml(hostType)}')">
-            <div class="store-card-icon"><span class="store-card-emoji">🧩</span></div>
+            <div class="store-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
             <div class="store-card-body">
               <div class="store-card-name">${_escHtml(name)}</div>
               <div class="store-card-desc">${_escHtml(desc)}</div>
               <div class="store-card-footer">
-                <span class="store-card-badge">${badge}</span>
+                ${badge ? `<span class="store-card-badge">${badge}</span>` : ""}
                 ${namespace ? `<span class="store-card-cmd">${_escHtml(namespace)}</span>` : ""}
                 ${toolCount > 0 ? `<span class="store-card-tag">${toolCount} tools</span>` : ""}
-                ${stars > 0 ? `<span class="store-card-star">★ ${stars}</span>` : ""}
+                ${stars > 0 ? `<span class="store-card-star"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2 4.5 4.9.5-3.7 3.2L12.5 14 8 11.5 3.5 14l1.3-4.8L1 6l4.9-.5z"/></svg> ${stars}</span>` : ""}
               </div>
             </div>
           </div>`;
