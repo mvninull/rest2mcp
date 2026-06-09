@@ -949,6 +949,8 @@
         } else {
           pkg = name;
         }
+        const warning = document.getElementById("mergePackageWarning");
+        if (warning) warning.style.display = "none";
         const cfg = { command: "npx", args: [pkg] };
         const ta = document.getElementById("mergeStdioJson");
         if (ta) ta.value = JSON.stringify(cfg, null, 2);
@@ -956,13 +958,20 @@
         if (ns && slug) {
           ns.value = slug.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
         }
-        const warning = document.getElementById("mergePackageWarning");
-        if (warning) warning.style.display = "none";
-        fetch("/v1/store/check-package?name=" + encodeURIComponent(pkg)).then(r => r.json()).then(data => {
-          if (!data.exists && warning) {
+        fetch("/v1/store/check-package?name=" + encodeURIComponent(pkg) + "&namespace=" + encodeURIComponent(namespace || "") + "&slug=" + encodeURIComponent(slug || "") + "&repo_url=" + encodeURIComponent(repoUrl || "")).then(r => r.json()).then(data => {
+          if (data.exists && data.command && data.args) {
+            const newCfg = { command: data.command, args: data.args };
+            if (ta) ta.value = JSON.stringify(newCfg, null, 2);
+          } else if (!data.exists && warning) {
             warning.style.display = "";
             let msg = "Pacote '" + pkg + "' não encontrado no npm.";
-            if (repoUrl && repoUrl.includes("github.com")) {
+            if (data.alternatives && data.alternatives.length) {
+              const alt = data.alternatives[0];
+              const altCmd = alt.command + " " + (alt.args || []).join(" ");
+              const newCfg = { command: alt.command, args: alt.args };
+              if (ta) ta.value = JSON.stringify(newCfg, null, 2);
+              msg += " Alternative: " + altCmd;
+            } else if (repoUrl && repoUrl.includes("github.com")) {
               const gh = repoUrl.replace("https://github.com/", "").replace(/\/$/, "");
               msg += " Tente: npx github:" + gh;
             } else {
