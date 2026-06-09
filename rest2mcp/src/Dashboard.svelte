@@ -2,8 +2,33 @@
   // @ts-nocheck
   import { onMount } from 'svelte';
   import './Dashboard.css';
+  import { installAppAlert, notifyAppAlert } from './app-alert.js';
 
   onMount(() => {
+      const debug = (...args) => console.log("[dashboard-debug]", ...args);
+
+      installAppAlert();
+      debug("onMount:init");
+      window.deleteServer = (serverId) => {
+        try {
+          debug("window.deleteServer", { serverId });
+          return deleteServer(serverId);
+        } catch (e) {
+          console.error("[dashboard-debug] window.deleteServer:error", e);
+          notifyAppAlert("Erro ao executar Remover servidor.");
+          throw e;
+        }
+      };
+      window.unmergeServer = (serverId) => {
+        try {
+          debug("window.unmergeServer", { serverId });
+          return unmergeServer(serverId);
+        } catch (e) {
+          console.error("[dashboard-debug] window.unmergeServer:error", e);
+          notifyAppAlert("Erro ao executar Desfazer merge.");
+          throw e;
+        }
+      };
 
       const API_BASE = (
         localStorage.getItem("api_base") || "http://localhost:8080"
@@ -40,31 +65,82 @@
         if (overlay) overlay.classList.remove("open");
       }
 
-      function showAppAlert(msg) {
-        const existing = document.getElementById("appAlertOverlay");
+      function showConfirmDialog(msg, onConfirm, onCancel) {
+        debug("showConfirmDialog:open", { msg });
+        const existing = document.getElementById("appConfirmOverlay");
         if (existing) existing.remove();
         const overlay = document.createElement("div");
-        overlay.id = "appAlertOverlay";
-        overlay.className = "modal-overlay";
-        overlay.style.display = "flex";
-        overlay.innerHTML = `
-          <div class="modal-box" style="max-width:400px;text-align:center;padding:2rem;">
-            <div class="modal-header" style="margin-bottom:0;">
-              <h3 style="font-size:1rem;">⚠️</h3>
-              <p style="color:var(--ink);font-size:0.9rem;margin-top:1rem;line-height:1.5;">${escapeHtml(msg)}</p>
-            </div>
-            <div class="modal-actions" style="justify-content:center;border:none;margin-top:1.2rem;padding-top:0;">
-              <button class="btn-confirm" style="padding:0.6rem 2rem;">OK</button>
-            </div>
-          </div>
-        `;
-        overlay.querySelector(".btn-confirm").addEventListener("click", () => overlay.remove());
-        overlay.addEventListener("click", (e) => { if (e.target === e.currentTarget) overlay.remove(); });
+        overlay.id = "appConfirmOverlay";
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(12,12,20,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000000;padding:16px;";
+
+        const box = document.createElement("div");
+        box.style.cssText = "background:#fff;border-radius:18px;padding:32px;max-width:400px;width:min(100%,400px);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.28);border:1px solid rgba(12,12,20,0.08);";
+
+        const icon = document.createElement("h3");
+        icon.textContent = "Confirmar";
+        icon.style.cssText = "margin:0;font-family:Inter,sans-serif;font-size:20px;font-weight:800;color:#0c0c14;";
+
+        const text = document.createElement("p");
+        text.textContent = msg;
+        text.style.cssText = "margin:14px 0 0;font-family:Inter,sans-serif;font-size:14px;line-height:1.6;color:#4b5563;";
+
+        const actions = document.createElement("div");
+        actions.style.cssText = "display:flex;justify-content:center;gap:8px;margin-top:20px;";
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.textContent = "Cancelar";
+        cancelBtn.style.cssText = "border:1px solid rgba(12,12,20,0.12);background:#fff;color:#0c0c14;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:700;";
+
+        const confirmBtn = document.createElement("button");
+        confirmBtn.type = "button";
+        confirmBtn.textContent = "Confirmar";
+        confirmBtn.style.cssText = "border:none;background:#1a56ff;color:#fff;padding:10px 24px;border-radius:10px;cursor:pointer;font-weight:700;";
+
+        actions.appendChild(cancelBtn);
+        actions.appendChild(confirmBtn);
+        box.appendChild(icon);
+        box.appendChild(text);
+        box.appendChild(actions);
+        overlay.appendChild(box);
+
+        confirmBtn.addEventListener("click", () => {
+          debug("showConfirmDialog:confirm", { msg });
+          overlay.remove();
+          if (onConfirm) onConfirm();
+        });
+        cancelBtn.addEventListener("click", () => {
+          debug("showConfirmDialog:cancel", { msg });
+          overlay.remove();
+          if (onCancel) onCancel();
+        });
+        overlay.addEventListener("click", (e) => {
+          if (e.target === e.currentTarget) {
+            debug("showConfirmDialog:backdrop-cancel", { msg });
+            overlay.remove();
+            if (onCancel) onCancel();
+          }
+        });
         document.body.appendChild(overlay);
+        debug("showConfirmDialog:mounted", {
+          hasOverlay: !!document.getElementById("appConfirmOverlay"),
+        });
+        requestAnimationFrame(() => {
+          const style = window.getComputedStyle(overlay);
+          const rect = box.getBoundingClientRect();
+          debug("showConfirmDialog:layout", {
+            display: style.display,
+            visibility: style.visibility,
+            opacity: style.opacity,
+            zIndex: style.zIndex,
+            boxWidth: Math.round(rect.width),
+            boxHeight: Math.round(rect.height),
+          });
+        });
       }
 
       async function loginWith(provider) {
-        if (!supabaseClient) return showAppAlert("Supabase não configurado.");
+        if (!supabaseClient) return window.showAppAlert("Supabase não configurado.");
         showLoading("Redirecionando para " + provider + "...");
         const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
         if (error) {
@@ -190,12 +266,12 @@
               });
             },
             onApprove: function(data) {
-              showAppAlert("Subscrição ativada!");
+              window.showAppAlert("Subscrição ativada!");
               document.getElementById("paypalModal").classList.remove("open");
             },
             onError: function(err) {
               console.error("PayPal error:", err);
-              showAppAlert("Erro ao processar pagamento.");
+              window.showAppAlert("Erro ao processar pagamento.");
             },
           }).render("#paypal-button-container");
         }
@@ -249,12 +325,7 @@
         card.addEventListener("drop", (e) => {
           e.preventDefault();
           card.classList.remove("drag-over");
-          const srcId = e.dataTransfer.getData("text/plain");
-          if (!srcId || srcId === s.server_id) return;
           document.querySelectorAll(".server-card").forEach((c) => c.classList.remove("drag-over"));
-          const srcCard = document.querySelector(`.server-card[data-server-id="${srcId}"]`);
-          const srcName = srcCard ? srcCard.dataset.serverName : srcId;
-          openMergeModal(srcId, s.server_id, s.name, srcName);
         });
 
         const emoji = isActive
@@ -291,8 +362,12 @@
                 <button onclick="openInspector('${escapeHtml(s.url_sse || "")}', '${s.transport || "http"}'); closeMenu();">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
                 </button>
+
                 <button onclick="editServer('${s.server_id}', '${escapeHtml(s.name || "")}', '${s.transport || "http"}'); closeMenu();">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> Editar
+                </button>
+                <button onclick="openMergeModalFromMenu('${s.server_id}', '${escapeHtml(s.name || "")}'); closeMenu();">
+                  <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> Merge
                 </button>
                 <div class="menu-divider"></div>
                 <button onclick="toggleServerStatus('${s.server_id}'); closeMenu();">
@@ -300,11 +375,11 @@
                   ${isActive ? "Desativar" : "Ativar"}
                 </button>
                 ${isMerged ? `<div class="menu-divider"></div>
-                <button onclick="unmergeServer('${s.server_id}'); closeMenu();">
+                <button data-action="unmerge" data-server-id="${s.server_id}">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> Desfazer Merge
                 </button>` : ""}
                 <div class="menu-divider"></div>
-                <button class="menu-danger" onclick="deleteServer('${s.server_id}'); closeMenu();">
+                <button class="menu-danger" data-action="delete" data-server-id="${s.server_id}">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> Remover
                 </button>
               </div>
@@ -386,11 +461,13 @@
           showLoading("Servidor criado! Carregando...", false);
           await loadServers();
           hideLoading();
+          window.showAppAlert("Servidor criado com sucesso.");
           const cards = document.querySelectorAll(".server-card");
           if (cards.length > 0)
             cards[0].scrollIntoView({ behavior: "smooth", block: "center" });
         } catch (err) {
           if (errorEl) showModalError(errorEl, err.message);
+          window.showAppAlert("Erro ao criar servidor: " + err.message);
         } finally {
           if (btn) {
             btn.disabled = false;
@@ -400,28 +477,39 @@
       }
 
       // ─── Delete Server ─────────────────────────────────────
-      async function deleteServer(serverId) {
-        if (!confirm("Remover este servidor permanentemente?")) return;
-        const card = document.querySelector(
-          `.server-card[data-server-id="${serverId}"]`,
-        );
-        if (!card) return;
-        card.style.opacity = "0";
-        card.style.transform = "translateX(20px)";
-        card.style.transition = "all 0.3s";
-        try {
-          await apiFetch(`/v1/servers/${serverId}`, { method: "DELETE" });
-          setTimeout(() => {
-            card.remove();
-            const sc = document.getElementById("serverCount");
-            if (sc) sc.textContent = document.querySelectorAll(".server-card").length;
-            if (activeServerId === serverId) activeServerId = null;
-          }, 300);
-        } catch (err) {
-          card.style.opacity = "1";
-          card.style.transform = "";
-          showAppAlert("Erro ao alterar status: " + err.message);
-        }
+      function deleteServer(serverId) {
+        debug("deleteServer:start", { serverId });
+        showConfirmDialog("Remover este servidor permanentemente?", () => {
+          debug("deleteServer:onConfirm", { serverId });
+          const card = document.querySelector(
+            `.server-card[data-server-id="${serverId}"]`,
+          );
+          debug("deleteServer:cardLookup", { serverId, found: !!card });
+          if (!card) return;
+          card.style.opacity = "0";
+          card.style.transform = "translateX(20px)";
+          card.style.transition = "all 0.3s";
+          (async () => {
+            try {
+              debug("deleteServer:apiFetch", { serverId });
+              await apiFetch(`/v1/servers/${serverId}`, { method: "DELETE" });
+              debug("deleteServer:apiSuccess", { serverId });
+              setTimeout(() => {
+                debug("deleteServer:timeout-fired", { serverId });
+                card.remove();
+                const sc = document.getElementById("serverCount");
+                if (sc) sc.textContent = document.querySelectorAll(".server-card").length;
+                if (activeServerId === serverId) activeServerId = null;
+                notifyAppAlert("Servidor removido com sucesso.");
+              }, 300);
+            } catch (err) {
+              console.error("[dashboard-debug] deleteServer:apiError", err);
+              card.style.opacity = "1";
+              card.style.transform = "";
+              notifyAppAlert("Erro ao remover: " + err.message);
+            }
+          })();
+        });
       }
 
       // ─── Toggle Status ──────────────────────────────────────
@@ -435,20 +523,28 @@
             body: JSON.stringify({ status: isActive ? "inactive" : "active" }),
           });
           await loadServers();
+          window.showAppAlert(`Servidor ${isActive ? "desativado" : "ativado"} com sucesso.`);
         } catch (err) {
-          showAppAlert("Erro ao alterar status: " + err.message);
+          window.showAppAlert("Erro ao alterar status: " + err.message);
         }
       }
 
       // ─── Unmerge ────────────────────────────────────────────
-      async function unmergeServer(serverId) {
-        if (!confirm("Desfazer merge deste servidor?")) return;
-        try {
-          await apiFetch(`/v1/servers/${serverId}/unmerge`, { method: "POST" });
-          await loadServers();
-        } catch (err) {
-          showAppAlert("Erro ao desfazer merge: " + err.message);
-        }
+      function unmergeServer(serverId) {
+        debug("unmergeServer:start", { serverId });
+        showConfirmDialog("Desfazer merge deste servidor?", async () => {
+          try {
+            debug("unmergeServer:apiFetch", { serverId });
+            await apiFetch(`/v1/servers/${serverId}/unmerge`, { method: "POST" });
+            debug("unmergeServer:apiSuccess", { serverId });
+            await loadServers();
+            debug("unmergeServer:loadServers:done", { serverId });
+            notifyAppAlert("Merge desfeito com sucesso.");
+          } catch (err) {
+            console.error("[dashboard-debug] unmergeServer:apiError", err);
+            notifyAppAlert("Erro ao desfazer merge: " + err.message);
+          }
+        });
       }
 
       // ─── Menu Portal ───────────────────────────────────────
@@ -458,6 +554,10 @@
       let activeMenuOriginWrapper = null;
 
       function toggleMenu(btn) {
+        debug("toggleMenu:click", {
+          hasPortal: !!portal,
+          hasButton: !!btn,
+        });
         if (!portal) return;
         const wrapper = btn.closest(".menu-wrapper");
         if (!wrapper) return;
@@ -475,6 +575,9 @@
         menu.classList.add("open");
         activeMenu = menu;
         activeMenuOriginWrapper = wrapper;
+        debug("toggleMenu:opened", {
+          serverId: wrapper.closest(".server-card")?.dataset?.serverId || null,
+        });
 
         const rect = btn.getBoundingClientRect();
         const menuW = 200;
@@ -487,10 +590,12 @@
         menu.style.top = top + "px";
         menu.style.minWidth = menuW + "px";
       }
+      window.toggleMenu = toggleMenu;
 
       function closeMenu() {
         closeAllMenus();
       }
+      window.closeMenu = closeMenu;
 
       function closeAllMenus() {
         if (!portal) return;
@@ -503,6 +608,25 @@
         }
         portal.classList.remove("open");
       }
+      window.closeAllMenus = closeAllMenus;
+
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-action]");
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const serverId = btn.dataset.serverId;
+        debug("menu-action:captured", { action, serverId });
+        if (!action || !serverId) return;
+        if (action === "delete") {
+          closeAllMenus();
+          deleteServer(serverId);
+          return;
+        }
+        if (action === "unmerge") {
+          closeAllMenus();
+          unmergeServer(serverId);
+        }
+      }, true);
 
       document.addEventListener("click", (e) => {
         if (
@@ -517,25 +641,121 @@
       // ─── Merge ─────────────────────────────────────────────
       let mergeSourceId = null;
       let mergeTargetId = null;
+      let mergeMode = "local";
 
-      function openMergeModal(sourceId, targetId, targetName, sourceName) {
-        mergeSourceId = sourceId;
-        mergeTargetId = targetId;
+      function populateMergeTargets(excludeId) {
+        const sel = document.getElementById("mergeTargetSelect");
+        if (!sel) return;
+        sel.innerHTML = '<option value="">Selecione um servidor...</option>';
+        document.querySelectorAll(".server-card").forEach((card) => {
+          const sid = card.dataset.serverId;
+          const sname = card.dataset.serverName || sid;
+          if (sid && sid !== excludeId) {
+            const opt = document.createElement("option");
+            opt.value = sid;
+            opt.textContent = sname;
+            sel.appendChild(opt);
+          }
+        });
+      }
+
+      function setMergeTab(mode) {
+        mergeMode = mode;
+        const localTab = document.getElementById("mergeTabLocal");
+        const remoteTab = document.getElementById("mergeTabRemote");
+        const sandboxTab = document.getElementById("mergeTabSandbox");
+        const localFields = document.getElementById("mergeLocalFields");
+        const remoteFields = document.getElementById("mergeRemoteFields");
+        const sandboxFields = document.getElementById("mergeSandboxFields");
+        if (localTab) localTab.classList.toggle("active", mode === "local");
+        if (remoteTab) remoteTab.classList.toggle("active", mode === "remote");
+        if (sandboxTab) sandboxTab.classList.toggle("active", mode === "sandbox");
+        if (localFields) localFields.style.display = mode === "local" ? "" : "none";
+        if (remoteFields) remoteFields.style.display = mode === "remote" ? "" : "none";
+        if (sandboxFields) sandboxFields.style.display = mode === "sandbox" ? "" : "none";
+        const mergeSub = document.getElementById("mergeSub");
+        if (mergeSub) {
+          const labels = { local: "Fusão de servidores no rest2mcp com namespace automático", remote: "Fusão de um servidor local com um servidor MCP remoto", sandbox: "Instalação temporária de um servidor MCP via npx, pipx ou uv" };
+          mergeSub.textContent = labels[mode] || "";
+        }
+      }
+      window.setMergeTab = setMergeTab;
+
+      function openMergeModalFromMenu(serverId, serverName) {
+        mergeMode = "local";
+        mergeSourceId = serverId;
+        mergeTargetId = null;
+        populateMergeTargets(serverId);
+        setMergeTab("local");
         const mm = document.getElementById("mergeModal");
         const mn = document.getElementById("mergeName");
         const me = document.getElementById("mergeError");
         const bc = document.getElementById("btnMergeConfirm");
+        const mr = document.getElementById("mergeRemoteUrl");
+        const sj = document.getElementById("mergeStdioJson");
+        const sns = document.getElementById("mergeStdioNamespace");
         if (mn) {
           mn.value = "";
-          mn.placeholder = `Ex: ${targetName} (Merged)`;
+          mn.placeholder = `Ex: ${serverName} (Merged)`;
         }
+        if (mr) mr.value = "";
+        if (sj) sj.value = "";
+        if (sns) sns.value = "";
         if (me) showModalError(me, "");
         if (bc) {
           bc.disabled = false;
           bc.textContent = "Criar Servidor Merged";
         }
         if (mm) mm.classList.add("open");
-        setTimeout(() => { const f = document.getElementById("mergeName"); if (f) f.focus(); }, 120);
+        setTimeout(() => { const f = document.getElementById("mergeTargetSelect"); if (f) f.focus(); }, 120);
+      }
+      window.openMergeModalFromMenu = openMergeModalFromMenu;
+
+      function openRemoteMergeModal(serverId, serverName) {
+        mergeMode = "remote";
+        mergeSourceId = serverId;
+        mergeTargetId = null;
+        setMergeTab("remote");
+        const mm = document.getElementById("mergeModal");
+        const mn = document.getElementById("mergeName");
+        const me = document.getElementById("mergeError");
+        const bc = document.getElementById("btnMergeConfirm");
+        const mr = document.getElementById("mergeRemoteUrl");
+        if (mn) {
+          mn.value = "";
+          mn.placeholder = `Ex: ${serverName} (Merged)`;
+        }
+        if (mr) mr.value = "";
+        if (me) showModalError(me, "");
+        if (bc) {
+          bc.disabled = false;
+          bc.textContent = "Criar Servidor Merged";
+        }
+        if (mm) mm.classList.add("open");
+        setTimeout(() => { const f = document.getElementById("mergeRemoteUrl"); if (f) f.focus(); }, 120);
+      }
+      window.openRemoteMergeModal = openRemoteMergeModal;
+
+      function fillSandbox(command, args, extra) {
+        const cfg = { command, args: args.split(" ").filter(Boolean) };
+        if (extra) cfg.args.push(extra);
+        const ta = document.getElementById("mergeStdioJson");
+        if (ta) ta.value = JSON.stringify(cfg, null, 2);
+        const ns = document.getElementById("mergeStdioNamespace");
+        if (ns) {
+          const name = command === "npx" ? args.split("/").pop() || args : args.split(" ")[0] || command;
+          ns.value = name.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+        }
+      }
+      window.fillSandbox = fillSandbox;
+
+      function autoNamespaceFromUrl(url) {
+        try {
+          const u = new URL(url);
+          return u.hostname.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "remote";
+        } catch {
+          return "remote";
+        }
       }
 
       function closeMergeModal() {
@@ -543,7 +763,158 @@
         if (mm) mm.classList.remove("open");
         mergeSourceId = null;
         mergeTargetId = null;
+        mergeMode = "local";
       }
+      window.closeMergeModal = closeMergeModal;
+
+      // ─── Store ─────────────────────────────────────────────
+      let _storeAllServers = [];
+      let _storeFacets = { hostingTypes: [], categories: [] };
+      let _storeFilterHosting = "";
+      let _storeFilterCategory = "";
+
+      function closeStoreModal() {
+        document.getElementById("storeModal")?.classList.remove("open");
+      }
+      window.closeStoreModal = closeStoreModal;
+
+      async function openStoreModal() {
+        const modal = document.getElementById("storeModal");
+        const grid = document.getElementById("storeGrid");
+        if (!modal || !grid) return;
+        modal.classList.add("open");
+        grid.innerHTML = "<div class='store-loading'>A carregar loja...</div>";
+        _storeFilterHosting = "";
+        _storeFilterCategory = "";
+        try {
+          const res = await fetch("/v1/store/servers");
+          if (!res.ok) throw new Error("Erro ao carregar loja");
+          const data = await res.json();
+          _storeAllServers = data.servers || [];
+          _storeFacets = data.facets || { hostingTypes: [], categories: [] };
+          _renderStoreFilters();
+          searchStore();
+        } catch (err) {
+          grid.innerHTML = "<div class='store-loading store-error'>Erro ao carregar servidores. Tente novamente.</div>";
+        }
+      }
+      window.openStoreModal = openStoreModal;
+
+      function setStoreFilterHosting(type) {
+        _storeFilterHosting = _storeFilterHosting === type ? "" : type;
+        _renderStoreFilters();
+        searchStore();
+      }
+      window.setStoreFilterHosting = setStoreFilterHosting;
+
+      function setStoreFilterCategory(cat) {
+        _storeFilterCategory = _storeFilterCategory === cat ? "" : cat;
+        _renderStoreFilters();
+        searchStore();
+      }
+      window.setStoreFilterCategory = setStoreFilterCategory;
+
+      function _renderStoreFilters() {
+        const bar = document.getElementById("storeFilterBar");
+        const catBar = document.getElementById("storeCategoryBar");
+        if (!bar) return;
+
+        const hostLabels = { "remote-capable": "☁️ Remoto", "hybrid": "🔄 Híbrido", "local-only": "💻 Local" };
+        bar.innerHTML = _storeFacets.hostingTypes.map(t =>
+          `<button class="store-filter-btn${_storeFilterHosting === t ? " active" : ""}" onclick="setStoreFilterHosting('${_escHtml(t)}')">${hostLabels[t] || t}</button>`
+        ).join("");
+
+        if (catBar) {
+          catBar.innerHTML = _storeFacets.categories.map(c =>
+            `<button class="store-cat-item${_storeFilterCategory === c.id ? " active" : ""}" onclick="setStoreFilterCategory('${_escHtml(c.id)}')"><span class="store-cat-name">${_escHtml(c.name)}</span><span class="store-cat-count">${c.count}</span></button>`
+          ).join("");
+        }
+      }
+
+      function searchStore() {
+        const q = (document.getElementById("storeSearch")?.value || "").toLowerCase();
+        let filtered = _storeAllServers;
+        if (q) {
+          filtered = filtered.filter(s =>
+            (s.name || "").toLowerCase().includes(q) ||
+            (s.description || "").toLowerCase().includes(q) ||
+            (s.namespace || "").toLowerCase().includes(q) ||
+            (s.slug || "").toLowerCase().includes(q)
+          );
+        }
+        if (_storeFilterHosting) {
+          filtered = filtered.filter(s =>
+            (s.attributes || []).includes("hosting:" + _storeFilterHosting)
+          );
+        }
+        if (_storeFilterCategory) {
+          filtered = filtered.filter(s =>
+            (s.categories || []).includes(_storeFilterCategory)
+          );
+        }
+        _renderStoreGrid(filtered);
+      }
+      window.searchStore = searchStore;
+
+      function _renderStoreGrid(servers) {
+        const grid = document.getElementById("storeGrid");
+        if (!grid) return;
+        if (!servers.length) {
+          grid.innerHTML = "<div class='store-loading'>Nenhum servidor encontrado.</div>";
+          return;
+        }
+        grid.innerHTML = servers.map(s => {
+          const name = s.name || s.slug || "MCP Server";
+          const desc = s.description || "";
+          const tags = (s.attributes || []).map(a => a.split(":")[1] || a).filter(Boolean);
+          const hostType = (s.attributes || []).find(a => a.startsWith("hosting:"))?.split(":")[1] || "";
+          const badge = hostType === "remote-capable" ? "☁️ Remoto" : hostType === "hybrid" ? "🔄 Híbrido" : "💻 Local";
+          const namespace = s.namespace || "";
+          const toolCount = (s.tools || []).length;
+          return `<div class="store-card" onclick="installFromStore('${_escHtml(s.id || "")}', '${_escHtml(namespace)}', '${_escHtml(s.slug || "")}', '${_escHtml(name)}', '${_escHtml(hostType)}')">
+            <div class="store-card-icon"><span class="store-card-emoji">🧩</span></div>
+            <div class="store-card-body">
+              <div class="store-card-name">${_escHtml(name)}</div>
+              <div class="store-card-desc">${_escHtml(desc)}</div>
+              <div class="store-card-footer">
+                <span class="store-card-badge">${badge}</span>
+                ${namespace ? `<span class="store-card-cmd">${_escHtml(namespace)}</span>` : ""}
+                ${toolCount > 0 ? `<span class="store-card-tag">${toolCount} tools</span>` : ""}
+              </div>
+            </div>
+          </div>`;
+        }).join("");
+      }
+
+      function _escHtml(str) {
+        if (!str) return "";
+        return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      }
+
+      function installFromStore(serverId, namespace, slug, name, hostType) {
+        closeStoreModal();
+        if (hostType === "remote-capable") {
+          const tab = document.getElementById("mergeTabRemote");
+          if (tab) tab.click();
+          const urlInput = document.getElementById("mergeRemoteUrl");
+          if (urlInput) urlInput.value = `https://glama.ai/mcp/servers/${_escHtml(serverId)}`;
+          return;
+        }
+        const tab = document.getElementById("mergeTabSandbox");
+        if (tab) tab.click();
+        let pkg = name;
+        if (!pkg.startsWith("@") && namespace && slug) {
+          pkg = `${namespace}/${slug}`;
+        }
+        const cfg = { command: "npx", args: ["-y", pkg] };
+        const ta = document.getElementById("mergeStdioJson");
+        if (ta) ta.value = JSON.stringify(cfg, null, 2);
+        const ns = document.getElementById("mergeStdioNamespace");
+        if (ns && name) {
+          ns.value = name.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+        }
+      }
+      window.installFromStore = installFromStore;
 
       async function confirmMerge() {
         const name = document.getElementById("mergeName")?.value?.trim();
@@ -551,6 +922,76 @@
         const btn = document.getElementById("btnMergeConfirm");
         if (errorEl) showModalError(errorEl, "");
         if (!name) { if (errorEl) showModalError(errorEl, "Informe o nome do servidor merged."); return; }
+
+        if (mergeMode === "sandbox") {
+          const jsonText = document.getElementById("mergeStdioJson")?.value?.trim();
+          if (!jsonText) { if (errorEl) showModalError(errorEl, "Informe a configuração JSON do servidor."); return; }
+          let stdioConfig;
+          try { stdioConfig = JSON.parse(jsonText); } catch {
+            if (errorEl) showModalError(errorEl, "JSON inválido. Verifique a sintaxe.");
+            return;
+          }
+          if (!stdioConfig.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command'."); return; }
+          const namespace = document.getElementById("mergeStdioNamespace")?.value?.trim() ||
+            stdioConfig.command.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+          if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
+          try {
+            await apiFetch("/v1/servers/merge", {
+              method: "POST",
+              body: JSON.stringify({ source_server_id: mergeSourceId, stdio_config: stdioConfig, namespace, merged_name: name }),
+            });
+            closeMergeModal();
+            showLoading("Servidor merged criado! Carregando...", false);
+            await loadServers();
+            hideLoading();
+            window.showAppAlert("Servidor merged (sandbox) criado com sucesso.");
+          } catch (err) {
+            if (errorEl) showModalError(errorEl, err.message);
+            window.showAppAlert("Erro no merge sandbox: " + err.message);
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
+          }
+          return;
+        }
+
+        if (mergeMode === "remote") {
+          const remoteUrl = document.getElementById("mergeRemoteUrl")?.value?.trim();
+          if (!remoteUrl) { if (errorEl) showModalError(errorEl, "Informe a URL do servidor MCP remoto."); return; }
+          if (!remoteUrl.startsWith("http://") && !remoteUrl.startsWith("https://")) {
+            if (errorEl) showModalError(errorEl, "URL inválida. Deve começar com http:// ou https://");
+            return;
+          }
+          if (!remoteUrl.endsWith("/mcp") && !remoteUrl.endsWith("/sse")) {
+            if (errorEl) showModalError(errorEl, "URL inválida. O endereço deve terminar com /mcp ou /sse para ser uma rota MCP válida.");
+            return;
+          }
+          const remoteTransport = remoteUrl.endsWith("/sse") ? "sse" : "http";
+          const namespace = autoNamespaceFromUrl(remoteUrl);
+          if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
+          try {
+            await apiFetch("/v1/servers/merge", {
+              method: "POST",
+              body: JSON.stringify({ source_server_id: mergeSourceId, remote_url: remoteUrl, remote_transport: remoteTransport, namespace, merged_name: name }),
+            });
+            closeMergeModal();
+            showLoading("Servidor merged criado! Carregando...", false);
+            await loadServers();
+            hideLoading();
+            window.showAppAlert("Servidor merged (remoto) criado com sucesso.");
+          } catch (err) {
+            if (errorEl) showModalError(errorEl, err.message);
+            window.showAppAlert("Erro no merge remoto: " + err.message);
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
+          }
+          return;
+        }
+
+        // Local merge (select box)
+        const targetId = document.getElementById("mergeTargetSelect")?.value;
+        if (!targetId) { if (errorEl) showModalError(errorEl, "Selecione um servidor alvo."); return; }
+        mergeTargetId = targetId;
+
         const srcCard = document.querySelector(`.server-card[data-server-id="${mergeSourceId}"]`);
         const srcName = srcCard?.dataset?.serverName || mergeSourceId;
         const namespace = String(srcName).toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "merged";
@@ -558,19 +999,22 @@
         try {
           await apiFetch("/v1/servers/merge", {
             method: "POST",
-            body: JSON.stringify({ source_server_id: mergeSourceId, target_server_id: mergeTargetId, namespace, merged_name: name }),
+            body: JSON.stringify({ source_server_id: mergeSourceId, target_server_id: targetId, namespace, merged_name: name }),
           });
           closeMergeModal();
           showLoading("Servidor merged criado! Carregando...", false);
           await loadServers();
           hideLoading();
+          window.showAppAlert("Servidor merged (local) criado com sucesso.");
         } catch (err) {
           if (errorEl) showModalError(errorEl, err.message);
+          window.showAppAlert("Erro no merge local: " + err.message);
         } finally {
           if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
         }
       }
 
+      window.confirmMerge = confirmMerge;
       const mergeModal = document.getElementById("mergeModal");
       if (mergeModal) mergeModal.addEventListener("click", (e) => {
         if (e.target === e.currentTarget) closeMergeModal();
@@ -611,8 +1055,10 @@
           });
           closeEditModal();
           await loadServers();
+          window.showAppAlert("Servidor atualizado com sucesso.");
         } catch (err) {
           if (errorEl) showModalError(errorEl, err.message);
+          window.showAppAlert("Erro ao atualizar servidor: " + err.message);
         } finally {
           if (btn) {
             btn.disabled = false;
@@ -864,15 +1310,17 @@
         window.open(`${API_BASE}/v1/servers/${activeServerId}/logs/export?format=${format}`, "_blank");
       }
 
-      async function clearLogs() {
+      function clearLogs() {
         if (!activeServerId) return;
-        if (!confirm("Limpar todos os logs deste servidor?")) return;
-        try {
-          await apiFetch(`/v1/servers/${activeServerId}/logs`, { method: "DELETE" });
-          pollLogs();
-        } catch (err) {
-          showAppAlert("Erro ao limpar logs: " + err.message);
-        }
+        showConfirmDialog("Limpar todos os logs deste servidor?", async () => {
+          try {
+            await apiFetch(`/v1/servers/${activeServerId}/logs`, { method: "DELETE" });
+            pollLogs();
+            window.showAppAlert("Logs limpos com sucesso.");
+          } catch (err) {
+            window.showAppAlert("Erro ao limpar logs: " + err.message);
+          }
+        });
       }
 
       function startLogsPolling() {
@@ -916,6 +1364,12 @@
             if (session?.access_token) {
               localStorage.setItem("supabase_token", session.access_token);
               currentUser = session.user;
+
+              if (event === "PASSWORD_RECOVERY") {
+                openResetPasswordModal();
+                return;
+              }
+
               fetchProfile();
               loadServers();
             } else if (event === "SIGNED_OUT") {
@@ -952,7 +1406,6 @@
       window.createServer = createServer;
       window.saveEdit = saveEdit;
       window.closeEditModal = closeEditModal;
-      window.openMergeModal = openMergeModal;
       window.closeMergeModal = closeMergeModal;
       window.confirmMerge = confirmMerge;
       window.closeLogDetail = closeLogDetail;
@@ -961,8 +1414,17 @@
       window.loadServers = loadServers;
       window.switchLogServer = switchLogServer;
       window.debouncePoll = debouncePoll;
-      window.showPayPal = showPayPal;
-      window.pollLogs = pollLogs;
+        window.showPayPal = showPayPal;
+        window.pollLogs = pollLogs;
+        window.setMergeTab = setMergeTab;
+        window.openMergeModalFromMenu = openMergeModalFromMenu;
+        window.openRemoteMergeModal = openRemoteMergeModal;
+        window.showConfirmDialog = showConfirmDialog;
+        window.openResetPasswordModal = openResetPasswordModal;
+        window.closeResetPasswordModal = closeResetPasswordModal;
+        window.confirmResetPassword = confirmResetPassword;
+        window.toggleChangePassword = toggleChangePassword;
+        window.saveNewPassword = saveNewPassword;
 
       // ─── Profile Modal ─────────────────────────────────────
         function openProfileModal() {
@@ -1060,6 +1522,94 @@
           await logout();
         }
 
+        // ─── Reset Password (recovery flow) ──────────────────
+        function openResetPasswordModal() {
+          const rm = document.getElementById("resetPasswordModal");
+          const rp = document.getElementById("resetPasswordInput");
+          const re = document.getElementById("resetPasswordError");
+          const rb = document.getElementById("btnResetPassword");
+          if (rp) rp.value = "";
+          if (re) re.textContent = "";
+          if (rb) { rb.disabled = false; rb.textContent = "Redefinir Palavra-passe"; }
+          if (rm) rm.classList.add("open");
+          setTimeout(() => { if (rp) rp.focus(); }, 120);
+        }
+
+        function closeResetPasswordModal() {
+          const rm = document.getElementById("resetPasswordModal");
+          if (rm) rm.classList.remove("open");
+        }
+
+        async function confirmResetPassword() {
+          const password = document.getElementById("resetPasswordInput")?.value;
+          const errorEl = document.getElementById("resetPasswordError");
+          const btn = document.getElementById("btnResetPassword");
+          if (errorEl) errorEl.textContent = "";
+          if (!password || password.length < 6) {
+            if (errorEl) errorEl.textContent = "A palavra-passe deve ter pelo menos 6 caracteres.";
+            return;
+          }
+          if (btn) { btn.disabled = true; btn.textContent = "A redefinir..."; }
+          try {
+            const { error } = await supabaseClient.auth.updateUser({ password });
+            if (error) {
+              if (errorEl) errorEl.textContent = error.message;
+              window.showAppAlert("Erro ao redefinir: " + error.message);
+            } else {
+              window.showAppAlert("Palavra-passe redefinida com sucesso!");
+              closeResetPasswordModal();
+              fetchProfile();
+              loadServers();
+            }
+          } catch (err) {
+            if (errorEl) errorEl.textContent = err.message;
+            window.showAppAlert("Erro ao redefinir: " + err.message);
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Redefinir Palavra-passe"; }
+          }
+        }
+
+        // ─── Change Password (profile) ────────────────────────
+        function toggleChangePassword() {
+          const section = document.getElementById("changePasswordSection");
+          const btn = document.getElementById("toggleChangePasswordBtn");
+          if (!section) return;
+          const isHidden = section.style.display === "none" || !section.style.display;
+          section.style.display = isHidden ? "block" : "none";
+          if (btn) btn.textContent = isHidden ? "Cancelar" : "Alterar Palavra-passe";
+          if (isHidden) {
+            const np = document.getElementById("newPasswordInput");
+            if (np) { np.value = ""; setTimeout(() => np.focus(), 100); }
+          }
+        }
+
+        async function saveNewPassword() {
+          const password = document.getElementById("newPasswordInput")?.value;
+          const errorEl = document.getElementById("changePasswordError");
+          const btn = document.getElementById("btnSavePassword");
+          if (errorEl) errorEl.textContent = "";
+          if (!password || password.length < 6) {
+            if (errorEl) errorEl.textContent = "A nova palavra-passe deve ter pelo menos 6 caracteres.";
+            return;
+          }
+          if (btn) { btn.disabled = true; btn.textContent = "A guardar..."; }
+          try {
+            const { error } = await supabaseClient.auth.updateUser({ password });
+            if (error) {
+              if (errorEl) errorEl.textContent = error.message;
+              window.showAppAlert("Erro ao alterar: " + error.message);
+            } else {
+              window.showAppAlert("Palavra-passe alterada com sucesso!");
+              toggleChangePassword();
+            }
+          } catch (err) {
+            if (errorEl) errorEl.textContent = err.message;
+            window.showAppAlert("Erro ao alterar: " + err.message);
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Guardar"; }
+          }
+        }
+
         // Expose to window for inline HTML onclick handlers
         window.loginWith = loginWith;
         window.logout = logout;
@@ -1082,17 +1632,26 @@
         window.createServer = createServer;
         window.saveEdit = saveEdit;
         window.closeEditModal = closeEditModal;
-        window.openMergeModal = openMergeModal;
+        window.openMergeModalFromMenu = openMergeModalFromMenu;
         window.closeMergeModal = closeMergeModal;
         window.confirmMerge = confirmMerge;
         window.closeLogDetail = closeLogDetail;
         window.exportLogs = exportLogs;
         window.clearLogs = clearLogs;
+        window.showConfirmDialog = showConfirmDialog;
         window.loadServers = loadServers;
         window.switchLogServer = switchLogServer;
         window.debouncePoll = debouncePoll;
         window.showPayPal = showPayPal;
         window.pollLogs = pollLogs;
+        window.openResetPasswordModal = openResetPasswordModal;
+        window.closeResetPasswordModal = closeResetPasswordModal;
+        window.confirmResetPassword = confirmResetPassword;
+        window.toggleChangePassword = toggleChangePassword;
+        window.saveNewPassword = saveNewPassword;
+
+        const _stdioTa = document.getElementById("mergeStdioJson");
+        if (_stdioTa) _stdioTa.placeholder = '{\n  "command": "uvx",\n  "args": ["mcp-excel-server"]\n}';
     
   });
 </script>
@@ -1232,6 +1791,39 @@
               Aguardando atividade...
             </div>
           </div>
+          <div class="sidebar-logs" style="margin-top: 12px;">
+            <div class="sidebar-logs-header">
+              <div class="logs-header-left">
+                <span class="log-title" style="font-size:0.7rem;">Clientes MCP</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 4px;">
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/vscode-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                VS Code
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/claude-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Claude
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="https://cdn.simpleicons.org/cursor/00C2FF" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Cursor
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="https://cdn.simpleicons.org/cline/EC4899" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Cline
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/windsurf-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                Windsurf
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
+                <img src="/logos/opencode-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
+                OpenCode
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1241,16 +1833,104 @@
       <div class="modal-box">
         <div class="modal-header">
           <h3>Merge de Servidores</h3>
-          <p class="modal-sub">Fusão de dois servidores MCP com namespace automático</p>
+          <p class="modal-sub" id="mergeSub">Fusão de dois servidores MCP com namespace automático</p>
+        </div>
+        <div class="merge-tabs">
+          <button class="merge-tab active" id="mergeTabLocal" onclick="setMergeTab('local')">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="10" height="10" rx="2"/><path d="M8 6v4M6 8h4"/></svg>
+            Servidores no rest2mcp
+          </button>
+          <button class="merge-tab" id="mergeTabRemote" onclick="setMergeTab('remote')">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M3 8h10M8 3a11 11 0 010 10M3.5 5.5A11 11 0 0012.5 5.5M3.5 10.5a11 11 0 019 0"/></svg>
+            Servidor remoto MCP
+          </button>
+          <button class="merge-tab" id="mergeTabSandbox" onclick="setMergeTab('sandbox')">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M8 5v6"/></svg>
+            Sandbox / JSON
+          </button>
         </div>
         <div class="form-group">
           <label for="mergeName">Nome do Servidor Merged</label>
           <input type="text" id="mergeName" placeholder="Ex: API Unificada" />
         </div>
+        <div id="mergeLocalFields" style="display:block">
+          <div class="form-group">
+            <label for="mergeTargetSelect">Servidor alvo</label>
+            <select id="mergeTargetSelect"><option value="">Selecione um servidor...</option></select>
+            <p class="form-hint">Servidor rest2mcp que será fundido com o servidor fonte</p>
+          </div>
+        </div>
+        <div id="mergeRemoteFields" style="display:none">
+          <div class="form-group">
+            <label for="mergeRemoteUrl">URL do Servidor MCP Remoto</label>
+            <input type="url" id="mergeRemoteUrl" placeholder="https://servidor-mcp.exemplo.com/mcp" />
+            <p class="form-hint">A URL deve terminar com <strong>/mcp</strong> (Streamable HTTP) ou <strong>/sse</strong> (SSE)</p>
+          </div>
+        </div>
+        <div id="mergeSandboxFields" style="display:none">
+          <div class="form-group">
+            <label>Quick-select</label>
+            <div class="sandbox-presets" aria-label="Quick-select de servidores MCP populares">
+              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-excel-server')">📊 Excel</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('npx', '@modelcontextprotocol/server-filesystem', '.')">📁 File System</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('pipx', 'mcp-server-sqlite')">🗄️ SQLite</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-server-pdf')">📄 PDF</button>
+            </div>
+            <div class="store-divider"><span>ou</span></div>
+            <button class="btn-store" onclick="openStoreModal()">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
+              Instalar a partir da loja
+            </button>
+          </div>
+          <div class="form-group">
+            <label for="mergeStdioJson">Config JSON</label>
+            <textarea id="mergeStdioJson" rows="5" class="code-textarea"></textarea>
+            <p class="form-hint">Comando e args do servidor MCP stdio. O ambiente é herdado do gateway.</p>
+          </div>
+          <div class="form-group">
+            <label for="mergeStdioNamespace">Namespace (prefixo das ferramentas)</label>
+            <input type="text" id="mergeStdioNamespace" placeholder="excel, fs, sqlite..." />
+            <p class="form-hint">Ex: namespace "excel" → ferramentas como <strong>excel_read_cells</strong>, <strong>excel_write_row</strong></p>
+          </div>
+        </div>
         <div class="modal-error" id="mergeError"></div>
         <div class="modal-actions">
           <button class="btn-cancel" onclick="closeMergeModal()">Cancelar</button>
           <button class="btn-confirm" id="btnMergeConfirm" onclick="confirmMerge()">Criar Servidor Merged</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STORE MODAL ─────────────────────────────────────────── -->
+    <div class="modal-overlay" id="storeModal">
+      <div class="modal-box store-box">
+        <div class="modal-header">
+          <h3>MCP Server Store</h3>
+          <p class="modal-sub">Encontre e instale servidores MCP públicos</p>
+        </div>
+        <div class="store-layout">
+          <div class="store-sidebar">
+            <div class="store-sidebar-section">
+              <div class="store-sidebar-title">Hosting</div>
+              <div class="store-filter-bar" id="storeFilterBar"></div>
+            </div>
+            <div class="store-sidebar-section">
+              <div class="store-sidebar-title">Categorias</div>
+              <div class="store-cat-list" id="storeCategoryBar"></div>
+            </div>
+          </div>
+          <div class="store-main">
+            <div class="store-search">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
+              <input type="text" id="storeSearch" placeholder="Buscar servidores MCP..." oninput="searchStore()" />
+            </div>
+            <div class="store-grid" id="storeGrid">
+              <div class="store-loading">A carregar loja...</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="closeStoreModal()">Fechar</button>
         </div>
       </div>
     </div>
@@ -1427,6 +2107,25 @@
           </div>
         </div>
 
+        <!-- Change Password -->
+        <div class="profile-section">
+          <div class="profile-section-title" style="cursor:pointer;" onclick="toggleChangePassword()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Palavra-passe
+            <button class="profile-token-btn" id="toggleChangePasswordBtn" style="margin-left:auto;font-size:0.72rem;padding:4px 10px;">Alterar Palavra-passe</button>
+          </div>
+          <div id="changePasswordSection" style="display:none;margin-top:10px;">
+            <div class="profile-token-field" style="margin-bottom:8px;">
+              <input type="password" id="newPasswordInput" class="profile-token-input" placeholder="Nova palavra-passe (mín. 6 caracteres)" style="width:100%;" />
+            </div>
+            <div class="modal-error" id="changePasswordError" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-confirm" id="btnSavePassword" onclick="saveNewPassword()" style="flex:1;">Guardar</button>
+              <button class="btn-cancel" onclick="toggleChangePassword()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div class="profile-modal-actions">
           <button class="btn-cancel" onclick="closeProfileModal()">Fechar</button>
@@ -1434,6 +2133,24 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Terminar Sessão
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RESET PASSWORD MODAL (recovery flow) ────────────────── -->
+    <div class="modal-overlay" id="resetPasswordModal">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-header">
+          <h3>Redefinir Palavra-passe</h3>
+          <p class="modal-sub">Escolha uma nova palavra-passe para a sua conta</p>
+        </div>
+        <div class="form-group">
+          <label for="resetPasswordInput">Nova Palavra-passe</label>
+          <input type="password" id="resetPasswordInput" placeholder="Mínimo 6 caracteres" />
+        </div>
+        <div class="modal-error" id="resetPasswordError"></div>
+        <div class="modal-actions">
+          <button class="btn-confirm" id="btnResetPassword" onclick="confirmResetPassword()">Redefinir Palavra-passe</button>
         </div>
       </div>
     </div>

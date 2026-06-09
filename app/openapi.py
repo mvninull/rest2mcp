@@ -165,15 +165,27 @@ class MCPServerManager:
 
     def _setup_dynamic_login(self):
         email_login_path = None
+        fallback_auth_path = None
         oauth_paths: dict[str, str] = {}
         spec_paths = self.spec.get("paths", {})
         for path, methods in spec_paths.items():
             if "post" not in methods:
                 continue
             lower = path.lower()
-            if any(k in lower for k in ["login", "token", "auth/"]):
+            if "register" in lower or "signup" in lower:
+                continue
+            if "login" in lower:
                 if email_login_path is None:
                     email_login_path = path
+            elif any(k in lower for k in ["token", "auth/"]):
+                if fallback_auth_path is None:
+                    fallback_auth_path = path
+        if email_login_path is None:
+            email_login_path = fallback_auth_path
+        for path, methods in spec_paths.items():
+            if "post" not in methods:
+                continue
+            lower = path.lower()
             for provider in ("google", "github", "apple"):
                 if provider in lower:
                     oauth_paths[provider] = path
@@ -230,7 +242,12 @@ class MCPServerManager:
                                 resp = await auth_client.post(url_to_call, data=payload)
                             if resp.status_code in (200, 201):
                                 data = resp.json()
-                                token = data.get("access_token") or data.get("token") or data.get("jwt") or data.get("id_token")
+                                token = (
+                                    data.get("access_token")
+                                    or data.get("token")
+                                    or data.get("jwt")
+                                    or data.get("id_token")
+                                )
                                 if token:
                                     self.token = token
                                     return "✅ Login realizado com sucesso!"
@@ -295,13 +312,25 @@ def create_merged_mcp_server(
     )
 
     for i, src in enumerate(sources):
-        src_manager = MCPServerManager(
-            spec_url="",
-            name=src.get("name", f"Source {i}"),
-            spec=src["spec"],
-            server_id=f"{server_id}_src{i}",
-            log_func=log_func,
-        )
-        base_manager.mcp.mount(src_manager.mcp, namespace=src["namespace"])
+        if src.get("remote_url"):
+            remote_url = src["remote_url"]
+            try:
+                from fastmcp import Client
+                from fastmcp.server import create_proxy
+
+                remote_client = Client(remote_url)
+                remote_proxy = create_proxy(remote_client, name=src.get("name", f"Remote {i}"))
+                base_manager.mcp.mount(remote_proxy, namespace=src.get("namespace", ""))
+            except Exception as e:
+                logger.warning(f"Falha ao montar remoto {remote_url}: {e}")
+        else:
+            src_manager = MCPServerManager(
+                spec_url="",
+                name=src.get("name", f"Source {i}"),
+                spec=src["spec"],
+                server_id=f"{server_id}_src{i}",
+                log_func=log_func,
+            )
+            base_manager.mcp.mount(src_manager.mcp, namespace=src.get("namespace", ""))
 
     return base_manager.mcp
