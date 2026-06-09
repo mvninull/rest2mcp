@@ -831,6 +831,16 @@
         }
       }
 
+      let _storeSort = "relevance";
+
+      function setStoreSort(sort) {
+        _storeSort = sort;
+        const sel = document.getElementById("storeSort");
+        if (sel) sel.value = sort;
+        searchStore();
+      }
+      window.setStoreSort = setStoreSort;
+
       function searchStore() {
         const q = (document.getElementById("storeSearch")?.value || "").toLowerCase();
         let filtered = _storeAllServers;
@@ -852,9 +862,21 @@
             (s.categories || []).includes(_storeFilterCategory)
           );
         }
-        _renderStoreGrid(filtered);
+        const sorted = _sortServers(filtered, _storeSort);
+        _renderStoreGrid(sorted);
       }
       window.searchStore = searchStore;
+
+      function _sortServers(arr, sortKey) {
+        const copy = [...arr];
+        switch (sortKey) {
+          case "name": return copy.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+          case "name_desc": return copy.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
+          case "stars": return copy.sort((a, b) => (b.stars || 0) - (a.stars || 0));
+          case "tools": return copy.sort((a, b) => (b.tools || []).length - (a.tools || []).length);
+          default: return copy;
+        }
+      }
 
       function _renderStoreGrid(servers) {
         const grid = document.getElementById("storeGrid");
@@ -866,11 +888,11 @@
         grid.innerHTML = servers.map(s => {
           const name = s.name || s.slug || "MCP Server";
           const desc = s.description || "";
-          const tags = (s.attributes || []).map(a => a.split(":")[1] || a).filter(Boolean);
           const hostType = (s.attributes || []).find(a => a.startsWith("hosting:"))?.split(":")[1] || "";
-          const badge = hostType === "remote-capable" ? "☁️ Remoto" : hostType === "hybrid" ? "🔄 Híbrido" : "💻 Local";
+          const badge = hostType === "remote-capable" ? "☁️" : hostType === "hybrid" ? "🔄" : "💻";
           const namespace = s.namespace || "";
           const toolCount = (s.tools || []).length;
+          const stars = s.stars || 0;
           return `<div class="store-card" onclick="installFromStore('${_escHtml(s.id || "")}', '${_escHtml(namespace)}', '${_escHtml(s.slug || "")}', '${_escHtml(name)}', '${_escHtml(hostType)}')">
             <div class="store-card-icon"><span class="store-card-emoji">🧩</span></div>
             <div class="store-card-body">
@@ -880,6 +902,7 @@
                 <span class="store-card-badge">${badge}</span>
                 ${namespace ? `<span class="store-card-cmd">${_escHtml(namespace)}</span>` : ""}
                 ${toolCount > 0 ? `<span class="store-card-tag">${toolCount} tools</span>` : ""}
+                ${stars > 0 ? `<span class="store-card-star">★ ${stars}</span>` : ""}
               </div>
             </div>
           </div>`;
@@ -1920,9 +1943,18 @@
             </div>
           </div>
           <div class="store-main">
-            <div class="store-search">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
-              <input type="text" id="storeSearch" placeholder="Buscar servidores MCP..." oninput="searchStore()" />
+            <div class="store-toolbar">
+              <div class="store-search">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
+                <input type="text" id="storeSearch" placeholder="Buscar servidores MCP..." oninput="searchStore()" />
+              </div>
+              <select class="store-sort" id="storeSort" onchange="setStoreSort(this.value)">
+                <option value="relevance">Relevância</option>
+                <option value="stars">★ Estrelas GitHub</option>
+                <option value="tools">🛠 Mais ferramentas</option>
+                <option value="name">Nome A-Z</option>
+                <option value="name_desc">Nome Z-A</option>
+              </select>
             </div>
             <div class="store-grid" id="storeGrid">
               <div class="store-loading">A carregar loja...</div>

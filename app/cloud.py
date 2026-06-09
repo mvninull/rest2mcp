@@ -1306,9 +1306,9 @@ _store_cache: dict = {"data": None, "timestamp": 0}
 
 @app.get("/v1/store/servers")
 async def list_store_servers():
-    global _store_cache
+    global _store_cache, _star_cache
     now = time.time()
-    if _store_cache["data"] and (now - _store_cache["timestamp"]) < 120:
+    if _store_cache["data"] and (now - _store_cache["timestamp"]) < 600:
         return _store_cache["data"]
     try:
         async with httpx.AsyncClient() as client:
@@ -1321,6 +1321,7 @@ async def list_store_servers():
             resp.raise_for_status()
             data = resp.json()
             servers = data.get("servers", [])
+            await _enrich_servers_with_stars(servers)
             facets = _compute_store_facets(servers)
             result = {"servers": servers, "facets": facets}
             _store_cache = {"data": result, "timestamp": now}
@@ -1328,6 +1329,59 @@ async def list_store_servers():
     except Exception as e:
         logger.warning("Store fetch failed: %s", e)
         raise HTTPException(status_code=502, detail="Falha ao carregar servidores da loja")
+
+
+_star_cache: dict = {}
+_GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+
+def _fetch_star_sync(owner: str, name: str) -> int:
+    headers = {"User-Agent": "rest2mcp/1.0"}
+    if _GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {_GITHUB_TOKEN}"
+    try:
+        resp = httpx.get(
+            f"https://api.github.com/repos/{owner}/{name}",
+            headers=headers,
+            timeout=5,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("stargazers_count", 0)
+    except Exception:
+        pass
+    return 0
+
+async def _enrich_servers_with_stars(servers: list):
+    batch = []
+    loop = asyncio.get_event_loop()
+
+    for s in servers:
+        repo = s.get("repository", {})
+        url = (repo.get("url") or "") if isinstance(repo, dict) else ""
+        if "github.com" not in url:
+            s["stars"] = 0
+            continue
+        parts = url.rstrip("/").split("/")
+        if len(parts) < 2:
+            s["stars"] = 0
+            continue
+        owner, name = parts[-2], parts[-1]
+        key = f"{owner}/{name}"
+        if key in _star_cache:
+            s["stars"] = _star_cache[key]
+        else:
+            batch.append((s, key, owner, name))
+
+    if not batch:
+        return
+
+    sem = asyncio.Semaphore(10)
+    async def fetch_one(s, key, owner, name):
+        async with sem:
+            stars = await loop.run_in_executor(None, _fetch_star_sync, owner, name)
+            _star_cache[key] = stars
+            s["stars"] = stars
+
+    await asyncio.gather(*[fetch_one(s, k, o, n) for s, k, o, n in batch], return_exceptions=True)
 
 
 _STORE_CATEGORIES: list[dict] = [
