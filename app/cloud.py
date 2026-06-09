@@ -1426,6 +1426,7 @@ async def check_store_package(name: str = "", namespace: str = "", slug: str = "
                     result["args"] = [gh_ref]
                     result["name"] = gh_ref
                     result["alternatives"].append({"command": "npx", "args": [gh_ref], "source": "github"})
+                    result["exists"] = True
 
     return result
 
