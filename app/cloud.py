@@ -1306,28 +1306,52 @@ async def health():
 async def list_store_servers(cursor: str = ""):
     try:
         async with httpx.AsyncClient() as client:
-            params = {"first": 100}
-            if cursor:
-                params["after"] = cursor
+            # For Smithery, cursor acts as the page number
+            page = int(cursor) if cursor and cursor.isdigit() else 1
+            params = {"page": page, "pageSize": 50}
+            
             resp = await client.get(
-                "https://glama.ai/api/mcp/v1/servers",
+                "https://api.smithery.ai/servers",
                 params=params,
                 headers={"User-Agent": "rest2mcp/1.0"},
                 timeout=15,
             )
             resp.raise_for_status()
             data = resp.json()
-            servers = data.get("servers", [])
-            page_info = data.get("pageInfo", {})
+            
+            smithery_servers = data.get("servers", [])
+            pagination = data.get("pagination", {})
+            
+            # Map Smithery servers to the format the frontend expects
+            servers = []
+            for s in smithery_servers:
+                mapped_server = {
+                    "id": s.get("id"),
+                    "name": s.get("qualifiedName"), # Primary identifier for Smithery
+                    "displayName": s.get("displayName") or s.get("qualifiedName"),
+                    "description": s.get("description", ""),
+                    "namespace": s.get("namespace", ""),
+                    "slug": s.get("slug", ""),
+                    "repository": {"url": s.get("homepage", "")}, # Used for links/stars if applicable
+                    "useCount": s.get("useCount", 0),
+                }
+                servers.append(mapped_server)
+            
             if not cursor:
                 await _enrich_servers_with_stars(servers)
+                
             facets = _compute_store_facets(servers)
+            
+            current_page = pagination.get("currentPage", 1)
+            total_pages = pagination.get("totalPages", 1)
+            has_next = current_page < total_pages
+            
             result = {
                 "servers": servers,
                 "facets": facets,
                 "pageInfo": {
-                    "hasNextPage": page_info.get("hasNextPage", False),
-                    "endCursor": page_info.get("endCursor", ""),
+                    "hasNextPage": has_next,
+                    "endCursor": str(current_page + 1) if has_next else "",
                 }
             }
             return result
@@ -1338,109 +1362,20 @@ async def list_store_servers(cursor: str = ""):
 
 @app.get("/v1/store/check-package")
 async def check_store_package(name: str = "", namespace: str = "", slug: str = "", repo_url: str = ""):
-    result = {"exists": False, "name": name, "command": None, "args": None, "alternatives": []}
-
-    async with httpx.AsyncClient() as client:
-        async def _npm_exists(pkg_name: str) -> bool:
-            try:
-                encoded = httpx.URL(pkg_name).path
-                r = await client.head(f"https://registry.npmjs.org/{encoded}", timeout=5)
-                return r.status_code == 200
-            except Exception:
-                return False
-
-        # 1) Check npm for the constructed package name
-        if name and await _npm_exists(name):
-            result["exists"] = True
-            result["command"] = "npx"
-            result["args"] = [name]
-            return result
-
-        # 2) Check GitHub repo for package.json / pyproject.toml / setup.py
-        if repo_url and "github.com" in repo_url:
-            parts = repo_url.rstrip("/").split("/")
-            if len(parts) >= 2:
-                owner, repo = parts[-2], parts[-1]
-                base = f"https://raw.githubusercontent.com/{owner}/{repo}/main"
-
-                # Try package.json (Node/npm)
-                try:
-                    r = await client.get(f"{base}/package.json", timeout=8)
-                    if r.status_code == 200:
-                        pkg = r.json()
-                        pkg_name = pkg.get("name", "")
-                        if pkg_name:
-                            # Check if this package name exists on npm (published version
-                            # may have bin even if the source repo doesn't)
-                            npm_meta = None
-                            try:
-                                encoded = httpx.URL(pkg_name).path
-                                mr = await client.get(f"https://registry.npmjs.org/{encoded}", timeout=5)
-                                if mr.status_code == 200:
-                                    npm_meta = mr.json()
-                            except Exception:
-                                pass
-                            if npm_meta:
-                                latest_ver = npm_meta.get("dist-tags", {}).get("latest", "")
-                                latest_pkg = npm_meta.get("versions", {}).get(latest_ver, {}) if latest_ver else {}
-                                if latest_pkg.get("bin"):
-                                    result["exists"] = True
-                                    result["command"] = "npx"
-                                    result["args"] = [pkg_name]
-                                    result["name"] = pkg_name
-                                    return result
-                            # No npm bin found — add as alternative, continue checking
-                            result["alternatives"].append({"command": "npx", "args": [pkg_name], "source": "package.json"})
-                except Exception:
-                    pass
-
-                # Try pyproject.toml (Python)
-                try:
-                    r = await client.get(f"{base}/pyproject.toml", timeout=8)
-                    if r.status_code == 200:
-                        import re
-                        m = re.search(r'name\s*=\s*"([^"]+)"', r.text)
-                        if m:
-                            py_pkg = m.group(1)
-                            result["alternatives"].append({"command": "uvx", "args": [py_pkg], "source": "pyproject.toml"})
-                            result["alternatives"].append({"command": "pipx", "args": [py_pkg], "source": "pyproject.toml"})
-                            if not result["exists"]:
-                                result["exists"] = True
-                                result["command"] = "uvx"
-                                result["args"] = [py_pkg]
-                                result["name"] = py_pkg
-                                return result
-                except Exception:
-                    pass
-
-                # Try setup.py (legacy Python)
-                try:
-                    r = await client.get(f"{base}/setup.py", timeout=5)
-                    if r.status_code == 200:
-                        import re
-                        m = re.search(r'name\s*=\s*["\']([^"\']+)["\']', r.text)
-                        if m:
-                            py_pkg = m.group(1)
-                            result["alternatives"].append({"command": "uvx", "args": [py_pkg], "source": "setup.py"})
-                            result["alternatives"].append({"command": "pipx", "args": [py_pkg], "source": "setup.py"})
-                            if not result["exists"]:
-                                result["exists"] = True
-                                result["command"] = "uvx"
-                                result["args"] = [py_pkg]
-                                result["name"] = py_pkg
-                                return result
-                except Exception:
-                    pass
-
-                # Fallback: try npx github:owner/repo
-                if not result["exists"]:
-                    gh_ref = f"github:{owner}/{repo}"
-                    result["command"] = "npx"
-                    result["args"] = [gh_ref]
-                    result["name"] = gh_ref
-                    result["alternatives"].append({"command": "npx", "args": [gh_ref], "source": "github"})
-                    result["exists"] = True
-
+    # Use Smithery CLI directly for all store packages
+    # Smithery CLI will automatically handle resolving, downloading, and running the package
+    
+    # name here corresponds to Smithery's qualifiedName (e.g. "exa", "@modelcontextprotocol/server-filesystem")
+    pkg_target = name if name else f"{namespace}/{slug}".strip("/")
+    
+    result = {
+        "exists": True, 
+        "name": pkg_target, 
+        "command": "npx", 
+        "args": ["-y", "@smithery/cli@latest", "run", pkg_target], 
+        "alternatives": []
+    }
+    
     return result
 
 
