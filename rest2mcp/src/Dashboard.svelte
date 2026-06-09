@@ -952,8 +952,8 @@
         const ta = document.getElementById("mergeStdioJson");
         if (ta) ta.value = JSON.stringify(cfg, null, 2);
         const ns = document.getElementById("mergeStdioNamespace");
-        if (ns && name) {
-          ns.value = name.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+        if (ns && slug) {
+          ns.value = slug.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
         }
         const schema = _storeEnvSchemas[serverId];
         const envContainer = document.getElementById("mergeEnvFields");
