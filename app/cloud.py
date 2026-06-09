@@ -1369,14 +1369,27 @@ async def check_store_package(name: str = "", namespace: str = "", slug: str = "
                     if r.status_code == 200:
                         pkg = r.json()
                         pkg_name = pkg.get("name", "")
-                        has_bin = bool(pkg.get("bin"))
                         if pkg_name:
-                            if has_bin and await _npm_exists(pkg_name):
-                                result["exists"] = True
-                                result["command"] = "npx"
-                                result["args"] = [pkg_name]
-                                result["name"] = pkg_name
-                                return result
+                            # Check if this package name exists on npm (published version
+                            # may have bin even if the source repo doesn't)
+                            npm_meta = None
+                            try:
+                                encoded = httpx.URL(pkg_name).path
+                                mr = await client.get(f"https://registry.npmjs.org/{encoded}", timeout=5)
+                                if mr.status_code == 200:
+                                    npm_meta = mr.json()
+                            except Exception:
+                                pass
+                            if npm_meta:
+                                latest_ver = npm_meta.get("dist-tags", {}).get("latest", "")
+                                latest_pkg = npm_meta.get("versions", {}).get(latest_ver, {}) if latest_ver else {}
+                                if latest_pkg.get("bin"):
+                                    result["exists"] = True
+                                    result["command"] = "npx"
+                                    result["args"] = [pkg_name]
+                                    result["name"] = pkg_name
+                                    return result
+                            # No npm bin found — add as alternative, continue checking
                             result["alternatives"].append({"command": "npx", "args": [pkg_name], "source": "package.json"})
                 except Exception:
                     pass
