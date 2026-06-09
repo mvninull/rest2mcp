@@ -772,6 +772,8 @@
       let _storeFacets = { hostingTypes: [], categories: [] };
       let _storeFilterHosting = "";
       let _storeFilterCategory = "";
+      let _storePageInfo = { hasNextPage: false, endCursor: "" };
+      let _storeLoading = false;
 
       function closeStoreModal() {
         document.getElementById("storeModal")?.classList.remove("open");
@@ -786,12 +788,15 @@
         grid.innerHTML = "<div class='store-loading'>A carregar loja...</div>";
         _storeFilterHosting = "";
         _storeFilterCategory = "";
+        _storeAllServers = [];
+        _storePageInfo = { hasNextPage: false, endCursor: "" };
         try {
           const res = await fetch("/v1/store/servers");
           if (!res.ok) throw new Error("Erro ao carregar loja");
           const data = await res.json();
           _storeAllServers = data.servers || [];
           _storeFacets = data.facets || { hostingTypes: [], categories: [] };
+          _storePageInfo = data.pageInfo || { hasNextPage: false, endCursor: "" };
           _renderStoreFilters();
           searchStore();
         } catch (err) {
@@ -799,6 +804,28 @@
         }
       }
       window.openStoreModal = openStoreModal;
+
+      async function loadMoreStore() {
+        if (_storeLoading || !_storePageInfo.hasNextPage) return;
+        _storeLoading = true;
+        const btn = document.getElementById("storeLoadMore");
+        if (btn) btn.textContent = "A carregar...";
+        try {
+          const res = await fetch("/v1/store/servers?cursor=" + encodeURIComponent(_storePageInfo.endCursor));
+          if (!res.ok) throw new Error("Erro");
+          const data = await res.json();
+          const newServers = data.servers || [];
+          _storeAllServers = _storeAllServers.concat(newServers);
+          _storePageInfo = data.pageInfo || { hasNextPage: false, endCursor: "" };
+          _renderStoreFilters();
+          searchStore();
+        } catch (err) {
+          if (btn) btn.textContent = "Erro ao carregar. Tentar novamente";
+        } finally {
+          _storeLoading = false;
+        }
+      }
+      window.loadMoreStore = loadMoreStore;
 
       function setStoreFilterHosting(type) {
         _storeFilterHosting = _storeFilterHosting === type ? "" : type;
@@ -888,6 +915,8 @@
         if (!grid) return;
         if (!servers.length) {
           grid.innerHTML = "<div class='store-loading'>Nenhum servidor encontrado.</div>";
+          const loadMore = document.getElementById("storeLoadMore");
+          if (loadMore) loadMore.style.display = "none";
           return;
         }
         const hostBadges = {
@@ -916,7 +945,13 @@
               </div>
             </div>
           </div>`;
-        }).join("");
+        }).join("");;
+        const loadMore = document.getElementById("storeLoadMore");
+        if (loadMore) {
+          const showMore = _storePageInfo.hasNextPage && !_storeFilterHosting && !_storeFilterCategory && !(document.getElementById("storeSearch")?.value || "");
+          loadMore.style.display = showMore ? "" : "none";
+          if (!_storeLoading) loadMore.textContent = "Carregar mais servidores (" + _storeAllServers.length + "+)";
+        }
       }
 
       function _escHtml(str) {
@@ -1969,6 +2004,7 @@
             <div class="store-grid" id="storeGrid">
               <div class="store-loading">A carregar loja...</div>
             </div>
+            <button class="store-load-more" id="storeLoadMore" onclick="loadMoreStore()" style="display:none">Carregar mais servidores</button>
           </div>
         </div>
         <div class="modal-actions">

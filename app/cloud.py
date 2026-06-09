@@ -1301,30 +1301,35 @@ async def health():
 
 # ─── MCP Server Store ──────────────────────────────────────────────────────────
 
-_store_cache: dict = {"data": None, "timestamp": 0}
-
 
 @app.get("/v1/store/servers")
-async def list_store_servers():
-    global _store_cache, _star_cache
-    now = time.time()
-    if _store_cache["data"] and (now - _store_cache["timestamp"]) < 600:
-        return _store_cache["data"]
+async def list_store_servers(cursor: str = ""):
     try:
         async with httpx.AsyncClient() as client:
+            params = {"first": 100}
+            if cursor:
+                params["after"] = cursor
             resp = await client.get(
                 "https://glama.ai/api/mcp/v1/servers",
-                params={"first": 100},
+                params=params,
                 headers={"User-Agent": "rest2mcp/1.0"},
                 timeout=15,
             )
             resp.raise_for_status()
             data = resp.json()
             servers = data.get("servers", [])
-            await _enrich_servers_with_stars(servers)
+            page_info = data.get("pageInfo", {})
+            if not cursor:
+                await _enrich_servers_with_stars(servers)
             facets = _compute_store_facets(servers)
-            result = {"servers": servers, "facets": facets}
-            _store_cache = {"data": result, "timestamp": now}
+            result = {
+                "servers": servers,
+                "facets": facets,
+                "pageInfo": {
+                    "hasNextPage": page_info.get("hasNextPage", False),
+                    "endCursor": page_info.get("endCursor", ""),
+                }
+            }
             return result
     except Exception as e:
         logger.warning("Store fetch failed: %s", e)
@@ -1344,6 +1349,8 @@ def _fetch_star_sync(owner: str, name: str) -> int:
             headers=headers,
             timeout=5,
         )
+        if resp.status_code == 403:
+            return -1
         if resp.status_code == 200:
             return resp.json().get("stargazers_count", 0)
     except Exception:
@@ -1374,10 +1381,19 @@ async def _enrich_servers_with_stars(servers: list):
     if not batch:
         return
 
-    sem = asyncio.Semaphore(10)
+    sem = asyncio.Semaphore(5)
+    rate_limited = False
     async def fetch_one(s, key, owner, name):
+        nonlocal rate_limited
+        if rate_limited:
+            s["stars"] = 0
+            return
         async with sem:
             stars = await loop.run_in_executor(None, _fetch_star_sync, owner, name)
+            if stars == -1:
+                rate_limited = True
+                s["stars"] = 0
+                return
             _star_cache[key] = stars
             s["stars"] = stars
 
