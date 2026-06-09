@@ -1989,6 +1989,28 @@ nav {
 .store-error {
     color: var(--warn);
 }
+.store-load-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--accent);
+    font-family: var(--body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.store-load-more:hover {
+    background: var(--accent-light);
+    border-style: solid;
+}
 .store-filter-bar {
     display: flex;
     flex-direction: column;
