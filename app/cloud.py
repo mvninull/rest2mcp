@@ -1340,109 +1340,92 @@ async def list_store_servers(cursor: str = ""):
 async def check_store_package(name: str = "", namespace: str = "", slug: str = "", repo_url: str = ""):
     result = {"exists": False, "name": name, "command": None, "args": None, "alternatives": []}
 
-    # 1) Check npm for the constructed package name
-    if name:
-        try:
-            async with httpx.AsyncClient() as c:
-                encoded = httpx.URL(name).path
-                r = await c.head(f"https://registry.npmjs.org/{encoded}", timeout=5)
-                if r.status_code == 200:
-                    result["exists"] = True
-                    result["command"] = "npx"
-                    result["args"] = [name]
-                    return result
-        except Exception:
-            pass
-
-    # 2) Check GitHub repo for package.json (npm) or pyproject.toml (Python)
-    if repo_url and "github.com" in repo_url:
-        parts = repo_url.rstrip("/").split("/")
-        if len(parts) >= 2:
-            owner, repo = parts[-2], parts[-1]
-            base = f"https://raw.githubusercontent.com/{owner}/{repo}/main"
-
-            # Try package.json (Node/npm)
+    async with httpx.AsyncClient() as client:
+        async def _npm_exists(pkg_name: str) -> bool:
             try:
-                async with httpx.AsyncClient() as c:
-                    r = await c.get(f"{base}/package.json", timeout=8)
+                encoded = httpx.URL(pkg_name).path
+                r = await client.head(f"https://registry.npmjs.org/{encoded}", timeout=5)
+                return r.status_code == 200
+            except Exception:
+                return False
+
+        # 1) Check npm for the constructed package name
+        if name and await _npm_exists(name):
+            result["exists"] = True
+            result["command"] = "npx"
+            result["args"] = [name]
+            return result
+
+        # 2) Check GitHub repo for package.json / pyproject.toml / setup.py
+        if repo_url and "github.com" in repo_url:
+            parts = repo_url.rstrip("/").split("/")
+            if len(parts) >= 2:
+                owner, repo = parts[-2], parts[-1]
+                base = f"https://raw.githubusercontent.com/{owner}/{repo}/main"
+
+                # Try package.json (Node/npm)
+                try:
+                    r = await client.get(f"{base}/package.json", timeout=8)
                     if r.status_code == 200:
                         pkg = r.json()
                         pkg_name = pkg.get("name", "")
                         has_bin = bool(pkg.get("bin"))
-                        if pkg_name and has_bin:
-                            # Has a binary entry — runnable via npx
-                            result["exists"] = True
-                            result["command"] = "npx"
-                            result["args"] = [pkg_name]
-                            result["name"] = pkg_name
-                            return result
-                        elif pkg_name:
-                            # Has a package name but no bin — maybe npx can still run it
-                            result["exists"] = True
-                            result["command"] = "npx"
-                            result["args"] = [pkg_name]
-                            result["name"] = pkg_name
-                            result["alternatives"].append(f"npx {pkg_name}")
-                            # Still check pyproject as well
-            except Exception:
-                pass
+                        if pkg_name:
+                            if has_bin and await _npm_exists(pkg_name):
+                                result["exists"] = True
+                                result["command"] = "npx"
+                                result["args"] = [pkg_name]
+                                result["name"] = pkg_name
+                                return result
+                            result["alternatives"].append({"command": "npx", "args": [pkg_name], "source": "package.json"})
+                except Exception:
+                    pass
 
-            # Try pyproject.toml (Python / uvx / pipx)
-            try:
-                async with httpx.AsyncClient() as c:
-                    r = await c.get(f"{base}/pyproject.toml", timeout=8)
+                # Try pyproject.toml (Python)
+                try:
+                    r = await client.get(f"{base}/pyproject.toml", timeout=8)
                     if r.status_code == 200:
                         import re
                         m = re.search(r'name\s*=\s*"([^"]+)"', r.text)
                         if m:
                             py_pkg = m.group(1)
-                            alt = {"command": "uvx", "args": [py_pkg], "source": "pyproject.toml"}
-                            if alt not in result["alternatives"]:
-                                result["alternatives"].append(alt)
-                            alt2 = {"command": "pipx", "args": [py_pkg], "source": "pyproject.toml"}
-                            if alt2 not in result["alternatives"]:
-                                result["alternatives"].append(alt2)
-                            # Prefer uvx if no npm package found
+                            result["alternatives"].append({"command": "uvx", "args": [py_pkg], "source": "pyproject.toml"})
+                            result["alternatives"].append({"command": "pipx", "args": [py_pkg], "source": "pyproject.toml"})
                             if not result["exists"]:
                                 result["exists"] = True
                                 result["command"] = "uvx"
                                 result["args"] = [py_pkg]
                                 result["name"] = py_pkg
                                 return result
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
-            # Try setup.py (legacy Python)
-            try:
-                async with httpx.AsyncClient() as c:
-                    r = await c.get(f"{base}/setup.py", timeout=5)
+                # Try setup.py (legacy Python)
+                try:
+                    r = await client.get(f"{base}/setup.py", timeout=5)
                     if r.status_code == 200:
                         import re
                         m = re.search(r'name\s*=\s*["\']([^"\']+)["\']', r.text)
                         if m:
                             py_pkg = m.group(1)
-                            alt = {"command": "uvx", "args": [py_pkg], "source": "setup.py"}
-                            if alt not in result["alternatives"]:
-                                result["alternatives"].append(alt)
-                            alt2 = {"command": "pipx", "args": [py_pkg], "source": "setup.py"}
-                            if alt2 not in result["alternatives"]:
-                                result["alternatives"].append(alt2)
+                            result["alternatives"].append({"command": "uvx", "args": [py_pkg], "source": "setup.py"})
+                            result["alternatives"].append({"command": "pipx", "args": [py_pkg], "source": "setup.py"})
                             if not result["exists"]:
                                 result["exists"] = True
                                 result["command"] = "uvx"
                                 result["args"] = [py_pkg]
                                 result["name"] = py_pkg
                                 return result
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
-            # Fallback: try npx github:owner/repo
-            if not result["exists"]:
-                gh_ref = f"github:{owner}/{repo}"
-                result["command"] = "npx"
-                result["args"] = [gh_ref]
-                result["name"] = gh_ref
-                result["alternatives"].append({"command": "npx", "args": [gh_ref], "source": "github"})
+                # Fallback: try npx github:owner/repo
+                if not result["exists"]:
+                    gh_ref = f"github:{owner}/{repo}"
+                    result["command"] = "npx"
+                    result["args"] = [gh_ref]
+                    result["name"] = gh_ref
+                    result["alternatives"].append({"command": "npx", "args": [gh_ref], "source": "github"})
 
     return result
 
