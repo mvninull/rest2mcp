@@ -689,7 +689,7 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
         if "command" not in req.stdio_config:
             raise HTTPException(status_code=400, detail="stdio_config precisa de 'command'")
 
-        logger.info(f"Stdio merge: {req.source_server_id} + stdio config for user {user_id}")
+        logger.info(f"Stdio merge: {req.source_server_id} + stdio_config={req.stdio_config} for user {user_id}")
 
         bridge_id = _generate_id(prefix="bridge", length=12)
         try:
