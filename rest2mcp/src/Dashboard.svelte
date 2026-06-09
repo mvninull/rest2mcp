@@ -662,20 +662,16 @@
       function setMergeTab(mode) {
         mergeMode = mode;
         const localTab = document.getElementById("mergeTabLocal");
-        const remoteTab = document.getElementById("mergeTabRemote");
         const sandboxTab = document.getElementById("mergeTabSandbox");
         const localFields = document.getElementById("mergeLocalFields");
-        const remoteFields = document.getElementById("mergeRemoteFields");
         const sandboxFields = document.getElementById("mergeSandboxFields");
         if (localTab) localTab.classList.toggle("active", mode === "local");
-        if (remoteTab) remoteTab.classList.toggle("active", mode === "remote");
         if (sandboxTab) sandboxTab.classList.toggle("active", mode === "sandbox");
         if (localFields) localFields.style.display = mode === "local" ? "" : "none";
-        if (remoteFields) remoteFields.style.display = mode === "remote" ? "" : "none";
         if (sandboxFields) sandboxFields.style.display = mode === "sandbox" ? "" : "none";
         const mergeSub = document.getElementById("mergeSub");
         if (mergeSub) {
-          const labels = { local: "Fusão de servidores no rest2mcp com namespace automático", remote: "Fusão de um servidor local com um servidor MCP remoto", sandbox: "Instalação temporária de um servidor MCP via npx, pipx ou uv" };
+          const labels = { local: "Fusão de servidores no rest2mcp com namespace automático", sandbox: "Instalação temporária de um servidor MCP via npx, pipx ou uv (ou JSON personalizado)" };
           mergeSub.textContent = labels[mode] || "";
         }
       }
@@ -691,14 +687,12 @@
         const mn = document.getElementById("mergeName");
         const me = document.getElementById("mergeError");
         const bc = document.getElementById("btnMergeConfirm");
-        const mr = document.getElementById("mergeRemoteUrl");
         const sj = document.getElementById("mergeStdioJson");
         const sns = document.getElementById("mergeStdioNamespace");
         if (mn) {
           mn.value = "";
           mn.placeholder = `Ex: ${serverName} (Merged)`;
         }
-        if (mr) mr.value = "";
         if (sj) sj.value = "";
         if (sns) sns.value = "";
         if (me) showModalError(me, "");
@@ -710,31 +704,6 @@
         setTimeout(() => { const f = document.getElementById("mergeTargetSelect"); if (f) f.focus(); }, 120);
       }
       window.openMergeModalFromMenu = openMergeModalFromMenu;
-
-      function openRemoteMergeModal(serverId, serverName) {
-        mergeMode = "remote";
-        mergeSourceId = serverId;
-        mergeTargetId = null;
-        setMergeTab("remote");
-        const mm = document.getElementById("mergeModal");
-        const mn = document.getElementById("mergeName");
-        const me = document.getElementById("mergeError");
-        const bc = document.getElementById("btnMergeConfirm");
-        const mr = document.getElementById("mergeRemoteUrl");
-        if (mn) {
-          mn.value = "";
-          mn.placeholder = `Ex: ${serverName} (Merged)`;
-        }
-        if (mr) mr.value = "";
-        if (me) showModalError(me, "");
-        if (bc) {
-          bc.disabled = false;
-          bc.textContent = "Criar Servidor Merged";
-        }
-        if (mm) mm.classList.add("open");
-        setTimeout(() => { const f = document.getElementById("mergeRemoteUrl"); if (f) f.focus(); }, 120);
-      }
-      window.openRemoteMergeModal = openRemoteMergeModal;
 
       function fillSandbox(command, args, extra) {
         const cfg = { command, args: args.split(" ").filter(Boolean) };
@@ -774,6 +743,7 @@
       let _storeFilterCategory = "";
       let _storePageInfo = { hasNextPage: false, endCursor: "" };
       let _storeLoading = false;
+      let _storeEnvSchemas = {};
 
       function closeStoreModal() {
         document.getElementById("storeModal")?.classList.remove("open");
@@ -790,13 +760,20 @@
         _storeFilterCategory = "";
         _storeAllServers = [];
         _storePageInfo = { hasNextPage: false, endCursor: "" };
+        _storeEnvSchemas = {};
         try {
           const res = await fetch("/v1/store/servers");
           if (!res.ok) throw new Error("Erro ao carregar loja");
           const data = await res.json();
-          _storeAllServers = data.servers || [];
+          const servers = data.servers || [];
+          _storeAllServers = servers;
           _storeFacets = data.facets || { hostingTypes: [], categories: [] };
           _storePageInfo = data.pageInfo || { hasNextPage: false, endCursor: "" };
+          servers.forEach(s => {
+            if (s.id && s.environmentVariablesJsonSchema) {
+              _storeEnvSchemas[s.id] = s.environmentVariablesJsonSchema;
+            }
+          });
           _renderStoreFilters();
           searchStore();
         } catch (err) {
@@ -974,6 +951,29 @@
         if (ns && name) {
           ns.value = name.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
         }
+        const schema = _storeEnvSchemas[serverId];
+        const envContainer = document.getElementById("mergeEnvFields");
+        if (!envContainer) return;
+        const props = (schema && schema.properties) || {};
+        const required = (schema && schema.required) || [];
+        const keys = Object.keys(props);
+        if (!keys.length) {
+          envContainer.style.display = "none";
+          return;
+        }
+        envContainer.style.display = "";
+        envContainer.innerHTML = '<div class="env-title">Variáveis de Ambiente</div>' +
+          keys.map(k => {
+            const p = props[k];
+            const isReq = required.includes(k);
+            const desc = (p && p.description) || "";
+            const ph = (p && p.default != null) ? p.default : (p && p.type === "string" ? "" : "");
+            return `<div class="form-group env-field">
+              <label for="env_${_escHtml(k)}">${_escHtml(k)}${isReq ? ' <span class="env-req">*</span>' : ''}</label>
+              <input type="text" id="env_${_escHtml(k)}" class="env-input" placeholder="${_escHtml(desc || ph)}" ${isReq ? 'required' : ''} />
+              ${desc ? `<p class="form-hint">${_escHtml(desc)}</p>` : ""}
+            </div>`;
+          }).join("");
       }
       window.installFromStore = installFromStore;
 
@@ -995,6 +995,22 @@
           if (!stdioConfig.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command'."); return; }
           const namespace = document.getElementById("mergeStdioNamespace")?.value?.trim() ||
             stdioConfig.command.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+          const envContainer = document.getElementById("mergeEnvFields");
+          const envInputs = envContainer ? envContainer.querySelectorAll(".env-input") : [];
+          let missingReq = false;
+          const envVars = {};
+          envInputs.forEach(inp => {
+            const val = inp.value.trim();
+            if (inp.hasAttribute("required") && !val) { missingReq = true; return; }
+            if (val) envVars[inp.id.replace("env_", "")] = val;
+          });
+          if (missingReq) {
+            if (errorEl) showModalError(errorEl, "Preencha todos os campos obrigatórios de ambiente.");
+            return;
+          }
+          if (Object.keys(envVars).length) {
+            stdioConfig = { ...stdioConfig, env: { ...(stdioConfig.env || {}), ...envVars } };
+          }
           if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
           try {
             await apiFetch("/v1/servers/merge", {
@@ -1009,39 +1025,6 @@
           } catch (err) {
             if (errorEl) showModalError(errorEl, err.message);
             window.showAppAlert("Erro no merge sandbox: " + err.message);
-          } finally {
-            if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
-          }
-          return;
-        }
-
-        if (mergeMode === "remote") {
-          const remoteUrl = document.getElementById("mergeRemoteUrl")?.value?.trim();
-          if (!remoteUrl) { if (errorEl) showModalError(errorEl, "Informe a URL do servidor MCP remoto."); return; }
-          if (!remoteUrl.startsWith("http://") && !remoteUrl.startsWith("https://")) {
-            if (errorEl) showModalError(errorEl, "URL inválida. Deve começar com http:// ou https://");
-            return;
-          }
-          if (!remoteUrl.endsWith("/mcp") && !remoteUrl.endsWith("/sse")) {
-            if (errorEl) showModalError(errorEl, "URL inválida. O endereço deve terminar com /mcp ou /sse para ser uma rota MCP válida.");
-            return;
-          }
-          const remoteTransport = remoteUrl.endsWith("/sse") ? "sse" : "http";
-          const namespace = autoNamespaceFromUrl(remoteUrl);
-          if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
-          try {
-            await apiFetch("/v1/servers/merge", {
-              method: "POST",
-              body: JSON.stringify({ source_server_id: mergeSourceId, remote_url: remoteUrl, remote_transport: remoteTransport, namespace, merged_name: name }),
-            });
-            closeMergeModal();
-            showLoading("Servidor merged criado! Carregando...", false);
-            await loadServers();
-            hideLoading();
-            window.showAppAlert("Servidor merged (remoto) criado com sucesso.");
-          } catch (err) {
-            if (errorEl) showModalError(errorEl, err.message);
-            window.showAppAlert("Erro no merge remoto: " + err.message);
           } finally {
             if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
           }
@@ -1479,7 +1462,6 @@
         window.pollLogs = pollLogs;
         window.setMergeTab = setMergeTab;
         window.openMergeModalFromMenu = openMergeModalFromMenu;
-        window.openRemoteMergeModal = openRemoteMergeModal;
         window.showConfirmDialog = showConfirmDialog;
         window.openResetPasswordModal = openResetPasswordModal;
         window.closeResetPasswordModal = closeResetPasswordModal;
@@ -1901,10 +1883,6 @@
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="10" height="10" rx="2"/><path d="M8 6v4M6 8h4"/></svg>
             Servidores no rest2mcp
           </button>
-          <button class="merge-tab" id="mergeTabRemote" onclick="setMergeTab('remote')">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M3 8h10M8 3a11 11 0 010 10M3.5 5.5A11 11 0 0012.5 5.5M3.5 10.5a11 11 0 019 0"/></svg>
-            Servidor remoto MCP
-          </button>
           <button class="merge-tab" id="mergeTabSandbox" onclick="setMergeTab('sandbox')">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M8 5v6"/></svg>
             Sandbox / JSON
@@ -1921,21 +1899,14 @@
             <p class="form-hint">Servidor rest2mcp que será fundido com o servidor fonte</p>
           </div>
         </div>
-        <div id="mergeRemoteFields" style="display:none">
-          <div class="form-group">
-            <label for="mergeRemoteUrl">URL do Servidor MCP Remoto</label>
-            <input type="url" id="mergeRemoteUrl" placeholder="https://servidor-mcp.exemplo.com/mcp" />
-            <p class="form-hint">A URL deve terminar com <strong>/mcp</strong> (Streamable HTTP) ou <strong>/sse</strong> (SSE)</p>
-          </div>
-        </div>
         <div id="mergeSandboxFields" style="display:none">
           <div class="form-group">
             <label>Quick-select</label>
             <div class="sandbox-presets" aria-label="Quick-select de servidores MCP populares">
-              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-excel-server')">📊 Excel</button>
-              <button class="sandbox-preset-btn" onclick="fillSandbox('npx', '@modelcontextprotocol/server-filesystem', '.')">📁 File System</button>
-              <button class="sandbox-preset-btn" onclick="fillSandbox('pipx', 'mcp-server-sqlite')">🗄️ SQLite</button>
-              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-server-pdf')">📄 PDF</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-excel-server')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 2v12"/></svg>Excel</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('npx', '@modelcontextprotocol/server-filesystem', '.')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 4.5A2 2 0 014 3h2.5l2 2H14a1 1 0 011 1v5.5a2 2 0 01-2 2H4a2 2 0 01-2-2z"/></svg>File System</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('pipx', 'mcp-server-sqlite')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><ellipse cx="8" cy="4" rx="6" ry="2"/><path d="M2 4v3c0 1.1 2.7 2 6 2s6-.9 6-2V4M2 7v3c0 1.1 2.7 2 6 2s6-.9 6-2V7"/></svg>SQLite</button>
+              <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-server-pdf')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 2h5l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M9 2v4h4M6 9h4M6 11.5h4"/></svg>PDF</button>
             </div>
             <div class="store-divider"><span>ou</span></div>
             <button class="btn-store" onclick="openStoreModal()">
@@ -1953,6 +1924,7 @@
             <input type="text" id="mergeStdioNamespace" placeholder="excel, fs, sqlite..." />
             <p class="form-hint">Ex: namespace "excel" → ferramentas como <strong>excel_read_cells</strong>, <strong>excel_write_row</strong></p>
           </div>
+          <div id="mergeEnvFields" style="display:none"></div>
         </div>
         <div class="modal-error" id="mergeError"></div>
         <div class="modal-actions">
