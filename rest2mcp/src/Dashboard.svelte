@@ -940,9 +940,13 @@
         closeStoreModal();
         const tab = document.getElementById("mergeTabSandbox");
         if (tab) tab.click();
-        let pkg = name;
-        if (!pkg.startsWith("@") && namespace && slug) {
-          pkg = `${namespace}/${slug}`;
+        let pkg;
+        if (namespace && slug) {
+          pkg = `@${namespace}/${slug}`;
+        } else if (slug) {
+          pkg = slug;
+        } else {
+          pkg = name;
         }
         const cfg = { command: "npx", args: ["-y", pkg] };
         const ta = document.getElementById("mergeStdioJson");
