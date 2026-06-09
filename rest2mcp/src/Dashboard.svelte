@@ -909,7 +909,8 @@
           const namespace = s.namespace || "";
           const toolCount = (s.tools || []).length;
           const stars = s.stars || 0;
-          return `<div class="store-card" onclick="installFromStore('${_escHtml(s.id || "")}', '${_escHtml(namespace)}', '${_escHtml(s.slug || "")}', '${_escHtml(name)}', '${_escHtml(hostType)}')">
+          const repoUrl = (s.repository && s.repository.url) || "";
+          return `<div class="store-card" onclick="installFromStore('${_escHtml(s.id || "")}', '${_escHtml(namespace)}', '${_escHtml(s.slug || "")}', '${_escHtml(name)}', '${_escHtml(hostType)}', '${_escHtml(repoUrl)}')">
             <div class="store-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
             <div class="store-card-body">
               <div class="store-card-name">${_escHtml(name)}</div>
@@ -936,7 +937,7 @@
         return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
       }
 
-      function installFromStore(serverId, namespace, slug, name, hostType) {
+      function installFromStore(serverId, namespace, slug, name, hostType, repoUrl) {
         closeStoreModal();
         const tab = document.getElementById("mergeTabSandbox");
         if (tab) tab.click();
@@ -955,6 +956,21 @@
         if (ns && slug) {
           ns.value = slug.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
         }
+        const warning = document.getElementById("mergePackageWarning");
+        if (warning) warning.style.display = "none";
+        fetch("/v1/store/check-package?name=" + encodeURIComponent(pkg)).then(r => r.json()).then(data => {
+          if (!data.exists && warning) {
+            warning.style.display = "";
+            let msg = "Pacote '" + pkg + "' não encontrado no npm.";
+            if (repoUrl && repoUrl.includes("github.com")) {
+              const gh = repoUrl.replace("https://github.com/", "").replace(/\/$/, "");
+              msg += " Tente: npx github:" + gh;
+            } else {
+              msg += " Verifique o nome do pacote no Config JSON acima.";
+            }
+            warning.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3"/><circle cx="8" cy="11" r="0.5" fill="currentColor"/></svg> ' + _escHtml(msg);
+          }
+        }).catch(() => {});
         const schema = _storeEnvSchemas[serverId];
         const envContainer = document.getElementById("mergeEnvFields");
         if (!envContainer) return;
@@ -1929,6 +1945,7 @@
             <p class="form-hint">Ex: namespace "excel" → ferramentas como <strong>excel_read_cells</strong>, <strong>excel_write_row</strong></p>
           </div>
           <div id="mergeEnvFields" style="display:none"></div>
+          <div id="mergePackageWarning" class="store-warning" style="display:none"></div>
         </div>
         <div class="modal-error" id="mergeError"></div>
         <div class="modal-actions">

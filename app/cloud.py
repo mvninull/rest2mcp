@@ -1336,6 +1336,19 @@ async def list_store_servers(cursor: str = ""):
         raise HTTPException(status_code=502, detail="Falha ao carregar servidores da loja")
 
 
+@app.get("/v1/store/check-package")
+async def check_store_package(name: str = ""):
+    if not name:
+        return {"exists": False, "name": name}
+    try:
+        async with httpx.AsyncClient() as c:
+            encoded = httpx.URL(name).path
+            r = await c.head(f"https://registry.npmjs.org/{encoded}", timeout=5)
+            return {"exists": r.status_code == 200, "name": name}
+    except Exception:
+        return {"exists": False, "name": name}
+
+
 _star_cache: dict = {}
 _GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
