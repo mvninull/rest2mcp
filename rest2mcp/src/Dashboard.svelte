@@ -961,13 +961,6 @@
 
       function installFromStore(serverId, namespace, slug, name, hostType) {
         closeStoreModal();
-        if (hostType === "remote-capable") {
-          const tab = document.getElementById("mergeTabRemote");
-          if (tab) tab.click();
-          const urlInput = document.getElementById("mergeRemoteUrl");
-          if (urlInput) urlInput.value = `https://glama.ai/mcp/servers/${_escHtml(serverId)}`;
-          return;
-        }
         const tab = document.getElementById("mergeTabSandbox");
         if (tab) tab.click();
         let pkg = name;
