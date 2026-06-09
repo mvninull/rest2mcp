@@ -948,7 +948,7 @@
         } else {
           pkg = name;
         }
-        const cfg = { command: "npx", args: ["-y", pkg] };
+        const cfg = { command: "npx", args: [pkg] };
         const ta = document.getElementById("mergeStdioJson");
         if (ta) ta.value = JSON.stringify(cfg, null, 2);
         const ns = document.getElementById("mergeStdioNamespace");
