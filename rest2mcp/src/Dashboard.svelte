@@ -959,23 +959,16 @@
           ns.value = slug.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
         }
         fetch("/v1/store/check-package?name=" + encodeURIComponent(pkg) + "&namespace=" + encodeURIComponent(namespace || "") + "&slug=" + encodeURIComponent(slug || "") + "&repo_url=" + encodeURIComponent(repoUrl || "")).then(r => r.json()).then(data => {
-          if (data.exists && data.command && data.args) {
+          if (data.command && data.args) {
             const newCfg = { command: data.command, args: data.args };
             if (ta) ta.value = JSON.stringify(newCfg, null, 2);
-          } else if (!data.exists && warning) {
+          }
+          if (!data.exists && warning) {
             warning.style.display = "";
-            let msg = "Pacote '" + pkg + "' não encontrado no npm.";
+            let msg = "Pacote '" + pkg + "' não encontrado no npm. Fallback ativado.";
             if (data.alternatives && data.alternatives.length) {
               const alt = data.alternatives[0];
-              const altCmd = alt.command + " " + (alt.args || []).join(" ");
-              const newCfg = { command: alt.command, args: alt.args };
-              if (ta) ta.value = JSON.stringify(newCfg, null, 2);
-              msg += " Alternative: " + altCmd;
-            } else if (repoUrl && repoUrl.includes("github.com")) {
-              const gh = repoUrl.replace("https://github.com/", "").replace(/\/$/, "");
-              msg += " Tente: npx github:" + gh;
-            } else {
-              msg += " Verifique o nome do pacote no Config JSON acima.";
+              msg += " A usar: " + alt.command + " " + (alt.args || []).join(" ");
             }
             warning.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3"/><circle cx="8" cy="11" r="0.5" fill="currentColor"/></svg> ' + _escHtml(msg);
           }
