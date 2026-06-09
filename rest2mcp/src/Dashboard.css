@@ -1889,14 +1889,18 @@ nav {
 }
 .store-card-icon {
     flex-shrink: 0;
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-sm);
     background: rgba(12,12,20,0.04);
-    font-size: 1.1rem;
+}
+.store-card-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--muted);
 }
 .store-card-body {
     flex: 1;
@@ -1928,12 +1932,20 @@ nav {
     margin-top: 5px;
 }
 .store-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     font-size: 0.65rem;
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 100px;
     background: rgba(12,12,20,0.05);
     color: var(--muted);
     font-weight: 600;
+}
+.store-card-badge svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
 }
 .store-card-tag {
     font-size: 0.65rem;
@@ -1944,12 +1956,20 @@ nav {
     font-weight: 500;
 }
 .store-card-star {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     font-size: 0.65rem;
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 100px;
     background: rgba(255, 193, 7, 0.12);
     color: #b8860b;
     font-weight: 600;
+}
+.store-card-star svg {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
 }
 .store-card-cmd {
     font-family: var(--mono);
@@ -1975,6 +1995,9 @@ nav {
     gap: 3px;
 }
 .store-filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding: 5px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -1986,16 +2009,29 @@ nav {
     cursor: pointer;
     transition: all 0.15s;
     text-align: left;
-    white-space: nowrap;
+}
+.store-filter-btn svg {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+}
+.store-filter-btn span {
+    flex: 1;
 }
 .store-filter-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
 }
+.store-filter-btn:hover svg {
+    stroke: var(--accent);
+}
 .store-filter-btn.active {
     background: var(--accent);
     color: white;
     border-color: var(--accent);
+}
+.store-filter-btn.active svg {
+    stroke: white;
 }
 .store-cat-list {
     display: flex;
