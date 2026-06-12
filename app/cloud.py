@@ -971,21 +971,31 @@ async def check_server_health(server_id: str, request: Request, db: Session = De
     if not record.is_active:
         return {"status": "inactive"}
 
-    try:
-        from fastmcp.client.transports import StreamableHttpTransport
-        from fastmcp import Client
+    # Try to fetch the OpenAPI spec URL as a health check
+    spec_urls = []
+    if record.spec_url:
+        spec_urls.append(record.spec_url)
+    if record.is_merged and record.merge_config:
+        for src in (record.merge_config.get("sources") or []):
+            url = src.get("source_spec_url") or ""
+            if url and url not in spec_urls:
+                spec_urls.append(url)
 
-        t = record.transport or "http"
-        suffix = "sse" if t == "sse" else "mcp"
-        mcp_url = f"{PUBLIC_URL}/v1/{record.server_id}/{record.apikey}/{suffix}"
+    errors = []
+    for url in spec_urls:
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as hc:
+                resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
+                if resp.is_success:
+                    return {"status": "ok", "spec_url": url}
+                else:
+                    errors.append(f"{url} -> {resp.status_code}")
+        except httpx.TimeoutException:
+            errors.append(f"{url} -> timeout")
+        except Exception as e:
+            errors.append(f"{url} -> {str(e)[:100]}")
 
-        transport = StreamableHttpTransport(url=mcp_url)
-        async with Client(transport) as client:
-            tools = await client.list_tools()
-        return {"status": "ok", "tools_count": len(tools)}
-    except Exception as e:
-        err_msg = str(e)[:300]
-        return {"status": "error", "detail": err_msg}
+    return {"status": "error", "detail": "; ".join(errors) if errors else "Nenhuma spec URL disponivel"}
 
 
 @app.delete("/v1/servers/{server_id}", status_code=204)
