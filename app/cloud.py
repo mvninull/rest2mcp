@@ -966,41 +966,22 @@ async def check_server_health(server_id: str, request: Request, db: Session = De
     user_id = request.state.user_id
     record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
     if not record:
-        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+        return {"status": "error", "detail": "Servidor não encontrado"}
 
-    if not record.is_active:
-        return {"status": "inactive"}
+    url = record.spec_url
+    if not url:
+        return {"status": "error", "detail": "Servidor sem spec URL"}
 
-    urls_to_check = []
-    if record.spec_url:
-        urls_to_check.append(("spec", record.spec_url))
-    if record.is_merged and record.merge_config:
-        for src in (record.merge_config.get("sources") or []):
-            url = src.get("source_spec_url") or ""
-            if url and url not in [u[1] for u in urls_to_check]:
-                urls_to_check.append(("source_spec", url))
-
-    # Fallback: try the MCP endpoint URL
-    t = record.transport or "http"
-    suffix = "sse" if t == "sse" else "mcp"
-    mcp_url = f"{PUBLIC_URL}/v1/{record.server_id}/{record.apikey}/{suffix}"
-    urls_to_check.append(("mcp", mcp_url))
-
-    errors = []
-    for label, url in urls_to_check:
-        try:
-            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as hc:
-                resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
-                if resp.is_success:
-                    return {"status": "ok", "checked": label, "url": url}
-                else:
-                    errors.append(f"{label}({resp.status_code})")
-        except httpx.TimeoutException:
-            errors.append(f"{label}(timeout)")
-        except Exception as e:
-            errors.append(f"{label}({str(e)[:80]})")
-
-    return {"status": "error", "detail": "; ".join(errors) if errors else "Nenhuma URL disponivel"}
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as hc:
+            resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
+            if resp.is_success:
+                return {"status": "ok"}
+            return {"status": "error", "detail": f"HTTP {resp.status_code}"}
+    except httpx.TimeoutException:
+        return {"status": "error", "detail": "timeout"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)[:120]}
 
 
 @app.delete("/v1/servers/{server_id}", status_code=204)
