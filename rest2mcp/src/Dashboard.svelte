@@ -448,14 +448,15 @@
             const card = document.querySelector(`.server-card[data-server-id="${srv.server_id}"]`);
             if (card) {
               card.classList.add("health-error");
+              const detail = res.status === "fulfilled" ? (res.value.detail || "") : "";
               const urlEl = card.querySelector(".server-url");
-              if (urlEl) urlEl.innerHTML = '<span style="color:var(--danger)">API indisponível</span>';
+              if (urlEl) urlEl.innerHTML = '<span style="color:var(--danger)">API indispon\u00edvel</span>' + (detail ? ' <span style="font-size:0.7rem;color:var(--muted)">' + escapeHtml(detail) + '</span>' : '');
               const statusIcon = card.querySelector(".status-icon");
               if (statusIcon) statusIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff5c35"/><circle cx="8" cy="8" r="7" stroke="#ff5c35" stroke-width="1.5" stroke-opacity="0.3"/></svg>';
               const statusChip = card.querySelector(".status-chip");
               if (statusChip) {
                 statusChip.className = "status-chip inactive";
-                statusChip.innerHTML = '<span class="status-chip-dot"></span>API indisponível';
+                statusChip.innerHTML = '<span class="status-chip-dot"></span>API indispon\u00edvel';
               }
             }
           }
