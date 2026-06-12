@@ -703,11 +703,17 @@
       }
       window.openMergeModalFromMenu = openMergeModalFromMenu;
 
+      // Quick-select: preenche Config JSON com servidores pré-definidos
+      //   uvx mcp-excel-server                                 → Excel
+      //   npx @modelcontextprotocol/server-filesystem .        → File System
+      //   pipx mcp-server-sqlite                               → SQLite
+      //   uvx mcp-server-pdf                                   → PDF
       function fillSandbox(command, args, extra) {
         const cfg = { command, args: args.split(" ").filter(Boolean) };
         if (extra) cfg.args.push(extra);
         const ta = document.getElementById("mergeStdioJson");
         if (ta) ta.value = JSON.stringify(cfg, null, 2);
+        closeStoreModal();
       }
       window.fillSandbox = fillSandbox;
 
@@ -726,6 +732,14 @@
         mergeSourceId = null;
         mergeTargetId = null;
         mergeMode = "local";
+        const mn = document.getElementById("mergeName");
+        if (mn) mn.value = "";
+        const sj = document.getElementById("mergeStdioJson");
+        if (sj) sj.value = "";
+        const warn = document.getElementById("mergePackageWarning");
+        if (warn) warn.style.display = "none";
+        const env = document.getElementById("mergeEnvFields");
+        if (env) { env.style.display = "none"; env.innerHTML = ""; }
       }
       window.closeMergeModal = closeMergeModal;
 
@@ -740,6 +754,8 @@
 
       function closeStoreModal() {
         document.getElementById("storeModal")?.classList.remove("open");
+        const ss = document.getElementById("storeSearch");
+        if (ss) ss.value = "";
       }
       window.closeStoreModal = closeStoreModal;
 
@@ -1894,39 +1910,6 @@
               Aguardando atividade...
             </div>
           </div>
-          <div class="sidebar-logs" style="margin-top: 12px;">
-            <div class="sidebar-logs-header">
-              <div class="logs-header-left">
-                <span class="log-title" style="font-size:0.7rem;">Clientes MCP</span>
-              </div>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 4px;">
-              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
-                <img src="/logos/vscode-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
-                VS Code
-              </span>
-              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
-                <img src="/logos/claude-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
-                Claude
-              </span>
-              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
-                <img src="https://cdn.simpleicons.org/cursor/00C2FF" alt="" width="18" height="18" style="flex-shrink:0;" />
-                Cursor
-              </span>
-              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
-                <img src="https://cdn.simpleicons.org/cline/EC4899" alt="" width="18" height="18" style="flex-shrink:0;" />
-                Cline
-              </span>
-              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
-                <img src="/logos/windsurf-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
-                Windsurf
-              </span>
-              <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:5px 12px;font-size:0.8rem;color:rgba(255,255,255,0.7);">
-                <img src="/logos/opencode-icon.svg" alt="" width="18" height="18" style="flex-shrink:0;" />
-                OpenCode
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1960,7 +1943,8 @@
           </div>
         </div>
         <div id="mergeSandboxFields" style="display:none">
-          <div class="form-group">
+             <!-- QUICK-SELECT COMENTADO
+            <div class="form-group">
             <label>Quick-select</label>
             <div class="sandbox-presets" aria-label="Quick-select de servidores MCP populares">
               <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-excel-server')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 2v12"/></svg>Excel</button>
@@ -1968,12 +1952,14 @@
               <button class="sandbox-preset-btn" onclick="fillSandbox('pipx', 'mcp-server-sqlite')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><ellipse cx="8" cy="4" rx="6" ry="2"/><path d="M2 4v3c0 1.1 2.7 2 6 2s6-.9 6-2V4M2 7v3c0 1.1 2.7 2 6 2s6-.9 6-2V7"/></svg>SQLite</button>
               <button class="sandbox-preset-btn" onclick="fillSandbox('uvx', 'mcp-server-pdf')"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 2h5l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M9 2v4h4M6 9h4M6 11.5h4"/></svg>PDF</button>
             </div>
+          </div>
+          -->
             <div class="store-divider"><span>ou</span></div>
             <button class="btn-store" onclick="openStoreModal()">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
               Instalar a partir da loja
             </button>
-          </div>
+          
           <div class="form-group">
             <label for="mergeStdioJson">Config JSON</label>
             <textarea id="mergeStdioJson" rows="5" class="code-textarea"></textarea>
