@@ -318,7 +318,19 @@ def create_merged_mcp_server(
                 from fastmcp import Client
                 from fastmcp.server import create_proxy
 
-                remote_client = Client(remote_url)
+                remote_headers = dict(src.get("remote_headers") or {})
+                auth = remote_headers.pop("Authorization", None)
+
+                if remote_headers or auth:
+                    from fastmcp.client.transports import StreamableHttpTransport
+                    transport = StreamableHttpTransport(
+                        url=remote_url,
+                        headers=remote_headers or None,
+                        auth=auth,
+                    )
+                    remote_client = Client(transport)
+                else:
+                    remote_client = Client(remote_url, auth=auth)
                 remote_proxy = create_proxy(remote_client, name=src.get("name", f"Remote {i}"))
                 base_manager.mcp.mount(remote_proxy, namespace=src.get("namespace", ""))
             except Exception as e:

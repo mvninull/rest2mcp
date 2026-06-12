@@ -688,13 +688,11 @@
         const me = document.getElementById("mergeError");
         const bc = document.getElementById("btnMergeConfirm");
         const sj = document.getElementById("mergeStdioJson");
-        const sns = document.getElementById("mergeStdioNamespace");
         if (mn) {
           mn.value = "";
           mn.placeholder = `Ex: ${serverName} (Merged)`;
         }
         if (sj) sj.value = "";
-        if (sns) sns.value = "";
         if (me) showModalError(me, "");
         if (bc) {
           bc.disabled = false;
@@ -710,11 +708,6 @@
         if (extra) cfg.args.push(extra);
         const ta = document.getElementById("mergeStdioJson");
         if (ta) ta.value = JSON.stringify(cfg, null, 2);
-        const ns = document.getElementById("mergeStdioNamespace");
-        if (ns) {
-          const name = command === "npx" ? args.split("/").pop() || args : args.split(" ")[0] || command;
-          ns.value = name.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
-        }
       }
       window.fillSandbox = fillSandbox;
 
@@ -947,18 +940,20 @@
         } else if (slug) {
           pkg = slug;
         } else {
-          pkg = name;
+          pkg = serverId;
         }
+        const isRemoteHost = hostType === "remote-capable" && !namespace && !slug;
         const warning = document.getElementById("mergePackageWarning");
         if (warning) warning.style.display = "none";
         const cfg = { command: "npx", args: [pkg] };
         const ta = document.getElementById("mergeStdioJson");
         if (ta) ta.value = JSON.stringify(cfg, null, 2);
-        const ns = document.getElementById("mergeStdioNamespace");
-        if (ns && slug) {
-          ns.value = slug.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
-        }
         fetch("/v1/store/check-package?name=" + encodeURIComponent(pkg) + "&namespace=" + encodeURIComponent(namespace || "") + "&slug=" + encodeURIComponent(slug || "") + "&repo_url=" + encodeURIComponent(repoUrl || "")).then(r => r.json()).then(data => {
+          if (data.remote_urls && data.remote_urls.length) {
+            const remoteCfg = { url: data.remote_urls[0], type: "streamable-http" };
+            if (ta) ta.value = JSON.stringify(remoteCfg, null, 2);
+            return;
+          }
           if (data.command && data.args) {
             const newCfg = { command: data.command, args: data.args };
             if (ta) ta.value = JSON.stringify(newCfg, null, 2);
@@ -979,23 +974,33 @@
         const props = (schema && schema.properties) || {};
         const required = (schema && schema.required) || [];
         const keys = Object.keys(props);
-        if (!keys.length) {
+        if (!keys.length && !isRemoteHost) {
           envContainer.style.display = "none";
           return;
         }
         envContainer.style.display = "";
-        envContainer.innerHTML = '<div class="env-title">Variáveis de Ambiente</div>' +
-          keys.map(k => {
+        let html = '<div class="env-title">Variáveis de Ambiente / Headers</div>';
+        if (keys.length) {
+          html += keys.map(k => {
             const p = props[k];
             const isReq = required.includes(k);
             const desc = (p && p.description) || "";
-            const ph = (p && p.default != null) ? p.default : (p && p.type === "string" ? "" : "");
+            const ph = (p && p.placeholder) || (p && p.default != null ? p.default : "");
             return `<div class="form-group env-field">
               <label for="env_${_escHtml(k)}">${_escHtml(k)}${isReq ? ' <span class="env-req">*</span>' : ''}</label>
-              <input type="text" id="env_${_escHtml(k)}" class="env-input" placeholder="${_escHtml(desc || ph)}" ${isReq ? 'required' : ''} />
+              <input type="text" id="env_${_escHtml(k)}" class="env-input" placeholder="${_escHtml(ph || desc)}" ${isReq ? 'required' : ''} />
               ${desc ? `<p class="form-hint">${_escHtml(desc)}</p>` : ""}
             </div>`;
           }).join("");
+        }
+        if (isRemoteHost && !keys.length) {
+          html += '<div class="form-group env-field">';
+          html += '<label for="env_Authorization">Authorization <span class="env-opt">(opcional)</span></label>';
+          html += '<input type="text" id="env_Authorization" class="env-input" placeholder="Bearer seu-token-aqui" />';
+          html += '<p class="form-hint">Token de autenticação para servidores remotos</p>';
+          html += '</div>';
+        }
+        envContainer.innerHTML = html;
       }
       window.installFromStore = installFromStore;
 
@@ -1009,14 +1014,47 @@
         if (mergeMode === "sandbox") {
           const jsonText = document.getElementById("mergeStdioJson")?.value?.trim();
           if (!jsonText) { if (errorEl) showModalError(errorEl, "Informe a configuração JSON do servidor."); return; }
-          let stdioConfig;
-          try { stdioConfig = JSON.parse(jsonText); } catch {
+          let cfg;
+          try { cfg = JSON.parse(jsonText); } catch {
             if (errorEl) showModalError(errorEl, "JSON inválido. Verifique a sintaxe.");
             return;
           }
-          if (!stdioConfig.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command'."); return; }
-          const namespace = document.getElementById("mergeStdioNamespace")?.value?.trim() ||
-            stdioConfig.command.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+          const namespace = (cfg.name || "").toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") ||
+            (cfg.command || "").replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
+          if (cfg.url) {
+            const envContainer = document.getElementById("mergeEnvFields");
+            const envInputs = envContainer ? envContainer.querySelectorAll(".env-input") : [];
+            let missingReq = false;
+            const headersVars = {};
+            envInputs.forEach(inp => {
+              const val = inp.value.trim();
+              if (inp.hasAttribute("required") && !val) { missingReq = true; return; }
+              if (val) headersVars[inp.id.replace("env_", "")] = val;
+            });
+            if (missingReq) {
+              if (errorEl) showModalError(errorEl, "Preencha todos os campos obrigatórios de ambiente.");
+              return;
+            }
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
+            try {
+              await apiFetch("/v1/servers/merge", {
+                method: "POST",
+                body: JSON.stringify({ source_server_id: mergeSourceId, remote_url: cfg.url, remote_transport: cfg.type || "streamable-http", remote_headers: Object.keys(headersVars).length ? headersVars : undefined, namespace, merged_name: name }),
+              });
+              closeMergeModal();
+              showLoading("Servidor merged criado! Carregando...", false);
+              await loadServers();
+              hideLoading();
+              window.showAppAlert("Servidor merged (remoto) criado com sucesso.");
+            } catch (err) {
+              if (errorEl) showModalError(errorEl, err.message);
+              window.showAppAlert("Erro no merge remoto: " + err.message);
+            } finally {
+              if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
+            }
+            return;
+          }
+          if (!cfg.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command'."); return; }
           const envContainer = document.getElementById("mergeEnvFields");
           const envInputs = envContainer ? envContainer.querySelectorAll(".env-input") : [];
           let missingReq = false;
@@ -1031,13 +1069,13 @@
             return;
           }
           if (Object.keys(envVars).length) {
-            stdioConfig = { ...stdioConfig, env: { ...(stdioConfig.env || {}), ...envVars } };
+            cfg = { ...cfg, env: { ...(cfg.env || {}), ...envVars } };
           }
           if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
           try {
             await apiFetch("/v1/servers/merge", {
               method: "POST",
-              body: JSON.stringify({ source_server_id: mergeSourceId, stdio_config: stdioConfig, namespace, merged_name: name }),
+              body: JSON.stringify({ source_server_id: mergeSourceId, stdio_config: cfg, namespace, merged_name: name }),
             });
             closeMergeModal();
             showLoading("Servidor merged criado! Carregando...", false);
@@ -1940,11 +1978,6 @@
             <label for="mergeStdioJson">Config JSON</label>
             <textarea id="mergeStdioJson" rows="5" class="code-textarea"></textarea>
             <p class="form-hint">Comando e args do servidor MCP stdio. O ambiente é herdado do gateway.</p>
-          </div>
-          <div class="form-group">
-            <label for="mergeStdioNamespace">Namespace (prefixo das ferramentas)</label>
-            <input type="text" id="mergeStdioNamespace" placeholder="excel, fs, sqlite..." />
-            <p class="form-hint">Ex: namespace "excel" → ferramentas como <strong>excel_read_cells</strong>, <strong>excel_write_row</strong></p>
           </div>
           <div id="mergeEnvFields" style="display:none"></div>
           <div id="mergePackageWarning" class="store-warning" style="display:none"></div>
