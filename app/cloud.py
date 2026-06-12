@@ -644,6 +644,30 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
 
         logger.info(f"Remote merge: {req.source_server_id} + remote {req.remote_url} for user {user_id}")
 
+        try:
+            from fastmcp.client.transports import StreamableHttpTransport
+            from fastmcp import Client
+            validate_headers = dict(req.remote_headers or {})
+            auth_val = validate_headers.pop("Authorization", None)
+            transport = StreamableHttpTransport(
+                url=req.remote_url,
+                headers=validate_headers or None,
+                auth=auth_val,
+            )
+            async with Client(transport) as remote_client:
+                tools = await remote_client.list_tools()
+        except Exception as e:
+            err_msg = str(e)
+            if "401" in err_msg or "403" in err_msg or "Unauthorized" in err_msg or "Forbidden" in err_msg:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"O servidor remoto rejeitou a conexão. {err_msg[:300]}. Informe um token Authorization no campo opcional."
+                )
+            elif "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+                pass
+            else:
+                logger.warning(f"Falha ao testar conexão MCP remota {req.remote_url}: {e}")
+
         sources = [
             {
                 "namespace": req.namespace,
