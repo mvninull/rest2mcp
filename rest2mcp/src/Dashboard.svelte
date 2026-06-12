@@ -434,9 +434,12 @@
       async function _checkAllServerHealth(servers) {
         _serverHealth = new Map();
         const active = servers.filter(s => s.status === "active");
+        const token = getAuthToken();
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
         const results = await Promise.allSettled(
           active.map(s =>
-            fetch(`${API_BASE}/v1/servers/${s.server_id}/health`).then(r => r.json())
+            fetch(`${API_BASE}/v1/servers/${s.server_id}/health`, { headers }).then(r => r.json())
           )
         );
         results.forEach((res, i) => {
