@@ -255,6 +255,14 @@ nav {
 .server-card.active-status::before {
     opacity: 1;
 }
+.server-card.health-error {
+    border-color: var(--danger, #e53935) !important;
+    opacity: 0.7;
+}
+.server-card.health-error .server-name {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
 .server-card:hover {
     border-color: var(--border-strong);
     box-shadow: var(--shadow-md);
