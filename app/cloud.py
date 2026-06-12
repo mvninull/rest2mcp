@@ -971,31 +971,36 @@ async def check_server_health(server_id: str, request: Request, db: Session = De
     if not record.is_active:
         return {"status": "inactive"}
 
-    # Try to fetch the OpenAPI spec URL as a health check
-    spec_urls = []
+    urls_to_check = []
     if record.spec_url:
-        spec_urls.append(record.spec_url)
+        urls_to_check.append(("spec", record.spec_url))
     if record.is_merged and record.merge_config:
         for src in (record.merge_config.get("sources") or []):
             url = src.get("source_spec_url") or ""
-            if url and url not in spec_urls:
-                spec_urls.append(url)
+            if url and url not in [u[1] for u in urls_to_check]:
+                urls_to_check.append(("source_spec", url))
+
+    # Fallback: try the MCP endpoint URL
+    t = record.transport or "http"
+    suffix = "sse" if t == "sse" else "mcp"
+    mcp_url = f"{PUBLIC_URL}/v1/{record.server_id}/{record.apikey}/{suffix}"
+    urls_to_check.append(("mcp", mcp_url))
 
     errors = []
-    for url in spec_urls:
+    for label, url in urls_to_check:
         try:
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as hc:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as hc:
                 resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
                 if resp.is_success:
-                    return {"status": "ok", "spec_url": url}
+                    return {"status": "ok", "checked": label, "url": url}
                 else:
-                    errors.append(f"{url} -> {resp.status_code}")
+                    errors.append(f"{label}({resp.status_code})")
         except httpx.TimeoutException:
-            errors.append(f"{url} -> timeout")
+            errors.append(f"{label}(timeout)")
         except Exception as e:
-            errors.append(f"{url} -> {str(e)[:100]}")
+            errors.append(f"{label}({str(e)[:80]})")
 
-    return {"status": "error", "detail": "; ".join(errors) if errors else "Nenhuma spec URL disponivel"}
+    return {"status": "error", "detail": "; ".join(errors) if errors else "Nenhuma URL disponivel"}
 
 
 @app.delete("/v1/servers/{server_id}", status_code=204)
