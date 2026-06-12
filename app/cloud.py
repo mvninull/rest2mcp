@@ -960,6 +960,34 @@ async def update_server(server_id: str, req: UpdateServerRequest, request: Reque
     )
 
 
+@app.get("/v1/servers/{server_id}/health")
+async def check_server_health(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    if not record.is_active:
+        return {"status": "inactive"}
+
+    try:
+        from fastmcp.client.transports import StreamableHttpTransport
+        from fastmcp import Client
+
+        t = record.transport or "http"
+        suffix = "sse" if t == "sse" else "mcp"
+        mcp_url = f"{PUBLIC_URL}/v1/{record.server_id}/{record.apikey}/{suffix}"
+
+        transport = StreamableHttpTransport(url=mcp_url)
+        async with Client(transport) as client:
+            tools = await client.list_tools()
+        return {"status": "ok", "tools_count": len(tools)}
+    except Exception as e:
+        err_msg = str(e)[:300]
+        return {"status": "error", "detail": err_msg}
+
+
 @app.delete("/v1/servers/{server_id}", status_code=204)
 async def delete_server(server_id: str, request: Request, db: Session = Depends(get_db)):
     await require_auth(request)

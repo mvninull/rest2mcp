@@ -408,6 +408,7 @@
             servers.forEach((s) => list.appendChild(renderServerCard(s)));
             _populateLogServerSelect(servers);
             selectServer(servers[0].server_id);
+            _checkAllServerHealth(servers);
           }
 
           const sc = document.getElementById("serverCount");
@@ -426,6 +427,39 @@
           const sc = document.getElementById("serverCount");
           if (sc) sc.textContent = "—";
         }
+      }
+
+      let _serverHealth = new Map();
+
+      async function _checkAllServerHealth(servers) {
+        _serverHealth = new Map();
+        const active = servers.filter(s => s.status === "active");
+        const results = await Promise.allSettled(
+          active.map(s =>
+            fetch(`${API_BASE}/v1/servers/${s.server_id}/health`).then(r => r.json())
+          )
+        );
+        results.forEach((res, i) => {
+          const srv = active[i];
+          if (res.status === "fulfilled" && res.value.status === "ok") {
+            _serverHealth.set(srv.server_id, "ok");
+          } else {
+            _serverHealth.set(srv.server_id, "error");
+            const card = document.querySelector(`.server-card[data-server-id="${srv.server_id}"]`);
+            if (card) {
+              card.classList.add("health-error");
+              const urlEl = card.querySelector(".server-url");
+              if (urlEl) urlEl.innerHTML = '<span style="color:var(--danger)">API indisponível</span>';
+              const statusIcon = card.querySelector(".status-icon");
+              if (statusIcon) statusIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff5c35"/><circle cx="8" cy="8" r="7" stroke="#ff5c35" stroke-width="1.5" stroke-opacity="0.3"/></svg>';
+              const statusChip = card.querySelector(".status-chip");
+              if (statusChip) {
+                statusChip.className = "status-chip inactive";
+                statusChip.innerHTML = '<span class="status-chip-dot"></span>API indisponível';
+              }
+            }
+          }
+        });
       }
 
       // ─── Create Server ─────────────────────────────────────
