@@ -1066,12 +1066,32 @@
     if (_inspecting) return;
     _inspecting = true;
     showLoading("A iniciar MCP Inspector...", false);
+    // Open a blank window synchronously while still inside the user-gesture call
+    // stack. Browsers block window.open() after an await (async break), so we
+    // must open the window BEFORE the network call and then navigate it.
+    const inspectorWin = window.open("", "_blank");
     try {
       const data = await apiFetch("/v1/servers/" + serverId + "/inspector", { method: "POST" });
       if (data && data.inspector_url) {
-        window.open(data.inspector_url, "_blank");
+        if (inspectorWin && !inspectorWin.closed) {
+          inspectorWin.location.href = data.inspector_url;
+        } else {
+          // Fallback: popup was blocked, try again (will likely be blocked too,
+          // but at least the user gets a clear error from showAppAlert below)
+          const w = window.open(data.inspector_url, "_blank");
+          if (!w) {
+            window.showAppAlert(
+              "O popup blocker impediu a abertura do MCP Inspector.\n" +
+              "Abra manualmente: " + data.inspector_url
+            );
+          }
+        }
+      } else {
+        if (inspectorWin && !inspectorWin.closed) inspectorWin.close();
+        window.showAppAlert("O backend não retornou um URL de inspector.");
       }
     } catch (err) {
+      if (inspectorWin && !inspectorWin.closed) inspectorWin.close();
       window.showAppAlert("Erro ao iniciar inspector: " + err.message);
     } finally {
       hideLoading();
@@ -1903,7 +1923,7 @@
   {#if activeMenu && activeMenuServer}
     {@const s = activeMenuServer}
     <div class="menu-dropdown open" style="position: fixed; left: {activeMenu.x}px; top: {activeMenu.y}px; z-index: 1000000; min-width: 200px;">
-      <button onclick="openInspector('{s.server_id}'); closeAllMenus();">
+      <button on:click={() => { openInspector(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
       </button>
       <button onclick="editServer('{s.server_id}', '{s.name?.replace(/'/g, "\\'") || ''}', '{s.transport || 'http'}'); closeAllMenus();">
