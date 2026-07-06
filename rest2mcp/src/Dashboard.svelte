@@ -1578,6 +1578,16 @@
     window.toggleChangePassword = toggleChangePassword;
     window.saveNewPassword = saveNewPassword;
 
+    // Store functions referenced in raw HTML/DOM templates (e.g. innerHTML dynamically generated strings)
+    window.openStoreModal = openStoreModal;
+    window.closeStoreModal = closeStoreModal;
+    window.installFromStore = installFromStore;
+    window.searchStore = searchStore;
+    window.loadMoreStore = loadMoreStore;
+    window.setStoreSort = setStoreSort;
+    window.setStoreFilterHosting = setStoreFilterHosting;
+    window.setStoreFilterCategory = setStoreFilterCategory;
+
     const mergeModal = document.getElementById("mergeModal");
     if (mergeModal) mergeModal.addEventListener("click", (e) => {
       if (e.target === e.currentTarget) closeMergeModal();
