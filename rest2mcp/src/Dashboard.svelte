@@ -1070,6 +1070,56 @@
     // stack. Browsers block window.open() after an await (async break), so we
     // must open the window BEFORE the network call and then navigate it.
     const inspectorWin = window.open("", "_blank");
+    if (inspectorWin) {
+      inspectorWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>A iniciar MCP Inspector...</title>
+          <style>
+            body {
+              margin: 0;
+              height: 100vh;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              background: #f8fafc;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #0f172a;
+            }
+            .spinner {
+              width: 36px;
+              height: 36px;
+              border: 3px solid #e2e8f0;
+              border-top-color: #6366f1;
+              border-radius: 50%;
+              animation: spin 0.8s linear infinite;
+            }
+            h3 {
+              margin: 16px 0 6px 0;
+              font-size: 1rem;
+              font-weight: 600;
+            }
+            p {
+              margin: 0;
+              font-size: 0.85rem;
+              color: #64748b;
+            }
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="spinner"></div>
+          <h3>A iniciar MCP Inspector</h3>
+          <p>Por favor, aguarde enquanto o gateway inicializa o processo...</p>
+        </body>
+        </html>
+      `);
+      inspectorWin.document.close();
+    }
     try {
       const data = await apiFetch("/v1/servers/" + serverId + "/inspector", { method: "POST" });
       if (data && data.inspector_url) {
