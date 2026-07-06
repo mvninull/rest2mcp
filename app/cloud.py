@@ -11,10 +11,6 @@ import time
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
-# On Windows, asyncio.create_subprocess_exec requires the ProactorEventLoop policy.
-# Otherwise, we get a NotImplementedError (e.g. under default SelectorEventLoopPolicy).
-if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 import httpx
 import uvicorn
@@ -362,15 +358,30 @@ async def _start_inspector_for_server(server_id: str, url: str, transport: str =
     logger.info(f"Lançando inspector: npx @modelcontextprotocol/inspector --server-url {url} --transport {transport_type}")
 
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
-            "--server-url", url,
-            "--transport", transport_type,
+        import subprocess
+        if sys.platform == "win32":
+            cmd = [
+                "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
+                "--server-url", url,
+                "--transport", transport_type,
+            ]
+        else:
+            cmd = [
+                "npx", "-y", "@modelcontextprotocol/inspector",
+                "--server-url", url,
+                "--transport", transport_type,
+            ]
+
+        proc = subprocess.Popen(
+            cmd,
             env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
     except FileNotFoundError:
+        cmd_str = "npx.cmd" if sys.platform == "win32" else "npx"
         raise RuntimeError(
-            "Comando npx.cmd não encontrado. "
+            f"Comando {cmd_str} não encontrado. "
             "Verifique se Node.js está instalado e no PATH."
         )
     except Exception as exc:
@@ -421,15 +432,30 @@ async def _start_mcp_inspector(bridge_id: str) -> str:
     logger.info(f"Lançando inspector (bridge): npx @modelcontextprotocol/inspector --server-url {bridge_url} --transport sse")
 
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
-            "--server-url", bridge_url,
-            "--transport", "sse",
+        import subprocess
+        if sys.platform == "win32":
+            cmd = [
+                "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
+                "--server-url", bridge_url,
+                "--transport", "sse",
+            ]
+        else:
+            cmd = [
+                "npx", "-y", "@modelcontextprotocol/inspector",
+                "--server-url", bridge_url,
+                "--transport", "sse",
+            ]
+
+        proc = subprocess.Popen(
+            cmd,
             env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
     except FileNotFoundError:
+        cmd_str = "npx.cmd" if sys.platform == "win32" else "npx"
         raise RuntimeError(
-            "Comando npx.cmd não encontrado. "
+            f"Comando {cmd_str} não encontrado. "
             "Verifique se Node.js está instalado e no PATH."
         )
     except Exception as exc:
