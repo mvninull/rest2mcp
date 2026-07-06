@@ -476,10 +476,8 @@ nav {
 #menuPortal {
     position: fixed;
     z-index: 9999;
+    /* pointer-events are controlled by .menu-dropdown(.open) below */
     pointer-events: none;
-}
-#menuPortal.open {
-    pointer-events: all;
 }
 .menu-dropdown {
     display: none;
@@ -502,6 +500,7 @@ nav {
 }
 .menu-dropdown.open {
     display: block;
+    pointer-events: all;
     animation: popIn 0.15s ease;
 }
 .menu-dropdown button {
