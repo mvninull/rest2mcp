@@ -190,7 +190,10 @@ class ActiveServer:
                     sources.append(
                         {"name": s.get("source_name", "Source"), "namespace": s.get("namespace", ""), "spec": ss}
                     )
-            from openapi import create_merged_mcp_server
+            try:
+                from .openapi import create_merged_mcp_server
+            except ImportError:
+                from openapi import create_merged_mcp_server
 
             merged_mcp = create_merged_mcp_server(
                 base_spec_url=self.spec_url,
