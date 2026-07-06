@@ -6,6 +6,9 @@
 
   onMount(() => {
       const debug = (...args) => console.log("[dashboard-debug]", ...args);
+      let list;
+      let _initialized = false;
+      let _serversCache = null;
 
       installAppAlert();
       debug("onMount:init");
@@ -296,9 +299,12 @@
       // ─── Render Card ───────────────────────────────────────
       function renderServerCard(s) {
         const isActive = s.status === "active";
+        const isHealthy = _serverHealth.get(s.server_id);
+        const healthError = isActive && isHealthy === "error";
         const isMerged = s.is_merged === true;
         const card = document.createElement("div");
         let cls = `server-card${isActive ? " active-status" : ""}`;
+        if (healthError) cls += " health-error";
         if (isMerged) cls += " server-card-merged";
         card.className = cls;
         card.dataset.serverId = s.server_id;
@@ -328,26 +334,34 @@
           document.querySelectorAll(".server-card").forEach((c) => c.classList.remove("drag-over"));
         });
 
-        const emoji = isActive
-          ? `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#00d4aa"/><circle cx="8" cy="8" r="7" stroke="#00d4aa" stroke-width="1.5" stroke-opacity="0.3"/></svg>`
-          : `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff5c35"/><circle cx="8" cy="8" r="7" stroke="#ff5c35" stroke-width="1.5" stroke-opacity="0.3"/></svg>`;
+        const emoji = healthError
+          ? `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff5c35"/><circle cx="8" cy="8" r="7" stroke="#ff5c35" stroke-width="1.5" stroke-opacity="0.3"/></svg>`
+          : isActive
+            ? `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#00d4aa"/><circle cx="8" cy="8" r="7" stroke="#00d4aa" stroke-width="1.5" stroke-opacity="0.3"/></svg>`
+            : `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff5c35"/><circle cx="8" cy="8" r="7" stroke="#ff5c35" stroke-width="1.5" stroke-opacity="0.3"/></svg>`;
 
         card.addEventListener("click", () => selectServer(s.server_id));
 
         const mergeLabel = isMerged ? `<span class="merge-badge"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l1.2 4.8L14 6l-4.8 1.2L8 12 6.8 7.2 2 6l4.8-1.2z"/></svg> Merged</span>` : "";
 
+        const urlText = healthError
+          ? '<span style="color:var(--danger)">API indispon\u00edvel</span>'
+          : escapeHtml(s.url_sse || s.server_id);
+        const statusText = healthError ? "API indispon\u00edvel" : isActive ? "Online" : "Offline";
+        const statusClass = healthError ? "inactive" : isActive ? "active" : "inactive";
+
         card.innerHTML = `
           <div class="server-info">
-            <div class="status-icon ${isActive ? "active" : "inactive"}">${emoji}</div>
+            <div class="status-icon ${isActive ? (healthError ? "inactive" : "active") : "inactive"}">${emoji}</div>
             <div class="server-meta">
               <div class="server-name">${escapeHtml(s.name)} ${mergeLabel}</div>
-              <div class="server-url">${escapeHtml(s.url_sse || s.server_id)}${s.merge_info ? ' · ' + escapeHtml(s.merge_info) : ''}</div>
+              <div class="server-url">${urlText}${s.merge_info ? ' · ' + escapeHtml(s.merge_info) : ''}</div>
             </div>
           </div>
           <div class="server-actions">
-            <span class="status-chip ${isActive ? "active" : "inactive"}">
+            <span class="status-chip ${statusClass}">
               <span class="status-chip-dot"></span>
-              ${isActive ? "Online" : "Offline"}
+              ${statusText}
             </span>
             <button class="btn-copy" ${isActive ? "" : "disabled"} onclick="copyUrl(this, '${escapeHtml(s.url_sse || "")}')">
               Copy URL
@@ -359,7 +373,7 @@
                 </svg>
               </button>
               <div class="menu-dropdown">
-                <button onclick="openInspector('${escapeHtml(s.url_sse || "")}', '${s.transport || "http"}'); closeMenu();">
+                <button onclick="openInspector('${s.server_id}'); closeMenu();">
                   <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
                 </button>
 
@@ -390,14 +404,22 @@
       }
 
       // ─── Load Servers ──────────────────────────────────────
-      async function loadServers() {
-        const list = document.getElementById("serverList");
+      async function loadServers(forceRefresh) {
+        if (_serversCache && !forceRefresh) {
+          const stored = _serversCache;
+          _serverHealth = new Map(Object.entries(stored.health || {}));
+          return stored.servers;
+        }
+        list = document.getElementById("serverList");
         if (!list) return;
         try {
           const servers = await apiFetch("/v1/servers");
+          console.log("[loadServers] GET /v1/servers recebido com", servers?.length, "servidores");
+          _serversCache = { servers, health: {} };
           list.innerHTML = "";
 
           if (!servers || servers.length === 0) {
+            console.log("[loadServers] lista vazia — a mostrar empty state");
             list.innerHTML = `
               <div class="empty-state">
                 <div class="empty-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="14" rx="2"/><path d="M9 16v4M15 16v4M9 20h6"/><path d="M9 6h6M9 10h6"/></svg></div>
@@ -405,9 +427,16 @@
               </div>
             `;
           } else {
+            console.log("[loadServers] a renderizar", servers.length, "servers (antes dos health checks)");
             servers.forEach((s) => list.appendChild(renderServerCard(s)));
             _populateLogServerSelect(servers);
-            selectServer(servers[0].server_id);
+            const stillExists = activeServerId && servers.some(s => s.server_id === activeServerId);
+            if (stillExists) {
+              selectServer(activeServerId);
+            } else {
+              selectServer(servers[0].server_id);
+            }
+            console.log("[loadServers] listagem pronta — a disparar health checks em background");
             _checkAllServerHealth(servers);
           }
 
@@ -434,19 +463,23 @@
       async function _checkAllServerHealth(servers) {
         _serverHealth = new Map();
         const active = servers.filter(s => s.status === "active");
+        console.log("[health] health checks iniciados para", active.length, "servidores ativos (em background)");
         const token = getAuthToken();
         const headers = { "Content-Type": "application/json" };
         if (token) headers["Authorization"] = `Bearer ${token}`;
         const results = await Promise.allSettled(
-          active.map(s =>
-            fetch(`${API_BASE}/v1/servers/${s.server_id}/health`, { headers }).then(r => r.json())
-          )
+          active.map(s => {
+            console.log("[health] a verificar", s.server_id, s.name);
+            return fetch(`${API_BASE}/v1/servers/${s.server_id}/health`, { headers }).then(r => r.json());
+          })
         );
         results.forEach((res, i) => {
           const srv = active[i];
           if (res.status === "fulfilled" && res.value.status === "ok") {
+            console.log("[health]", srv.server_id, srv.name, "→ OK");
             _serverHealth.set(srv.server_id, "ok");
           } else {
+            console.log("[health]", srv.server_id, srv.name, "→ ERROR", res.status === "fulfilled" ? res.value.detail : "fetch failed");
             _serverHealth.set(srv.server_id, "error");
             const card = document.querySelector(`.server-card[data-server-id="${srv.server_id}"]`);
             if (card) {
@@ -464,6 +497,11 @@
             }
           }
         });
+        console.log("[health] todos os health checks concluídos");
+        _serversCache = {
+          servers: servers,
+          health: Object.fromEntries(_serverHealth),
+        };
       }
 
       // ─── Create Server ─────────────────────────────────────
@@ -797,16 +835,21 @@
       }
       window.closeStoreModal = closeStoreModal;
 
+      let _storeCacheFetched = false;
+
       async function openStoreModal() {
         const modal = document.getElementById("storeModal");
         const grid = document.getElementById("storeGrid");
         if (!modal || !grid) return;
         modal.classList.add("open");
-        grid.innerHTML = "<div class='store-loading'>A carregar loja...</div>";
         _storeFilterHosting = "";
         _storeFilterCategory = "";
-        _storeAllServers = [];
-        _storePageInfo = { hasNextPage: false, endCursor: "" };
+        if (_storeCacheFetched) {
+          _renderStoreFilters();
+          searchStore();
+          return;
+        }
+        grid.innerHTML = "<div class='store-loading'>A carregar loja...</div>";
         _storeEnvSchemas = {};
         try {
           const res = await fetch("/v1/store/servers");
@@ -821,6 +864,7 @@
               _storeEnvSchemas[s.id] = s.environmentVariablesJsonSchema;
             }
           });
+          _storeCacheFetched = true;
           _renderStoreFilters();
           searchStore();
         } catch (err) {
@@ -1073,28 +1117,74 @@
             if (errorEl) showModalError(errorEl, "JSON inválido. Verifique a sintaxe.");
             return;
           }
-          const namespace = (cfg.name || "").toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") ||
-            (cfg.command || "").replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "sandbox";
-          if (cfg.url) {
-            const envContainer = document.getElementById("mergeEnvFields");
-            const envInputs = envContainer ? envContainer.querySelectorAll(".env-input") : [];
+
+          const hasMcpServers = !!cfg.mcpServers;
+          const getNamespace = (cfg) => {
+            let ns = (cfg.name || "").toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+            if (!ns && cfg.command) ns = cfg.command.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+            if (!ns && cfg.url) ns = (() => { try { return new URL(cfg.url).hostname.replace(/[^a-z0-9]/g, "_"); } catch { return "remote"; } })();
+            return ns || "sandbox";
+          };
+          const namespace = getNamespace(cfg);
+
+          const envContainer = document.getElementById("mergeEnvFields");
+          const envInputs = envContainer ? envContainer.querySelectorAll(".env-input") : [];
+          const collectEnv = () => {
             let missingReq = false;
-            const headersVars = {};
+            const vars = {};
             envInputs.forEach(inp => {
               const val = inp.value.trim();
               if (inp.hasAttribute("required") && !val) { missingReq = true; return; }
-              if (val) headersVars[inp.id.replace("env_", "")] = val;
+              if (val) vars[inp.id.replace("env_", "")] = val;
             });
+            return { missingReq, vars };
+          };
+
+          if (hasMcpServers) {
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
+            try {
+              const { missingReq, vars: envVars } = collectEnv();
+              if (missingReq) throw new Error("Preencha todos os campos obrigatórios de ambiente.");
+              if (Object.keys(envVars).length) {
+                const name = Object.keys(cfg.mcpServers)[0];
+                cfg.mcpServers[name] = { ...cfg.mcpServers[name], env: { ...(cfg.mcpServers[name].env || {}), ...envVars } };
+              }
+              await apiFetch("/v1/servers/merge", {
+                method: "POST",
+                body: JSON.stringify({ source_server_id: mergeSourceId, stdio_config: cfg, namespace, merged_name: name }),
+              });
+              closeMergeModal();
+              showLoading("Servidor merged criado! Carregando...", false);
+              await loadServers();
+              hideLoading();
+              window.showAppAlert("Servidor merged (config) criado com sucesso.");
+            } catch (err) {
+              if (errorEl) showModalError(errorEl, err.message);
+              window.showAppAlert("Erro no merge: " + err.message);
+            } finally {
+              if (btn) { btn.disabled = false; btn.textContent = "Criar Servidor Merged"; }
+            }
+            return;
+          }
+
+          if (cfg.url) {
+            const { missingReq, vars: headersVars } = collectEnv();
             if (missingReq) {
               if (errorEl) showModalError(errorEl, "Preencha todos os campos obrigatórios de ambiente.");
               return;
             }
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
             try {
-              await apiFetch("/v1/servers/merge", {
-                method: "POST",
-                body: JSON.stringify({ source_server_id: mergeSourceId, remote_url: cfg.url, remote_transport: cfg.type || "streamable-http", remote_headers: Object.keys(headersVars).length ? headersVars : undefined, namespace, merged_name: name }),
-              });
+              const body = {
+                source_server_id: mergeSourceId,
+                remote_url: cfg.url,
+                remote_transport: cfg.type || "streamable-http",
+                remote_headers: Object.keys(headersVars).length ? headersVars : undefined,
+                namespace,
+                merged_name: name,
+              };
+              if (cfg.tools) body.remote_tools = cfg.tools;
+              await apiFetch("/v1/servers/merge", { method: "POST", body: JSON.stringify(body) });
               closeMergeModal();
               showLoading("Servidor merged criado! Carregando...", false);
               await loadServers();
@@ -1108,16 +1198,8 @@
             }
             return;
           }
-          if (!cfg.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command'."); return; }
-          const envContainer = document.getElementById("mergeEnvFields");
-          const envInputs = envContainer ? envContainer.querySelectorAll(".env-input") : [];
-          let missingReq = false;
-          const envVars = {};
-          envInputs.forEach(inp => {
-            const val = inp.value.trim();
-            if (inp.hasAttribute("required") && !val) { missingReq = true; return; }
-            if (val) envVars[inp.id.replace("env_", "")] = val;
-          });
+          if (!cfg.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command' ou 'mcpServers'."); return; }
+          const { missingReq, vars: envVars } = collectEnv();
           if (missingReq) {
             if (errorEl) showModalError(errorEl, "Preencha todos os campos obrigatórios de ambiente.");
             return;
@@ -1235,18 +1317,23 @@
       });
 
       // ─── Inspector ─────────────────────────────────────────
-      function openInspector(url, transportType) {
-        const transport = transportType === "http" ? "streamable-http" : "sse";
-        navigator.clipboard.writeText(url).catch(() => {});
-        fetch("http://127.0.0.1:6277/connect", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, transportType: transport }),
-        }).catch(() => {});
-        window.open(
-          `http://localhost:6274/?url=${encodeURIComponent(url)}&transportType=${transport}`,
-          "_blank",
-        );
+      let _inspecting = false;
+      async function openInspector(serverId) {
+        if (!serverId) { window.showAppAlert("ID do servidor não disponível"); return; }
+        if (_inspecting) return;
+        _inspecting = true;
+        showLoading("A iniciar MCP Inspector...", false);
+        try {
+          const data = await apiFetch("/v1/servers/" + serverId + "/inspector", { method: "POST" });
+          if (data && data.inspector_url) {
+            window.open(data.inspector_url, "_blank");
+          }
+        } catch (err) {
+          window.showAppAlert("Erro ao iniciar inspector: " + err.message);
+        } finally {
+          hideLoading();
+          _inspecting = false;
+        }
       }
 
       // ─── Copy URL ──────────────────────────────────────────
@@ -1514,7 +1601,9 @@
       (async function init() {
         await checkGateway();
         await restoreSession();
-        await loadServers();
+        if (list) list.innerHTML = '<div class="loading-state" style="text-align:center;padding:3rem 1rem;color:var(--muted);font-size:0.9rem;">Carregando servidores<span class="loading-dots"></span></div>';
+        await loadServers(true);
+        _initialized = true;
         startLogsPolling();
 
         if (supabaseClient) {
@@ -1808,7 +1897,7 @@
         window.saveNewPassword = saveNewPassword;
 
         const _stdioTa = document.getElementById("mergeStdioJson");
-        if (_stdioTa) _stdioTa.placeholder = '{\n  "command": "uvx",\n  "args": ["mcp-excel-server"]\n}';
+        if (_stdioTa) _stdioTa.placeholder = '{\n  "command": "uvx",\n  "args": ["mcp-excel-server"],\n  "env": { "KEY": "val" },\n  "tools": { "tool_name": { "name": "novo_nome", "description": "...", "arguments": { "param": { "default": "x", "hide": true } } } }\n}';
     
   });
 </script>
@@ -2001,7 +2090,7 @@
           <div class="form-group">
             <label for="mergeStdioJson">Config JSON</label>
             <textarea id="mergeStdioJson" rows="5" class="code-textarea"></textarea>
-            <p class="form-hint">Comando e args do servidor MCP stdio. O ambiente é herdado do gateway.</p>
+            <p class="form-hint">Comando/args do servidor MCP. Suporta <code>mcpServers</code>, <code>url</code> (remoto), <code>command</code> (stdio), <code>tools</code> (transformações) e <code>env</code>.</p>
           </div>
           <div id="mergeEnvFields" style="display:none"></div>
           <div id="mergePackageWarning" class="store-warning" style="display:none"></div>

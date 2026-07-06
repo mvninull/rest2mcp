@@ -169,13 +169,16 @@ class ActiveServer:
             for s in sources_raw:
                 if s.get("remote_url"):
                     runtime_url = bridge_info["url"] if bridge_info else s["remote_url"]
-                    sources.append(
-                        {
-                            "name": s.get("source_name", "Remote Source"),
-                            "namespace": s.get("namespace", ""),
-                            "remote_url": runtime_url,
-                        }
-                    )
+                    src_entry = {
+                        "name": s.get("source_name", "Remote Source"),
+                        "namespace": s.get("namespace", ""),
+                        "remote_url": runtime_url,
+                    }
+                    if s.get("tools"):
+                        src_entry["tools"] = s["tools"]
+                    if s.get("remote_headers"):
+                        src_entry["remote_headers"] = s["remote_headers"]
+                    sources.append(src_entry)
                 else:
                     ss = (
                         json.loads(s["source_spec_data"])
@@ -195,7 +198,7 @@ class ActiveServer:
                 server_id=self.server_id,
                 log_func=_make_log_func(self.server_id),
             )
-            self.manager = merged_mcp._manager if hasattr(merged_mcp, "_manager") else None
+            self.manager = getattr(merged_mcp, "_manager", None)
             self.sse_app = merged_mcp.http_app(transport=transport or self._transport)
         else:
             self.manager = MCPServerManager(
@@ -267,15 +270,15 @@ async def _start_stdio_bridge(stdio_config: dict, bridge_id: str) -> str:
 
     if "mcpServers" not in stdio_config:
         cmd_name = os.path.basename(stdio_config.get("command", "sandbox"))
-        stdio_config = {
-            "mcpServers": {
-                cmd_name: {
-                    "command": stdio_config["command"],
-                    "args": stdio_config.get("args", []),
-                    **({"env": stdio_config["env"]} if stdio_config.get("env") else {}),
-                }
-            }
+        server_entry = {
+            "command": stdio_config["command"],
+            "args": stdio_config.get("args", []),
         }
+        if stdio_config.get("env"):
+            server_entry["env"] = stdio_config["env"]
+        if stdio_config.get("tools"):
+            server_entry["tools"] = stdio_config["tools"]
+        stdio_config = {"mcpServers": {cmd_name: server_entry}}
 
     port = _find_free_port()
 
@@ -335,6 +338,110 @@ def _stop_direct_inspector(server_id: str):
         except Exception:
             pass
     logger.info(f"Direct inspector {server_id} stopped")
+
+
+async def _start_inspector_for_server(server_id: str, url: str, transport: str = "http") -> str:
+    _stop_direct_inspector(server_id)
+
+    client_port = _find_free_port()
+    server_port = _find_free_port()
+    logger.info(f"_start_inspector_for_server: ports {client_port}/{server_port}")
+
+    env = os.environ.copy()
+    env["CLIENT_PORT"] = str(client_port)
+    env["SERVER_PORT"] = str(server_port)
+    env["DANGEROUSLY_OMIT_AUTH"] = "true"
+
+    try:
+        from fastmcp.cli.cli import _get_npx_command
+        npx_cmd = _get_npx_command()
+        logger.info(f"_start_inspector_for_server: npx_cmd={npx_cmd!r}")
+        if not npx_cmd:
+            raise RuntimeError("npx não encontrado. Verifique a instalação do Node.js.")
+    except Exception as inner:
+        logger.error(f"_start_inspector_for_server: erro no npx lookup: {type(inner).__name__}: {inner!r}")
+        raise
+
+    transport_type = "http" if transport in ("http", "streamable-http") else "sse"
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            npx_cmd, "-y", "@modelcontextprotocol/inspector",
+            "--server-url", url,
+            "--transport", transport_type,
+            env=env,
+        )
+        logger.info(f"_start_inspector_for_server: subprocess started pid={proc.pid}")
+    except Exception as inner:
+        logger.error(f"_start_inspector_for_server: erro no create_subprocess: {type(inner).__name__}: {inner!r}")
+        raise
+
+    direct_inspectors[server_id] = {"proc": proc, "url": url}
+
+    inspector_url = f"http://localhost:{client_port}"
+
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        try:
+            s = socket.create_connection(("localhost", client_port), timeout=1)
+            s.close()
+            logger.info(f"Inspector {server_id} pronto em {inspector_url}")
+            return inspector_url
+        except Exception:
+            await asyncio.sleep(0.5)
+
+    logger.warning(f"Inspector {server_id} started but port {client_port} not ready yet")
+    return inspector_url
+
+
+async def _start_mcp_inspector(bridge_id: str) -> str:
+    bridge = stdio_bridges.get(bridge_id)
+    if not bridge:
+        raise ValueError(f"Bridge {bridge_id} not found")
+
+    insp_proc = bridge.get("inspector_proc")
+    if insp_proc:
+        try:
+            insp_proc.kill()
+        except Exception:
+            pass
+
+    client_port = _find_free_port()
+    server_port = _find_free_port()
+
+    env = os.environ.copy()
+    env["CLIENT_PORT"] = str(client_port)
+    env["SERVER_PORT"] = str(server_port)
+    env["DANGEROUSLY_OMIT_AUTH"] = "true"
+
+    from fastmcp.cli.cli import _get_npx_command
+    npx_cmd = _get_npx_command()
+    if not npx_cmd:
+        raise RuntimeError("npx não encontrado. Verifique a instalação do Node.js.")
+
+    bridge_url = bridge.get("url", "")
+    proc = await asyncio.create_subprocess_exec(
+        npx_cmd, "-y", "@modelcontextprotocol/inspector",
+        "--server-url", bridge_url,
+        "--transport", "sse",
+        env=env,
+    )
+
+    bridge["inspector_proc"] = proc
+    inspector_url = f"http://localhost:{client_port}"
+
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        try:
+            s = socket.create_connection(("localhost", client_port), timeout=1)
+            s.close()
+            logger.info(f"MCP Inspector {bridge_id} pronto em {inspector_url}")
+            return inspector_url
+        except Exception:
+            await asyncio.sleep(0.5)
+
+    logger.warning(f"MCP Inspector {bridge_id} started but port {client_port} not ready yet")
+    return inspector_url
 
 
 def register_sse_session(user_id: str) -> asyncio.Event:
@@ -438,6 +545,7 @@ class MergeServerRequest(BaseModel):
     remote_url: str | None = None
     remote_transport: str = "http"
     remote_headers: dict[str, str] | None = None
+    remote_tools: dict | None = None
     stdio_config: dict | None = None
     namespace: str
     merged_name: str
@@ -646,7 +754,6 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
 
         try:
             from fastmcp.client.transports import StreamableHttpTransport
-            from fastmcp import Client
             validate_headers = dict(req.remote_headers or {})
             auth_val = validate_headers.pop("Authorization", None)
             transport = StreamableHttpTransport(
@@ -654,6 +761,7 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
                 headers=validate_headers or None,
                 auth=auth_val,
             )
+            from fastmcp import Client
             async with Client(transport) as remote_client:
                 tools = await remote_client.list_tools()
         except Exception as e:
@@ -680,6 +788,8 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
                 "source_spec_url": "",
             }
         ]
+        if req.remote_tools:
+            sources[0]["tools"] = req.remote_tools
 
         record = _create_merged_server(
             db=db,
@@ -972,16 +1082,61 @@ async def check_server_health(server_id: str, request: Request, db: Session = De
     if not url:
         return {"status": "error", "detail": "Servidor sem spec URL"}
 
+    async with httpx.AsyncClient(follow_redirects=True) as hc:
+        resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
+        if resp.is_success:
+            return {"status": "ok"}
+        return {"status": "error", "detail": f"HTTP {resp.status_code}"}
+
+
+@app.post("/v1/servers/{server_id}/inspector")
+async def start_server_inspector(server_id: str, request: Request, db: Session = Depends(get_db)):
+    """Start the MCP Inspector for any server (sandbox or regular)."""
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    # Sandbox/merged server flow (stdio-based sandbox only)
+    if record.is_merged and record.merge_config:
+        bridge_id = record.merge_config.get("_bridge_id")
+        if bridge_id:
+            if bridge_id not in stdio_bridges:
+                stdio_cfg = record.merge_config.get("_stdio_config")
+                if not stdio_cfg:
+                    sources = record.merge_config.get("sources", [])
+                    src_name = sources[0].get("source_name", "") if sources else ""
+                    m = re.match(r"^Sandbox\s*\((.+)\)$", src_name)
+                    if m:
+                        cmd = m.group(1).strip()
+                        stdio_cfg = {"command": cmd, "args": []}
+                        logger.info(f"Reconstructed stdio_cfg for bridge {bridge_id}: {cmd}")
+                    else:
+                        raise HTTPException(status_code=400, detail="Configuração sandbox perdida. Recrie o merge.")
+                try:
+                    await _start_stdio_bridge(stdio_cfg, bridge_id)
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Falha ao reiniciar sandbox: {e}")
+
+            try:
+                inspector_url = await _start_mcp_inspector(bridge_id)
+                return {"inspector_url": inspector_url}
+            except Exception as e:
+                logger.error(f"Falha ao iniciar inspector para {bridge_id}: {e}")
+                raise HTTPException(status_code=500, detail=f"Falha ao iniciar inspector: {e}")
+
+    # Regular server flow — start a direct inspector with server URL pre-configured
+    suffix = "mcp" if record.transport == "http" else "sse"
+    server_url = f"http://127.0.0.1:{GATEWAY_PORT}/v1/{record.server_id}/{record.apikey}/{suffix}"
+    logger.info(f"Starting direct inspector for {server_id} -> {server_url}")
+
     try:
-        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as hc:
-            resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
-            if resp.is_success:
-                return {"status": "ok"}
-            return {"status": "error", "detail": f"HTTP {resp.status_code}"}
-    except httpx.TimeoutException:
-        return {"status": "error", "detail": "timeout"}
+        inspector_url = await _start_inspector_for_server(record.server_id, server_url, record.transport)
+        return {"inspector_url": inspector_url}
     except Exception as e:
-        return {"status": "error", "detail": str(e)[:120]}
+        logger.error(f"Falha ao iniciar inspector para {server_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Falha ao iniciar inspector: {e}")
 
 
 @app.delete("/v1/servers/{server_id}", status_code=204)
@@ -1502,18 +1657,18 @@ async def check_store_package(name: str = "", namespace: str = "", slug: str = "
 
 def _extract_env_schema(server_data: dict) -> dict | None:
     all_vars: list[dict] = []
-    
+
     for pkg in (server_data.get("packages") or []):
         for ev in (pkg.get("environmentVariables") or []):
             all_vars.append(ev)
-    
+
     for remote in (server_data.get("remotes") or []):
         for header in (remote.get("headers") or []):
             all_vars.append(header)
-    
+
     if not all_vars:
         return None
-    
+
     properties = {}
     required = []
     seen = set()
@@ -1534,7 +1689,7 @@ def _extract_env_schema(server_data: dict) -> dict | None:
         properties[name] = prop
         if ev.get("isRequired"):
             required.append(name)
-    
+
     schema: dict = {"type": "object", "properties": properties}
     if required:
         schema["required"] = required
