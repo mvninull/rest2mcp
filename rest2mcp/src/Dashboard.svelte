@@ -1922,18 +1922,23 @@
 <div id="menuPortal">
   {#if activeMenu && activeMenuServer}
     {@const s = activeMenuServer}
-    <div class="menu-dropdown open" style="position: fixed; left: {activeMenu.x}px; top: {activeMenu.y}px; z-index: 1000000; min-width: 200px;">
+    <!-- stopPropagation prevents the global document click-outside listener from
+         closing the menu (and destroying this {#if} block) before the button
+         handlers have a chance to run. -->
+    <div class="menu-dropdown open"
+         style="position: fixed; left: {activeMenu.x}px; top: {activeMenu.y}px; z-index: 1000000; min-width: 200px;"
+         on:click|stopPropagation>
       <button on:click={() => { openInspector(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
       </button>
-      <button onclick="editServer('{s.server_id}', '{s.name?.replace(/'/g, "\\'") || ''}', '{s.transport || 'http'}'); closeAllMenus();">
+      <button on:click={() => { editServer(s.server_id, s.name || '', s.transport || 'http'); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> Editar
       </button>
-      <button onclick="openMergeModalFromMenu('{s.server_id}', '{s.name?.replace(/'/g, "\\'") || ''}'); closeAllMenus();">
+      <button on:click={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> Merge
       </button>
       <div class="menu-divider"></div>
-      <button onclick="toggleServerStatus('{s.server_id}'); closeAllMenus();">
+      <button on:click={() => { toggleServerStatus(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon">
           {#if s.status === "active"}
             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>
@@ -1945,12 +1950,12 @@
       </button>
       {#if s.is_merged === true}
         <div class="menu-divider"></div>
-        <button onclick="unmergeServer('{s.server_id}'); closeAllMenus();">
+        <button on:click={() => { unmergeServer(s.server_id); closeAllMenus(); }}>
           <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> Desfazer Merge
         </button>
       {/if}
       <div class="menu-divider"></div>
-      <button class="menu-danger" onclick="deleteServer('{s.server_id}'); closeAllMenus();">
+      <button class="menu-danger" on:click={() => { deleteServer(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> Remover
       </button>
     </div>
