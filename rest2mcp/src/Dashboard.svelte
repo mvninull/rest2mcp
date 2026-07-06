@@ -14,6 +14,7 @@
   const SUPABASE_ANON_KEY = localStorage.getItem("supabase_anon_key") || "sb_publishable_mF0UgfLvgZN5OupdpsSa0A_ibOcfzq4";
 
   let activeMenu = null;
+  $: menuServer = activeMenu ? $servers.find(s => s.server_id === activeMenu.serverId) : null;
   let mergeSourceId = null;
   let mergeTargetId = null;
   let mergeMode = "local";
@@ -1895,44 +1896,41 @@
 
 <!-- ── MENU PORTAL ──────────────────────────────────────── -->
 <div id="menuPortal">
-  {#if activeMenu}
-    {#each $servers as s (s.server_id)}
-      {#if s.server_id === activeMenu.serverId}
-        {@const isMergedPortal = s.is_merged === true}
-        <div class="menu-dropdown open" style="position: fixed; left: {activeMenu.x}px; top: {activeMenu.y}px; z-index: 1000000; min-width: 200px;">
-          <button on:click={() => { openInspector(s.server_id); closeAllMenus(); }}>
-            <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
-          </button>
-          <button on:click={() => { editServer(s.server_id, s.name || '', s.transport || 'http'); closeAllMenus(); }}>
-            <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> Editar
-          </button>
-          <button on:click={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
-            <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> Merge
-          </button>
-          <div class="menu-divider"></div>
-          <button on:click={() => { toggleServerStatus(s.server_id); closeAllMenus(); }}>
-            <span class="menu-icon">
-              {#if s.status === "active"}
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>
-              {:else}
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg>
-              {/if}
-            </span>
-            {s.status === "active" ? "Desativar" : "Ativar"}
-          </button>
-          {#if isMergedPortal}
-            <div class="menu-divider"></div>
-            <button on:click={() => { unmergeServer(s.server_id); closeAllMenus(); }}>
-              <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> Desfazer Merge
-            </button>
+  {#if activeMenu && menuServer}
+    {@const s = menuServer}
+    {@const isMergedPortal = s.is_merged === true}
+    <div class="menu-dropdown open" style="position: fixed; left: {activeMenu.x}px; top: {activeMenu.y}px; z-index: 1000000; min-width: 200px;">
+      <button on:click={() => { openInspector(s.server_id); closeAllMenus(); }}>
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
+      </button>
+      <button on:click={() => { editServer(s.server_id, s.name || '', s.transport || 'http'); closeAllMenus(); }}>
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> Editar
+      </button>
+      <button on:click={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> Merge
+      </button>
+      <div class="menu-divider"></div>
+      <button on:click={() => { toggleServerStatus(s.server_id); closeAllMenus(); }}>
+        <span class="menu-icon">
+          {#if s.status === "active"}
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>
+          {:else}
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg>
           {/if}
-          <div class="menu-divider"></div>
-          <button class="menu-danger" on:click={() => { deleteServer(s.server_id); closeAllMenus(); }}>
-            <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> Remover
-          </button>
-        </div>
+        </span>
+        {s.status === "active" ? "Desativar" : "Ativar"}
+      </button>
+      {#if isMergedPortal}
+        <div class="menu-divider"></div>
+        <button on:click={() => { unmergeServer(s.server_id); closeAllMenus(); }}>
+          <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> Desfazer Merge
+        </button>
       {/if}
-    {/each}
+      <div class="menu-divider"></div>
+      <button class="menu-danger" on:click={() => { deleteServer(s.server_id); closeAllMenus(); }}>
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> Remover
+      </button>
+    </div>
   {/if}
 </div>
 
