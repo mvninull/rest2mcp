@@ -5,10 +5,16 @@ import re
 import secrets
 import socket
 import string
+import sys
 import threading
 import time
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
+
+# On Windows, asyncio.create_subprocess_exec requires the ProactorEventLoop policy.
+# Otherwise, we get a NotImplementedError (e.g. under default SelectorEventLoopPolicy).
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 import httpx
 import uvicorn
@@ -345,36 +351,32 @@ async def _start_inspector_for_server(server_id: str, url: str, transport: str =
 
     client_port = _find_free_port()
     server_port = _find_free_port()
-    logger.info(f"_start_inspector_for_server: ports {client_port}/{server_port}")
 
     env = os.environ.copy()
     env["CLIENT_PORT"] = str(client_port)
     env["SERVER_PORT"] = str(server_port)
     env["DANGEROUSLY_OMIT_AUTH"] = "true"
 
-    try:
-        from fastmcp.cli.cli import _get_npx_command
-        npx_cmd = _get_npx_command()
-        logger.info(f"_start_inspector_for_server: npx_cmd={npx_cmd!r}")
-        if not npx_cmd:
-            raise RuntimeError("npx não encontrado. Verifique a instalação do Node.js.")
-    except Exception as inner:
-        logger.error(f"_start_inspector_for_server: erro no npx lookup: {type(inner).__name__}: {inner!r}")
-        raise
-
     transport_type = "http" if transport in ("http", "streamable-http") else "sse"
+
+    logger.info(f"Lançando inspector: npx @modelcontextprotocol/inspector --server-url {url} --transport {transport_type}")
 
     try:
         proc = await asyncio.create_subprocess_exec(
-            npx_cmd, "-y", "@modelcontextprotocol/inspector",
+            "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
             "--server-url", url,
             "--transport", transport_type,
             env=env,
         )
-        logger.info(f"_start_inspector_for_server: subprocess started pid={proc.pid}")
-    except Exception as inner:
-        logger.error(f"_start_inspector_for_server: erro no create_subprocess: {type(inner).__name__}: {inner!r}")
-        raise
+    except FileNotFoundError:
+        raise RuntimeError(
+            "Comando npx.cmd não encontrado. "
+            "Verifique se Node.js está instalado e no PATH."
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Falha ao lançar inspector: {type(exc).__name__}: {exc}"
+        ) from exc
 
     direct_inspectors[server_id] = {"proc": proc, "url": url}
 
@@ -414,18 +416,26 @@ async def _start_mcp_inspector(bridge_id: str) -> str:
     env["SERVER_PORT"] = str(server_port)
     env["DANGEROUSLY_OMIT_AUTH"] = "true"
 
-    from fastmcp.cli.cli import _get_npx_command
-    npx_cmd = _get_npx_command()
-    if not npx_cmd:
-        raise RuntimeError("npx não encontrado. Verifique a instalação do Node.js.")
-
     bridge_url = bridge.get("url", "")
-    proc = await asyncio.create_subprocess_exec(
-        npx_cmd, "-y", "@modelcontextprotocol/inspector",
-        "--server-url", bridge_url,
-        "--transport", "sse",
-        env=env,
-    )
+
+    logger.info(f"Lançando inspector (bridge): npx @modelcontextprotocol/inspector --server-url {bridge_url} --transport sse")
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
+            "--server-url", bridge_url,
+            "--transport", "sse",
+            env=env,
+        )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "Comando npx.cmd não encontrado. "
+            "Verifique se Node.js está instalado e no PATH."
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Falha ao lançar inspector: {type(exc).__name__}: {exc}"
+        ) from exc
 
     bridge["inspector_proc"] = proc
     inspector_url = f"http://localhost:{client_port}"
