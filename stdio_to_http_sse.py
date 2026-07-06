@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-stdio_to_http_sse.py — Bridge stdio MCP servers to HTTP/SSE.
+stdio_to_http_sse.py — Bridge stdio MCP servers to HTTP/SSE (FastMCP v3).
 
-Takes any stdio-based MCP server (uvx, npx, pipx, etc.) and exposes it
-as an HTTP/SSE endpoint compatible with fastmcp.Client for remote merge.
+Wraps any stdio-based MCP server (uvx, npx, pipx, etc.) and serves it
+over HTTP/SSE using FastMCP's create_proxy().
 
 Usage:
   python stdio_to_http_sse.py --command uvx --args mcp-excel-server
@@ -12,16 +12,9 @@ Usage:
   python stdio_to_http_sse.py --config server.json
   python stdio_to_http_sse.py --config claude_desktop_config.json --name excel
 
-Config file (JSON):
-  {
-    "mcpServers": {
-      "excel": {
-        "command": "uvx",
-        "args": ["mcp-excel-server"],
-        "env": { "PYTHONPATH": "/path/to/your/python" }
-      }
-    }
-  }
+Equivalente via FastMCP CLI directamente:
+  fastmcp run config.json --transport sse --port PORT --host HOST
+  fastmcp run <(echo '{"mcpServers":{"srv":{"command":"uvx","args":["mcp-excel-server"]}}}') --transport sse
 
 Integration with merge-point:
   POST /v1/servers/merge
@@ -32,17 +25,15 @@ Integration with merge-point:
 """
 
 import argparse
-import asyncio
 import json
 import os
-import signal
+import subprocess
 import sys
-
-import uvicorn
+import tempfile
 
 
 def _build_config(command: str, cmd_args: list[str], env_vars: dict[str, str], server_name: str) -> dict:
-    cfg: dict = {
+    cfg = {
         "mcpServers": {
             server_name: {
                 "command": command,
@@ -94,54 +85,9 @@ def _resolve_config(args: argparse.Namespace) -> tuple[str, list[str], dict[str,
     return command, cmd_args, env_vars, server_name
 
 
-async def _run_bridge(
-    command: str,
-    cmd_args: list[str],
-    env_vars: dict[str, str],
-    host: str,
-    port: int,
-    server_name: str,
-):
-    from fastmcp import FastMCP
-
-    config = _build_config(command, cmd_args, env_vars, server_name)
-    print(f"Starting: {command} {' '.join(cmd_args)}")
-    print(f"Server:   {server_name}")
-
-    proxy = FastMCP.as_proxy(config, name=server_name)
-    app = proxy.http_app(transport="sse")
-
-    uvicorn_cfg = uvicorn.Config(app=app, host=host, port=port, log_level="info")
-    server = uvicorn.Server(uvicorn_cfg)
-
-    loop = asyncio.get_event_loop()
-    stop = asyncio.Event()
-
-    def _on_signal():
-        if not stop.is_set():
-            print("\nShutting down, cleaning up subprocess...")
-            server.should_exit = True
-            stop.set()
-
-    if sys.platform != "win32":
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            try:
-                loop.add_signal_handler(sig, _on_signal)
-            except NotImplementedError:
-                pass
-
-    print(f"Serving on http://{host}:{port}/sse")
-    print("Press Ctrl+C to stop")
-
-    try:
-        await server.serve()
-    except asyncio.CancelledError:
-        _on_signal()
-
-
 def main():
     parser = argparse.ArgumentParser(
-        description="Bridge stdio MCP servers to HTTP/SSE for merge-point"
+        description="Bridge stdio MCP servers to HTTP/SSE para merge-point (FastMCP v3)"
     )
     parser.add_argument("--command", "-c", help="Command (uvx, npx, pipx, etc.)")
     parser.add_argument("--args", "-a", nargs="*", default=[], help="Args for the command")
@@ -150,14 +96,43 @@ def main():
     parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     parser.add_argument("--config", "-f", help="JSON config file")
     parser.add_argument("--name", "-n", help="Server name for mcpServers config")
+    parser.add_argument(
+        "--transport", "-t", choices=["sse", "http"], default="sse",
+        help="Transport: sse (default) ou http (Streamable HTTP)"
+    )
 
     args = parser.parse_args()
     command, cmd_args, env_vars, server_name = _resolve_config(args)
+    config = _build_config(command, cmd_args, env_vars, server_name)
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", prefix="fastmcp_bridge_", delete=False, encoding="utf-8"
+    ) as f:
+        json.dump(config, f)
+        config_path = f.name
+
+    cmd = [
+        sys.executable, "-m", "fastmcp", "run", config_path,
+        "--transport", args.transport,
+        "--host", args.host,
+        "--port", str(args.port),
+    ]
+
+    print(f"Starting: {command} {' '.join(cmd_args)}")
+    print(f"Server:   {server_name}")
+    print(f"Running: {' '.join(cmd)}")
+    print(f"Serving on http://{args.host}:{args.port}/{args.transport}")
+    print("Press Ctrl+C to stop")
 
     try:
-        asyncio.run(_run_bridge(command, cmd_args, env_vars, args.host, args.port, server_name))
+        subprocess.run(cmd)
     except KeyboardInterrupt:
         pass
+    finally:
+        try:
+            os.unlink(config_path)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

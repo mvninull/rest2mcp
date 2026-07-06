@@ -40,13 +40,15 @@ Usado para testar se o servidor remoto está vivo **antes** de fazer o merge.
 
 ---
 
-### 4. `FastMCP.as_proxy()` — Cria um proxy de servidor remoto
+### 4. `create_proxy()` — Cria um proxy de servidor remoto
 
 ```python
-proxy = FastMCP.as_proxy(Client("http://localhost:8001/mcp"))
+from fastmcp.server import create_proxy
+
+proxy = create_proxy("http://localhost:8001/mcp")
 ```
 
-Transforma a conexão com um servidor remoto num objeto `FastMCP` local, que pode ser passado ao `mount()`.
+Transforma uma URL remota, ficheiro local, config dict ou transporte num objeto `FastMCP` local, que pode ser passado ao `mount()`. Substitui o deprecado `FastMCP.as_proxy()`.
 
 ---
 
@@ -132,11 +134,7 @@ async def test_remote_connection(url: str) -> bool:
         logger.info(f"🔍 A testar conexão com: {url}")
 
         async with Client(url) as client:
-            alive = await client.ping()
-
-            if not alive:
-                logger.error("❌ Ping falhou")
-                return False
+            await client.ping()
 
             tools = await client.list_tools()
             logger.info(f"✅ Conexão OK — {len(tools)} ferramentas encontradas")
@@ -189,8 +187,8 @@ async def build_main_server() -> FastMCP:
 
     if connection_ok:
         # Cria o proxy do servidor remoto e monta
-        remote_client = Client(REMOTE_URL)
-        news_proxy = FastMCP.as_proxy(remote_client, name="News Proxy")
+        from fastmcp.server import create_proxy
+        news_proxy = create_proxy(REMOTE_URL, name="News Proxy")
 
         main.mount(news_proxy, namespace="news")
         logger.info("✅ Servidor remoto montado com namespace 'news'")
@@ -276,5 +274,5 @@ INFO  ✅ Servidor remoto montado com namespace 'news'
 |---|---|---|
 | Servidores internos | `mount(server, namespace="x")` | Não precisam de teste — estão no mesmo processo |
 | Servidor remoto | Testa com `Client.ping()` primeiro | Pode estar offline |
-| Proxy remoto | `FastMCP.as_proxy(Client(url))` | Transforma conexão remota em objecto local para o `mount()` |
+| Proxy remoto | `create_proxy(url)` | Transforma URL/transporte em objecto local para o `mount()` |
 | Namespace | Definido **uma vez** no `mount()` | Aplica-se automaticamente a **todas** as tools do servidor |

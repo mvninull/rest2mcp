@@ -117,6 +117,7 @@ class MCPServerManager:
             name=self.name,
             client=self.client,
         )
+        self.mcp._manager = self
 
         self._setup_dynamic_login()
 
@@ -254,7 +255,7 @@ class MCPServerManager:
                                 return "⚠️ Login OK, mas token não encontrado."
                             if resp.status_code not in (400, 401, 422):
                                 return f"❌ Erro ({resp.status_code}): {resp.text}"
-                    return f"❌ Erro (401): Nenhum formato de payload funcionou."
+                    return "❌ Erro (401): Nenhum formato de payload funcionou."
             elif username and password:
                 if not _email_login_path:
                     return "⚠️ Nenhum endpoint de login encontrado na spec."
@@ -315,26 +316,49 @@ def create_merged_mcp_server(
         if src.get("remote_url"):
             remote_url = src["remote_url"]
             try:
-                from fastmcp import Client
+                from fastmcp.client.transports import StreamableHttpTransport
                 from fastmcp.server import create_proxy
 
+                tool_transforms = src.get("tools")
                 remote_headers = dict(src.get("remote_headers") or {})
                 auth = remote_headers.pop("Authorization", None)
 
-                if remote_headers or auth:
-                    from fastmcp.client.transports import StreamableHttpTransport
+                if tool_transforms:
+                    cfg = {
+                        "mcpServers": {
+                            src.get("name", f"Remote {i}"): {
+                                "url": remote_url,
+                            }
+                        }
+                    }
+                    if remote_headers:
+                        cfg["mcpServers"][src.get("name", f"Remote {i}")]["headers"] = remote_headers
+                    if auth:
+                        cfg["mcpServers"][src.get("name", f"Remote {i}")]["headers"] = dict(src.get("remote_headers") or {})
+                    if tool_transforms:
+                        cfg["mcpServers"][src.get("name", f"Remote {i}")]["tools"] = tool_transforms
+                    remote_proxy = create_proxy(cfg, name=src.get("name", f"Remote {i}"))
+                elif remote_headers or auth:
                     transport = StreamableHttpTransport(
                         url=remote_url,
                         headers=remote_headers or None,
                         auth=auth,
                     )
-                    remote_client = Client(transport)
+                    remote_proxy = create_proxy(transport, name=src.get("name", f"Remote {i}"))
                 else:
-                    remote_client = Client(remote_url, auth=auth)
-                remote_proxy = create_proxy(remote_client, name=src.get("name", f"Remote {i}"))
+                    remote_proxy = create_proxy(remote_url, name=src.get("name", f"Remote {i}"))
                 base_manager.mcp.mount(remote_proxy, namespace=src.get("namespace", ""))
             except Exception as e:
                 logger.warning(f"Falha ao montar remoto {remote_url}: {e}")
+        elif src.get("stdio_config"):
+            try:
+                from fastmcp.server import create_proxy
+
+                stdio_cfg = src["stdio_config"]
+                proxy = create_proxy(stdio_cfg, name=src.get("name", f"Stdio {i}"))
+                base_manager.mcp.mount(proxy, namespace=src.get("namespace", ""))
+            except Exception as e:
+                logger.warning(f"Falha ao montar proxy stdio: {e}")
         else:
             src_manager = MCPServerManager(
                 spec_url="",
