@@ -1,0 +1,11 @@
+to do:
+
+O botão criar servidor grátis, deve redirecionar no login, se o user não estiver logado
+Caso esteja redireciona na dashboard
+Removeo botão ver no GitHub
+Remove secções onde destacamos o stdio, procura e remove
+remove secções que explicamos comandos python, como explicado o inspect (pois o projecto já não sera opensource)
+No plano apenas terá o plano pro, como esta no projecto
+Remove a secção de instalação e clone
+Remove a secção de quick start
+Nos clientes mcp  suportados adiciona todos, apenas com as suas imagens das suas empresa: cursor, claude, windsuf, cline, vscode, antigravity, remove os exemplos de configuração, porque cada cliente tem o seu tipo de ficheiro de configuração
