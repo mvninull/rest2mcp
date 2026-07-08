@@ -1,0 +1,25 @@
+.git_disabled/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.ruff_cache/
+
+# Databases
+*.db
+*.sqlite3
+
+# Vite / Build files
+*.timestamp-*
