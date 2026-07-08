@@ -21,7 +21,7 @@ PAYPAL_SANDBOX = os.getenv("PAYPAL_SANDBOX", "true").lower() == "true"
 
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8080"))
-PUBLIC_URL = os.getenv("PUBLIC_URL", f"http://localhost:{GATEWAY_PORT}")
+PUBLIC_URL = os.getenv("PUBLIC_URL", "https://rest2mcp.fly.dev")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///cloud.db")
 
 # NGROK_AUTH_TOKEN = os.getenv("NGROK_AUTH_TOKEN", "")
