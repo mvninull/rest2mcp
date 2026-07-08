@@ -2,7 +2,6 @@ app = "rest2mcp"
 primary_region = "ams"
 
 [build]
-  builder = "dockerfile"
   dockerfile = "Dockerfile"
 
 [http_service]
