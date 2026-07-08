@@ -24,7 +24,7 @@ GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8080"))
 PUBLIC_URL = os.getenv("PUBLIC_URL", f"http://localhost:{GATEWAY_PORT}")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///cloud.db")
 
-NGROK_AUTH_TOKEN = os.getenv("NGROK_AUTH_TOKEN", "")
+# NGROK_AUTH_TOKEN = os.getenv("NGROK_AUTH_TOKEN", "")
 
 FREE_TIER_MAX_SERVERS = int(os.getenv("FREE_TIER_MAX_SERVERS", "2"))
 FREE_TIER_RPM = int(os.getenv("FREE_TIER_RPM", "10"))
