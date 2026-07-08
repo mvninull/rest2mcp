@@ -23,3 +23,11 @@ env/
 
 # Vite / Build files
 *.timestamp-*
+
+# Agent / IDE cache
+.agents/
+skills-lock.json
+opencode.json
+
+# Misc artifacts
+nul

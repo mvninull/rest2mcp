@@ -1,0 +1,5 @@
+name = "rest2mcp"
+compatibility_date = "2025-07-01"
+pages_build_output_dir = "dist"
+
+[env.production]
