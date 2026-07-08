@@ -6,7 +6,7 @@
   import { installAppAlert, notifyAppAlert } from './app-alert.js';
 
   const API_BASE = (
-    localStorage.getItem("api_base") || "http://localhost:8080"
+    localStorage.getItem("api_base") || "https://rest2mcp.fly.dev"
   ).replace(/\/+$/, "");
   const POLL_LOGS_INTERVAL = 5000;
 
@@ -43,7 +43,17 @@
   }
 
   if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    try {
+      if (typeof supabase === 'undefined') {
+        throw new Error('window.supabase indefinido — o SDK do Supabase não foi carregado (verifica o <script> no index.html ou usa import npm).');
+      }
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+      // Isto corre à construção do componente, ANTES de qualquer DOM.
+      // Sem este try/catch, uma falha aqui impede o Dashboard inteiro
+      // de montar (nada renderiza, nenhum botão existe).
+      console.error('[Dashboard] Falha ao inicializar Supabase:', err);
+    }
   }
 
   function getAuthToken() {
@@ -69,7 +79,7 @@
     if (existing) existing.remove();
     const overlay = document.createElement("div");
     overlay.id = "appConfirmOverlay";
-    overlay.style.cssText = "position:fixed;inset:0;background:rgba(12,12,20,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000000;padding:16px;";
+    overlay.style.cssText = "positionfixed;inset:0;background:rgba(12,12,20,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000000;padding:16px;";
 
     const box = document.createElement("div");
     box.style.cssText = "background:#fff;border-radius:18px;padding:32px;max-width:400px;width:min(100%,400px);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.28);border:1px solid rgba(12,12,20,0.08);";
@@ -1503,6 +1513,10 @@
       if (errorEl) errorEl.textContent = "A palavra-passe deve ter pelo menos 6 caracteres.";
       return;
     }
+    if (!supabaseClient) {
+      window.showAppAlert("Serviço indisponível de momento. Tente recarregar a página.");
+      return;
+    }
     if (btn) { btn.disabled = true; btn.textContent = "A redefinir..."; }
     try {
       const { error } = await supabaseClient.auth.updateUser({ password });
@@ -1544,6 +1558,10 @@
     if (errorEl) errorEl.textContent = "";
     if (!password || password.length < 6) {
       if (errorEl) errorEl.textContent = "A nova palavra-passe deve ter pelo menos 6 caracteres.";
+      return;
+    }
+    if (!supabaseClient) {
+      window.showAppAlert("Serviço indisponível de momento. Tente recarregar a página.");
       return;
     }
     if (btn) { btn.disabled = true; btn.textContent = "A guardar..."; }
@@ -1763,13 +1781,13 @@
 
     <div class="nav-right" id="navAuth">
       <div class="auth-user" id="authUser" style="display:none">
-        <button class="user-profile-btn" id="userProfileBtn" onclick="openProfileModal()" title="Ver perfil">
-          <img class="auth-avatar" id="authAvatar" src="" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+        <button class="user-profile-btn" id="userProfileBtn" onclick={() => window.openProfileModal()} title="Ver perfil">
+          <img class="auth-avatar" id="authAvatar" src="" alt="" onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex' }} />
           <span class="auth-avatar-fallback" id="authAvatarFallback" style="display:none"></span>
           <span class="auth-name" id="authName"></span>
           <span class="auth-plan" id="authPlan"></span>
         </button>
-        <button class="auth-btn logout-btn-nav" onclick="logout()" title="Sair da conta">
+        <button class="auth-btn logout-btn-nav" onclick={() => window.logout()} title="Sair da conta">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Sair
         </button>
@@ -1788,7 +1806,7 @@
         <h2>Meus Servidores</h2>
         <p class="sub">Gerencie suas pontes MCP na nuvem</p>
       </div>
-      <button class="btn-add-server" onclick="openCreateModal()">
+      <button class="btn-add-server" onclick={() => window.openCreateModal()}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
         </svg>
@@ -1812,7 +1830,7 @@
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff5c35" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <div style="color:var(--warn)">Erro ao carregar servidores:<br/>{$serversError}</div>
-          <button on:click={() => loadServers(true)} style="margin-top:1.2rem;padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-family:var(--mono);font-size:0.78rem;transition:all 0.2s;">
+          <button onclick={() => loadServers(true)} style="margin-top:1.2rem;padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-family:var(--mono);font-size:0.78rem;transitionall 0.2s;">
             Tentar novamente
           </button>
         </div>
@@ -1841,13 +1859,13 @@
             data-apikey={s.apikey || ""}
             data-transport={s.transport || "http"}
             draggable={!isMerged}
-            on:dragstart={(e) => handleDragStart(e, s.server_id)}
-            on:dragend={handleDragEnd}
-            on:dragover={handleDragOver}
-            on:dragleave={handleDragLeave}
-            on:drop={handleDrop}
-            on:click={() => selectServer(s.server_id)}
-            on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectServer(s.server_id); }}>
+            ondragstart={(e) => handleDragStart(e, s.server_id)}
+            ondragend={handleDragEnd}
+            ondragover={handleDragOver}
+            ondragleave={handleDragLeave}
+            ondrop={handleDrop}
+            onclick={() => selectServer(s.server_id)}
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectServer(s.server_id); }}>
             <div class="server-info">
               <div class="status-icon" class:active={isActive && !healthError} class:inactive={!isActive || healthError}>
                 {#if healthError}
@@ -1885,11 +1903,11 @@
                 <span class="status-chip-dot"></span>
                 {healthError ? "API indisponível" : isActive ? "Online" : "Offline"}
               </span>
-              <button class="btn-copy" disabled={!isActive} on:click={(e) => copyUrl(e.currentTarget, s.url_sse || '')}>
+              <button class="btn-copy" disabled={!isActive} onclick={(e) => copyUrl(e.currentTarget, s.url_sse || '')}>
                 Copy URL
               </button>
               <div class="menu-wrapper">
-                <button class="menu-btn" on:click={(e) => toggleMenu(s.server_id, e.currentTarget)} title="Mais opções">
+                <button class="menu-btn" onclick={(e) => toggleMenu(s.server_id, e.currentTarget)} title="Mais opções">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                     <circle cx="7" cy="2" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="7" cy="12" r="1.3"/>
                   </svg>
@@ -1937,7 +1955,7 @@
         <div class="sub-quota"><span>Servidores</span><span class="val" id="subServers">0 / 1</span></div>
         <div class="sub-quota"><span>RPM</span><span class="val" id="subRPM">10</span></div>
         <div class="sub-upgrade" id="subUpgrade">
-          <button class="sub-upgrade-btn" onclick="showPayPal()">Assinar Pro — $9.90/mês</button>
+          <button class="sub-upgrade-btn" onclick={() => window.showPayPal()}>Assinar Pro — $9.90/mês</button>
         </div>
         <div id="paypal-button-container" style="display:none"></div>
       </div>
@@ -1949,20 +1967,20 @@
         <div class="logs-header-left">
           <span class="pulse-dot"></span>
           <span class="log-title">Logs</span>
-          <select class="log-server-select" id="logServerSelect" onchange="switchLogServer(this.value)">
+          <select class="log-server-select" id="logServerSelect" onchange={() => window.switchLogServer(this.value)}>
             <option value="">Servidor...</option>
           </select>
         </div>
         <div class="logs-header-actions">
-          <button class="log-action-btn" title="Exportar JSON" onclick="exportLogs('json')">↓</button>
-          <button class="log-action-btn" title="Exportar CSV" onclick="exportLogs('csv')">⇩</button>
-          <button class="log-action-btn log-action-danger" title="Limpar logs" onclick="clearLogs()">✕</button>
-          <button class="log-refresh-btn" title="Atualizar" onclick="pollLogs()">↻</button>
+          <button class="log-action-btn" title="Exportar JSON" onclick={() => window.exportLogs('json')}>↓</button>
+          <button class="log-action-btn" title="Exportar CSV" onclick={() => window.exportLogs('csv')}>⇩</button>
+          <button class="log-action-btn log-action-danger" title="Limpar logs" onclick={() => window.clearLogs()}>✕</button>
+          <button class="log-refresh-btn" title="Atualizar" onclick={() => window.pollLogs()}>↻</button>
         </div>
       </div>
       <div class="log-filter-bar">
-        <input type="text" class="log-filter-input" id="logToolFilter" placeholder="Filtrar tool..." oninput="debouncePoll()">
-        <select class="log-filter-select" id="logStatusFilter" onchange="pollLogs()">
+        <input type="text" class="log-filter-input" id="logToolFilter" placeholder="Filtrar tool..." oninput={() => window.debouncePoll()}>
+        <select class="log-filter-select" id="logStatusFilter" onchange={() => window.pollLogs()}>
           <option value="">Todos</option>
           <option value="200-299">2xx Sucesso</option>
           <option value="400-499">4xx Erro</option>
@@ -1987,18 +2005,18 @@
          handlers have a chance to run. -->
     <div class="menu-dropdown open"
          style="position: fixed; left: {activeMenu.x}px; top: {activeMenu.y}px; z-index: 1000000; min-width: 200px;"
-         on:click|stopPropagation>
-      <button on:click={() => { openInspector(s.server_id); closeAllMenus(); }}>
+         onclick={(e) => e.stopPropagation()}>
+      <button onclick={() => { openInspector(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
       </button>
-      <button on:click={() => { editServer(s.server_id, s.name || '', s.transport || 'http'); closeAllMenus(); }}>
+      <button onclick={() => { editServer(s.server_id, s.name || '', s.transport || 'http'); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> Editar
       </button>
-      <button on:click={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
+      <button onclick={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> Merge
       </button>
       <div class="menu-divider"></div>
-      <button on:click={() => { toggleServerStatus(s.server_id); closeAllMenus(); }}>
+      <button onclick={() => { toggleServerStatus(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon">
           {#if s.status === "active"}
             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>
@@ -2010,12 +2028,12 @@
       </button>
       {#if s.is_merged === true}
         <div class="menu-divider"></div>
-        <button on:click={() => { unmergeServer(s.server_id); closeAllMenus(); }}>
+        <button onclick={() => { unmergeServer(s.server_id); closeAllMenus(); }}>
           <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> Desfazer Merge
         </button>
       {/if}
       <div class="menu-divider"></div>
-      <button class="menu-danger" on:click={() => { deleteServer(s.server_id); closeAllMenus(); }}>
+      <button class="menu-danger" onclick={() => { deleteServer(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> Remover
       </button>
     </div>
@@ -2030,11 +2048,11 @@
       <p class="modal-sub" id="mergeSub">Fusão de dois servidores MCP com namespace automático</p>
     </div>
     <div class="merge-tabs">
-      <button class="merge-tab active" id="mergeTabLocal" onclick="setMergeTab('local')">
+      <button class="merge-tab active" id="mergeTabLocal" onclick={() => window.setMergeTab('local')}>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="10" height="10" rx="2"/><path d="M8 6v4M6 8h4"/></svg>
         Servidores no rest2mcp
       </button>
-      <button class="merge-tab" id="mergeTabSandbox" onclick="setMergeTab('sandbox')">
+      <button class="merge-tab" id="mergeTabSandbox" onclick={() => window.setMergeTab('sandbox')}>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M8 5v6"/></svg>
         Sandbox / JSON
       </button>
@@ -2052,7 +2070,7 @@
     </div>
     <div id="mergeSandboxFields" style="display:none">
       <div class="store-divider"><span>ou</span></div>
-      <button class="btn-store" onclick="openStoreModal()">
+      <button class="btn-store" onclick={() => window.openStoreModal()}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
         Instalar a partir da loja
       </button>
@@ -2066,8 +2084,8 @@
     </div>
     <div class="modal-error" id="mergeError"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeMergeModal()">Cancelar</button>
-      <button class="btn-confirm" id="btnMergeConfirm" onclick="confirmMerge()">Criar Servidor Merged</button>
+      <button class="btn-cancel" onclick={() => window.closeMergeModal()}>Cancelar</button>
+      <button class="btn-confirm" id="btnMergeConfirm" onclick={() => window.confirmMerge()}>Criar Servidor Merged</button>
     </div>
   </div>
 </div>
@@ -2094,9 +2112,9 @@
         <div class="store-toolbar">
           <div class="store-search">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
-            <input type="text" id="storeSearch" placeholder="Buscar servidores MCP..." oninput="searchStore()" />
+            <input type="text" id="storeSearch" placeholder="Buscar servidores MCP..." oninput={() => window.searchStore()} />
           </div>
-          <select class="store-sort" id="storeSort" onchange="setStoreSort(this.value)">
+          <select class="store-sort" id="storeSort" onchange={() => window.setStoreSort(this.value)}>
             <option value="relevance">Relevância</option>
             <option value="stars">★ Estrelas GitHub</option>
             <option value="tools">🛠 Mais ferramentas</option>
@@ -2107,11 +2125,11 @@
         <div class="store-grid" id="storeGrid">
           <div class="store-loading">A carregar loja...</div>
         </div>
-        <button class="store-load-more" id="storeLoadMore" onclick="loadMoreStore()" style="display:none">Carregar mais servidores</button>
+        <button class="store-load-more" id="storeLoadMore" onclick={() => window.loadMoreStore()} style="display:none">Carregar mais servidores</button>
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeStoreModal()">Fechar</button>
+      <button class="btn-cancel" onclick={() => window.closeStoreModal()}>Fechar</button>
     </div>
   </div>
 </div>
@@ -2143,8 +2161,8 @@
     </div>
     <div class="modal-error" id="editError"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
-      <button class="btn-confirm" id="btnEditConfirm" onclick="saveEdit()">Salvar</button>
+      <button class="btn-cancel" onclick={() => window.closeEditModal()}>Cancelar</button>
+      <button class="btn-confirm" id="btnEditConfirm" onclick={() => window.saveEdit()}>Salvar</button>
     </div>
   </div>
 </div>
@@ -2173,8 +2191,8 @@
     </div>
     <div class="modal-error" id="modalError"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeCreateModal()">Cancelar</button>
-      <button class="btn-confirm" id="btnCreateConfirm" onclick="createServer()">Criar Servidor</button>
+      <button class="btn-cancel" onclick={() => window.closeCreateModal()}>Cancelar</button>
+      <button class="btn-confirm" id="btnCreateConfirm" onclick={() => window.createServer()}>Criar Servidor</button>
     </div>
   </div>
 </div>
@@ -2204,7 +2222,7 @@
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeLogDetail()">Fechar</button>
+      <button class="btn-cancel" onclick={() => window.closeLogDetail()}>Fechar</button>
     </div>
   </div>
 </div>
@@ -2226,7 +2244,7 @@
           </div>
         </div>
       </div>
-      <button class="profile-close-btn" onclick="closeProfileModal()" title="Fechar">
+      <button class="profile-close-btn" onclick={() => window.closeProfileModal()} title="Fechar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -2255,10 +2273,10 @@
       </div>
       <div class="profile-token-field">
         <input type="password" id="profileToken" class="profile-token-input" readonly />
-        <button class="profile-token-btn" id="toggleTokenBtn" onclick="toggleTokenVisibility()" title="Mostrar/ocultar token">
+        <button class="profile-token-btn" id="toggleTokenBtn" onclick={() => window.toggleTokenVisibility()} title="Mostrar/ocultar token">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
-        <button class="profile-token-btn profile-copy-btn" id="copyTokenBtn" onclick="copyToken()" title="Copiar token">Copiar</button>
+        <button class="profile-token-btn profile-copy-btn" id="copyTokenBtn" onclick={() => window.copyToken()} title="Copiar token">Copiar</button>
       </div>
       <p class="profile-token-hint">Use este token no cabeçalho <code>Authorization: Bearer <token></code> para autenticar pedidos à API.</p>
     </div>
@@ -2285,7 +2303,7 @@
     </div>
 
     <div class="profile-section">
-      <div class="profile-section-title" style="cursor:pointer;" onclick="toggleChangePassword()">
+      <div class="profile-section-title" style="cursor:pointer;" onclick={() => window.toggleChangePassword()}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         Palavra-passe
         <button class="profile-token-btn" id="toggleChangePasswordBtn" style="margin-left:auto;font-size:0.72rem;padding:4px 10px;">Alterar Palavra-passe</button>
@@ -2296,15 +2314,15 @@
         </div>
         <div class="modal-error" id="changePasswordError" style="margin-bottom:8px;"></div>
         <div style="display:flex;gap:8px;">
-          <button class="btn-confirm" id="btnSavePassword" onclick="saveNewPassword()" style="flex:1;">Guardar</button>
-          <button class="btn-cancel" onclick="toggleChangePassword()">Cancelar</button>
+          <button class="btn-confirm" id="btnSavePassword" onclick={() => window.saveNewPassword()} style="flex:1;">Guardar</button>
+          <button class="btn-cancel" onclick={() => window.toggleChangePassword()}>Cancelar</button>
         </div>
       </div>
     </div>
 
     <div class="profile-modal-actions">
-      <button class="btn-cancel" onclick="closeProfileModal()">Fechar</button>
-      <button class="profile-logout-btn" onclick="logoutFromProfile()">
+      <button class="btn-cancel" onclick={() => window.closeProfileModal()}>Fechar</button>
+      <button class="profile-logout-btn" onclick={() => window.logoutFromProfile()}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Terminar Sessão
       </button>
@@ -2325,7 +2343,7 @@
     </div>
     <div class="modal-error" id="resetPasswordError"></div>
     <div class="modal-actions">
-      <button class="btn-confirm" id="btnResetPassword" onclick="confirmResetPassword()">Redefinir Palavra-passe</button>
+      <button class="btn-confirm" id="btnResetPassword" onclick={() => window.confirmResetPassword()}>Redefinir Palavra-passe</button>
     </div>
   </div>
 </div>
