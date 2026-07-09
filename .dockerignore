@@ -2,17 +2,26 @@
 .env.*
 __pycache__
 *.pyc
+*.db
+*.html
 .git
 .gitignore
 .gitattributes
-*.md
 .agents
 .agents/
 .wrangler
 wrangler.toml
 opencode.json
 opencode.jsonc
-rest2mcp/node_modules
+venv/
 rest2mcp/
+rest2mcp/node_modules
 tests/
+examples/
+scripts/
+sql/
 nul
+inspector changes
+to do.txt
+error.txt
+*.md
