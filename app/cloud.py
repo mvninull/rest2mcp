@@ -1299,8 +1299,13 @@ async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
                             f'b="/v1/inspector-api/{inspector_id}";'
                             f"var f=window.fetch;"
                             f"window.fetch=function(u,o){{"
-                            f'if(typeof u==="string"&&u.includes(":"+p))'
-                            f'u=u.replace(":"+p,b);'
+                            f"var w=typeof u==='string'?u:u&&(u.url||u.href);"
+                            f"if(typeof w==='string'&&w.includes(':'+p)){{"
+                            f"w=w.replace(':'+p,b);"
+                            f"if(typeof u==='string')return f.call(this,w,o);"
+                            f"if(u&&typeof u.url==='string')return f.call(this,new Request(w,u));"
+                            f"return f.call(this,w,o);"
+                            f"}}"
                             f"return f.call(this,u,o);"
                             f"}};"
                             f"}})()"
