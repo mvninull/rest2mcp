@@ -19,6 +19,7 @@ env/
 
 # Databases
 *.db
+!cloud.db
 *.sqlite3
 
 # Vite / Build files
