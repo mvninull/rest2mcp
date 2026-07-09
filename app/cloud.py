@@ -1285,22 +1285,33 @@ async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
             content = resp.content
             ct = (resp.headers.get("content-type") or "").lower()
 
-            if resp.status_code == 200 and (
-                "text/html" in ct
-                or "text/javascript" in ct
-                or "application/javascript" in ct
-                or "application/x-javascript" in ct
-            ):
+            if resp.status_code == 200:
                 prefix = f"/v1/inspector/{inspector_id}"
-                api_prefix = f"/v1/inspector-api/{inspector_id}"
-                origin = str(request.base_url).rstrip("/")
                 text = content.decode("utf-8")
-                text = re.sub(r'(src|href|action)=([\'"])/', rf"\1=\2{prefix}/", text)
-                text = re.sub(r'(url\([\'"]?)/', rf"\1{prefix}/", text)
-                text = re.sub(r'(fetch\([\'"])/', rf"\1{prefix}/", text)
-                if server_port:
-                    text = re.sub(rf"{origin}:{server_port}", rf"{origin}{api_prefix}", text)
-                    text = re.sub(rf"rest2mcp\.fly\.dev:{server_port}", rf"rest2mcp.fly.dev{api_prefix}", text)
+
+                if "text/html" in ct:
+                    text = re.sub(r'(src|href|action)=([\'"])/', rf"\1=\2{prefix}/", text)
+                    if server_port:
+                        shim = (
+                            f"<script>"
+                            f"(function(){{"
+                            f"var p={server_port},"
+                            f'b="/v1/inspector-api/{inspector_id}";'
+                            f"var f=window.fetch;"
+                            f"window.fetch=function(u,o){{"
+                            f'if(typeof u==="string"&&u.includes(":"+p))'
+                            f'u=u.replace(":"+p,b);'
+                            f"return f.call(this,u,o);"
+                            f"}};"
+                            f"}})()"
+                            f"</script>"
+                        )
+                        text = text.replace("</head>", shim + "</head>")
+                elif "text/javascript" in ct or "application/javascript" in ct or "application/x-javascript" in ct:
+                    text = re.sub(r'(fetch\([\'"])/', rf"\1{prefix}/", text)
+                    if server_port:
+                        text = re.sub(rf':{server_port}(/|"|\')', rf"/v1/inspector-api/{inspector_id}\1", text)
+
                 content = text.encode("utf-8")
 
             return Response(
