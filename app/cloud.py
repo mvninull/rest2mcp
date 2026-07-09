@@ -329,6 +329,12 @@ def _stop_stdio_bridge(bridge_id: str):
     if not bridge:
         return
     bridge["server"].should_exit = True
+    insp_proc = bridge.get("inspector_proc")
+    if insp_proc:
+        try:
+            insp_proc.kill()
+        except Exception:
+            pass
     logger.info(f"Stdio bridge {bridge_id} stopped")
 
 
@@ -358,21 +364,34 @@ async def _start_inspector_for_server(server_id: str, url: str, transport: str =
 
     transport_type = "http" if transport in ("http", "streamable-http") else "sse"
 
-    logger.info(f"Lançando inspector: npx @modelcontextprotocol/inspector --server-url {url} --transport {transport_type}")
+    logger.info(
+        f"Lançando inspector: npx @modelcontextprotocol/inspector --server-url {url} --transport {transport_type}"
+    )
 
     try:
         import subprocess
+
         if sys.platform == "win32":
             cmd = [
-                "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
-                "--server-url", url,
-                "--transport", transport_type,
+                "cmd.exe",
+                "/c",
+                "npx.cmd",
+                "-y",
+                "@modelcontextprotocol/inspector",
+                "--server-url",
+                url,
+                "--transport",
+                transport_type,
             ]
         else:
             cmd = [
-                "npx", "-y", "@modelcontextprotocol/inspector",
-                "--server-url", url,
-                "--transport", transport_type,
+                "npx",
+                "-y",
+                "@modelcontextprotocol/inspector",
+                "--server-url",
+                url,
+                "--transport",
+                transport_type,
             ]
 
         proc = subprocess.Popen(
@@ -383,31 +402,26 @@ async def _start_inspector_for_server(server_id: str, url: str, transport: str =
         )
     except FileNotFoundError:
         cmd_str = "npx.cmd" if sys.platform == "win32" else "npx"
-        raise RuntimeError(
-            f"Comando {cmd_str} não encontrado. "
-            "Verifique se Node.js está instalado e no PATH."
-        )
+        raise RuntimeError(f"Comando {cmd_str} não encontrado. Verifique se Node.js está instalado e no PATH.")
     except Exception as exc:
-        raise RuntimeError(
-            f"Falha ao lançar inspector: {type(exc).__name__}: {exc}"
-        ) from exc
+        raise RuntimeError(f"Falha ao lançar inspector: {type(exc).__name__}: {exc}") from exc
 
-    direct_inspectors[server_id] = {"proc": proc, "url": url}
+    direct_inspectors[server_id] = {"proc": proc, "url": url, "client_port": client_port, "server_port": server_port}
 
-    inspector_url = f"http://localhost:{client_port}"
+    proxy_url = f"{PUBLIC_URL}/v1/inspector/{server_id}"
 
     deadline = time.time() + 30
     while time.time() < deadline:
         try:
             s = socket.create_connection(("localhost", client_port), timeout=1)
             s.close()
-            logger.info(f"Inspector {server_id} pronto em {inspector_url}")
-            return inspector_url
+            logger.info(f"Inspector {server_id} pronto em {proxy_url} (localhost:{client_port})")
+            return proxy_url
         except Exception:
             await asyncio.sleep(0.5)
 
     logger.warning(f"Inspector {server_id} started but port {client_port} not ready yet")
-    return inspector_url
+    return proxy_url
 
 
 async def _start_mcp_inspector(bridge_id: str) -> str:
@@ -432,21 +446,34 @@ async def _start_mcp_inspector(bridge_id: str) -> str:
 
     bridge_url = bridge.get("url", "")
 
-    logger.info(f"Lançando inspector (bridge): npx @modelcontextprotocol/inspector --server-url {bridge_url} --transport sse")
+    logger.info(
+        f"Lançando inspector (bridge): npx @modelcontextprotocol/inspector --server-url {bridge_url} --transport sse"
+    )
 
     try:
         import subprocess
+
         if sys.platform == "win32":
             cmd = [
-                "cmd.exe", "/c", "npx.cmd", "-y", "@modelcontextprotocol/inspector",
-                "--server-url", bridge_url,
-                "--transport", "sse",
+                "cmd.exe",
+                "/c",
+                "npx.cmd",
+                "-y",
+                "@modelcontextprotocol/inspector",
+                "--server-url",
+                bridge_url,
+                "--transport",
+                "sse",
             ]
         else:
             cmd = [
-                "npx", "-y", "@modelcontextprotocol/inspector",
-                "--server-url", bridge_url,
-                "--transport", "sse",
+                "npx",
+                "-y",
+                "@modelcontextprotocol/inspector",
+                "--server-url",
+                bridge_url,
+                "--transport",
+                "sse",
             ]
 
         proc = subprocess.Popen(
@@ -457,30 +484,28 @@ async def _start_mcp_inspector(bridge_id: str) -> str:
         )
     except FileNotFoundError:
         cmd_str = "npx.cmd" if sys.platform == "win32" else "npx"
-        raise RuntimeError(
-            f"Comando {cmd_str} não encontrado. "
-            "Verifique se Node.js está instalado e no PATH."
-        )
+        raise RuntimeError(f"Comando {cmd_str} não encontrado. Verifique se Node.js está instalado e no PATH.")
     except Exception as exc:
-        raise RuntimeError(
-            f"Falha ao lançar inspector: {type(exc).__name__}: {exc}"
-        ) from exc
+        raise RuntimeError(f"Falha ao lançar inspector: {type(exc).__name__}: {exc}") from exc
 
     bridge["inspector_proc"] = proc
-    inspector_url = f"http://localhost:{client_port}"
+    bridge["client_port"] = client_port
+    bridge["server_port"] = server_port
+
+    proxy_url = f"{PUBLIC_URL}/v1/inspector/{bridge_id}"
 
     deadline = time.time() + 30
     while time.time() < deadline:
         try:
             s = socket.create_connection(("localhost", client_port), timeout=1)
             s.close()
-            logger.info(f"MCP Inspector {bridge_id} pronto em {inspector_url}")
-            return inspector_url
+            logger.info(f"MCP Inspector {bridge_id} pronto em {proxy_url} (localhost:{client_port})")
+            return proxy_url
         except Exception:
             await asyncio.sleep(0.5)
 
     logger.warning(f"MCP Inspector {bridge_id} started but port {client_port} not ready yet")
-    return inspector_url
+    return proxy_url
 
 
 def register_sse_session(user_id: str) -> asyncio.Event:
@@ -793,6 +818,7 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
 
         try:
             from fastmcp.client.transports import StreamableHttpTransport
+
             validate_headers = dict(req.remote_headers or {})
             auth_val = validate_headers.pop("Authorization", None)
             transport = StreamableHttpTransport(
@@ -801,6 +827,7 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
                 auth=auth_val,
             )
             from fastmcp import Client
+
             async with Client(transport) as remote_client:
                 tools = await remote_client.list_tools()
         except Exception as e:
@@ -808,7 +835,7 @@ async def merge_servers(req: MergeServerRequest, request: Request, db: Session =
             if "401" in err_msg or "403" in err_msg or "Unauthorized" in err_msg or "Forbidden" in err_msg:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"O servidor remoto rejeitou a conexão. {err_msg[:300]}. Informe um token Authorization no campo opcional."
+                    detail=f"O servidor remoto rejeitou a conexão. {err_msg[:300]}. Informe um token Authorization no campo opcional.",
                 )
             elif "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
                 pass
@@ -1176,6 +1203,117 @@ async def start_server_inspector(server_id: str, request: Request, db: Session =
     except Exception as e:
         logger.error(f"Falha ao iniciar inspector para {server_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Falha ao iniciar inspector: {e}")
+
+
+@app.api_route("/v1/inspector-api/{inspector_id}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+@app.api_route(
+    "/v1/inspector-api/{inspector_id}/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+)
+async def inspector_api_proxy(inspector_id: str, request: Request, path: str = ""):
+    entry = direct_inspectors.get(inspector_id) or stdio_bridges.get(inspector_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Inspector não encontrado ou expirou")
+
+    server_port = entry.get("server_port") or entry.get("client_port")
+    if not server_port:
+        raise HTTPException(status_code=404, detail="Inspector port não disponível")
+
+    target_path = path or ""
+    target_url = f"http://localhost:{server_port}/{target_path}"
+    query = request.url.query
+    if query:
+        target_url += f"?{query}"
+
+    excluded_headers = {"host", "content-length", "transfer-encoding", "connection", "upgrade"}
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.request(
+                method=request.method,
+                url=target_url,
+                headers={k: v for k, v in request.headers.items() if k.lower() not in excluded_headers},
+                content=await request.body(),
+                follow_redirects=True,
+            )
+            return Response(
+                content=resp.content,
+                status_code=resp.status_code,
+                headers={k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers},
+                media_type=resp.headers.get("content-type"),
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=502, detail="Inspector backend não está respondendo")
+    except Exception as exc:
+        logger.error(f"Erro no proxy do inspector-api {inspector_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Erro no proxy: {exc}")
+
+
+@app.api_route("/v1/inspector/{inspector_id}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+@app.api_route(
+    "/v1/inspector/{inspector_id}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+)
+async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
+    entry = direct_inspectors.get(inspector_id) or stdio_bridges.get(inspector_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Inspector não encontrado ou expirou")
+
+    client_port = entry.get("client_port")
+    if not client_port:
+        raise HTTPException(status_code=404, detail="Inspector port não disponível")
+
+    server_port = entry.get("server_port")
+
+    target_path = path or ""
+    target_url = f"http://localhost:{client_port}/{target_path}"
+    query = request.url.query
+    if query:
+        target_url += f"?{query}"
+
+    excluded_headers = {"host", "content-length", "transfer-encoding", "connection", "upgrade"}
+    forward_headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.request(
+                method=request.method,
+                url=target_url,
+                headers=forward_headers,
+                content=await request.body(),
+                follow_redirects=True,
+            )
+            content = resp.content
+            ct = (resp.headers.get("content-type") or "").lower()
+
+            if resp.status_code == 200 and (
+                "text/html" in ct
+                or "text/javascript" in ct
+                or "application/javascript" in ct
+                or "application/x-javascript" in ct
+            ):
+                prefix = f"/v1/inspector/{inspector_id}"
+                api_prefix = f"/v1/inspector-api/{inspector_id}"
+                origin = str(request.base_url).rstrip("/")
+                text = content.decode("utf-8")
+                text = re.sub(r'(src|href|action)=([\'"])/', rf"\1=\2{prefix}/", text)
+                text = re.sub(r'(url\([\'"]?)/', rf"\1{prefix}/", text)
+                text = re.sub(r'(fetch\([\'"])/', rf"\1{prefix}/", text)
+                if server_port:
+                    text = re.sub(rf"{origin}:{server_port}", rf"{origin}{api_prefix}", text)
+                    text = re.sub(rf"rest2mcp\.fly\.dev:{server_port}", rf"rest2mcp.fly.dev{api_prefix}", text)
+                content = text.encode("utf-8")
+
+            return Response(
+                content=content,
+                status_code=resp.status_code,
+                headers={k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers},
+                media_type=resp.headers.get("content-type"),
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=502, detail="Inspector não está respondendo")
+    except Exception as exc:
+        logger.error(f"Erro no proxy do inspector {inspector_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Erro no proxy: {exc}")
 
 
 @app.delete("/v1/servers/{server_id}", status_code=204)
@@ -1697,12 +1835,12 @@ async def check_store_package(name: str = "", namespace: str = "", slug: str = "
 def _extract_env_schema(server_data: dict) -> dict | None:
     all_vars: list[dict] = []
 
-    for pkg in (server_data.get("packages") or []):
-        for ev in (pkg.get("environmentVariables") or []):
+    for pkg in server_data.get("packages") or []:
+        for ev in pkg.get("environmentVariables") or []:
             all_vars.append(ev)
 
-    for remote in (server_data.get("remotes") or []):
-        for header in (remote.get("headers") or []):
+    for remote in server_data.get("remotes") or []:
+        for header in remote.get("headers") or []:
             all_vars.append(header)
 
     if not all_vars:
