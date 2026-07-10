@@ -1301,7 +1301,7 @@ async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
                             f"window.fetch=function(u,o){{"
                             f"var w=typeof u==='string'?u:u&&(u.url||u.href);"
                             f"if(typeof w==='string'&&w.includes(':'+p)){{"
-                            f"w=w.replace(':'+p,b);"
+                            f"w=w.replace('http://localhost:'+p,window.location.origin+b).replace('http://127.0.0.1:'+p,window.location.origin+b);"
                             f"if(typeof u==='string')return f.call(this,w,o);"
                             f"if(u&&typeof u.url==='string')return f.call(this,new Request(w,u));"
                             f"return f.call(this,w,o);"
@@ -1315,7 +1315,12 @@ async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
                 elif "text/javascript" in ct or "application/javascript" in ct or "application/x-javascript" in ct:
                     text = re.sub(r'(fetch\([\'"])/', rf"\1{prefix}/", text)
                     if server_port:
-                        text = re.sub(rf':{server_port}(/|"|\')', rf"/v1/inspector-api/{inspector_id}\1", text)
+                        text = re.sub(
+                            rf'http://localhost:{server_port}(\/|"|\')', rf"/v1/inspector-api/{inspector_id}\1", text
+                        )
+                        text = re.sub(
+                            rf'http://127\.0\.0\.1:{server_port}(\/|"|\')', rf"/v1/inspector-api/{inspector_id}\1", text
+                        )
 
                 content = text.encode("utf-8")
 
