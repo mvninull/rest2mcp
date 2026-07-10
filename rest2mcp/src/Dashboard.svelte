@@ -626,9 +626,7 @@
     grid.innerHTML = "<div class='store-loading'>A carregar loja...</div>";
     _storeEnvSchemas = {};
     try {
-      const res = await apiFetch("/v1/store/servers");
-      if (!res.ok) throw new Error("Erro ao carregar loja");
-      const data = await res.json();
+      const data = await apiFetch("/v1/store/servers");
       const servers = data.servers || [];
       _storeAllServers = servers;
       _storeFacets = data.facets || { hostingTypes: [], categories: [] };
@@ -652,9 +650,7 @@
     const btn = document.getElementById("storeLoadMore");
     if (btn) btn.textContent = "A carregar...";
     try {
-      const res = await apiFetch("/v1/store/servers?cursor=" + encodeURIComponent(_storePageInfo.endCursor));
-      if (!res.ok) throw new Error("Erro");
-      const data = await res.json();
+      const data = await apiFetch("/v1/store/servers?cursor=" + encodeURIComponent(_storePageInfo.endCursor));
       const newServers = data.servers || [];
       _storeAllServers = _storeAllServers.concat(newServers);
       _storePageInfo = data.pageInfo || { hasNextPage: false, endCursor: "" };
