@@ -415,12 +415,25 @@ async def _start_inspector_for_server(server_id: str, url: str, transport: str =
         try:
             s = socket.create_connection(("localhost", client_port), timeout=1)
             s.close()
-            logger.info(f"Inspector {server_id} pronto em {proxy_url} (localhost:{client_port})")
+            logger.info(f"Inspector {server_id} CLIENT_PORT pronto (localhost:{client_port})")
+            break
+        except Exception:
+            await asyncio.sleep(0.5)
+    else:
+        logger.warning(f"Inspector {server_id} started but CLIENT_PORT {client_port} not ready yet")
+        return proxy_url
+
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        try:
+            s = socket.create_connection(("localhost", server_port), timeout=1)
+            s.close()
+            logger.info(f"Inspector {server_id} SERVER_PORT pronto (localhost:{server_port})")
             return proxy_url
         except Exception:
             await asyncio.sleep(0.5)
 
-    logger.warning(f"Inspector {server_id} started but port {client_port} not ready yet")
+    logger.warning(f"Inspector {server_id} CLIENT_PORT ok but SERVER_PORT {server_port} not ready yet")
     return proxy_url
 
 
@@ -499,12 +512,22 @@ async def _start_mcp_inspector(bridge_id: str) -> str:
         try:
             s = socket.create_connection(("localhost", client_port), timeout=1)
             s.close()
-            logger.info(f"MCP Inspector {bridge_id} pronto em {proxy_url} (localhost:{client_port})")
+            logger.info(f"MCP Inspector {bridge_id} CLIENT_PORT pronto (localhost:{client_port})")
+            break
+        except Exception:
+            await asyncio.sleep(0.5)
+
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        try:
+            s = socket.create_connection(("localhost", server_port), timeout=1)
+            s.close()
+            logger.info(f"MCP Inspector {bridge_id} SERVER_PORT pronto (localhost:{server_port})")
             return proxy_url
         except Exception:
             await asyncio.sleep(0.5)
 
-    logger.warning(f"MCP Inspector {bridge_id} started but port {client_port} not ready yet")
+    logger.warning(f"MCP Inspector {bridge_id} CLIENT_PORT ok but SERVER_PORT {server_port} not ready yet")
     return proxy_url
 
 
@@ -1215,9 +1238,9 @@ async def inspector_api_proxy(inspector_id: str, request: Request, path: str = "
     if not entry:
         raise HTTPException(status_code=404, detail="Inspector não encontrado ou expirou")
 
-    server_port = entry.get("server_port") or entry.get("client_port")
+    server_port = entry.get("server_port")
     if not server_port:
-        raise HTTPException(status_code=404, detail="Inspector port não disponível")
+        raise HTTPException(status_code=502, detail="Inspector API port not ready yet")
 
     target_path = path or ""
     target_url = f"http://localhost:{server_port}/{target_path}"
@@ -1285,9 +1308,18 @@ async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
             content = resp.content
             ct = (resp.headers.get("content-type") or "").lower()
 
-            if resp.status_code == 200:
+            if resp.status_code == 200 and ("text/html" in ct or "javascript" in ct):
+                try:
+                    text = content.decode("utf-8")
+                except UnicodeDecodeError:
+                    return Response(
+                        content=content,
+                        status_code=resp.status_code,
+                        headers={k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers},
+                        media_type=resp.headers.get("content-type"),
+                    )
+
                 prefix = f"/v1/inspector/{inspector_id}"
-                text = content.decode("utf-8")
 
                 if "text/html" in ct:
                     text = re.sub(r'(src|href|action)=([\'"])/', rf"\1=\2{prefix}/", text)
@@ -1299,13 +1331,16 @@ async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
                             f'b="/v1/inspector-api/{inspector_id}";'
                             f"var f=window.fetch;"
                             f"window.fetch=function(u,o){{"
-                            f"var w=typeof u==='string'?u:u&&(u.url||u.href);"
-                            f"if(typeof w==='string'&&w.includes(':'+p)){{"
-                            f"var idx=w.indexOf(':'+p);"
-                            f"w=window.location.origin+b+w.substring(idx+(':'+p).length);"
-                            f"if(typeof u==='string')return f.call(this,w,o);"
-                            f"if(u&&typeof u.url==='string')return f.call(this,new Request(w,u));"
+                            f'var w=typeof u==="string"?u:(u&&(u.url||u.href||u.toString()));'
+                            f"if(w){{"
+                            f"var needle=':'+p;"
+                            f"var idx=w.indexOf(needle);"
+                            f"if(idx!==-1){{"
+                            f"w=window.location.origin+b+w.substring(idx+needle.length);"
+                            f'if(typeof u==="string")return f.call(this,w,o);'
+                            f"if(typeof Request!=='undefined'&&u instanceof Request)return f.call(this,new Request(w,u));"
                             f"return f.call(this,w,o);"
+                            f"}}"
                             f"}}"
                             f"return f.call(this,u,o);"
                             f"}};"
@@ -1313,20 +1348,18 @@ async def inspector_proxy(inspector_id: str, request: Request, path: str = ""):
                             f"</script>"
                         )
                         text = text.replace("</head>", shim + "</head>")
-                elif "text/javascript" in ct or "application/javascript" in ct or "application/x-javascript" in ct:
+                elif "javascript" in ct:
                     text = re.sub(r'(fetch\([\'"])/', rf"\1{prefix}/", text)
                     if server_port:
                         text = re.sub(
-                            rf'http://localhost:{server_port}(\/|"|\')', rf"/v1/inspector-api/{inspector_id}\1", text
+                            rf'http://localhost:{server_port}(?=[/"\'?#]|$)', rf"/v1/inspector-api/{inspector_id}", text
                         )
                         text = re.sub(
-                            rf'http://127\.0\.0\.1:{server_port}(\/|"|\')', rf"/v1/inspector-api/{inspector_id}\1", text
-                        )
-                        text = re.sub(
-                            rf'(?<![^\'"]){re.escape(":" + str(server_port))}(/|"|\')',
-                            rf"/v1/inspector-api/{inspector_id}\1",
+                            rf'http://127\.0\.0\.1:{server_port}(?=[/"\'?#]|$)',
+                            rf"/v1/inspector-api/{inspector_id}",
                             text,
                         )
+                        text = re.sub(rf':{server_port}(?=[/"\'?#]|$)', rf"/v1/inspector-api/{inspector_id}", text)
 
                 content = text.encode("utf-8")
 
