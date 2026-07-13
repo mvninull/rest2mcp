@@ -1721,7 +1721,6 @@
             }
 
             fetchProfile();
-            loadServers(true);
           } else if (event === "SIGNED_OUT") {
             localStorage.removeItem("supabase_token");
             localStorage.removeItem("supabase.auth.token");
