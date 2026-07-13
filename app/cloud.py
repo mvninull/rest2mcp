@@ -1833,7 +1833,7 @@ async def list_store_servers(cursor: str = ""):
                 "https://registry.modelcontextprotocol.io/v0.1/servers",
                 params=params,
                 headers={"User-Agent": "rest2mcp/1.0"},
-                timeout=15,
+                timeout=30,
             )
             resp.raise_for_status()
             data = resp.json()

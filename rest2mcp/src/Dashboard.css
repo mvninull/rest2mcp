@@ -1077,6 +1077,11 @@ nav {
     font-family: var(--mono);
     box-sizing: border-box;
 }
+textarea.tool-arg-input {
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.5;
+}
 .tool-arg-input:focus {
     outline: none;
     border-color: #1a56ff;

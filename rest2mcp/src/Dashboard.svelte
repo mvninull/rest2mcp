@@ -673,14 +673,35 @@
     return text;
   }
 
+  function parseArgValue(value, schema) {
+    if (!schema || !value) return value;
+    const typ = schema.type || "";
+    if (typ === "array") {
+      if (Array.isArray(value)) return value;
+      try { const p = JSON.parse(value); return Array.isArray(p) ? p : [p]; }
+      catch { return value.split(",").map(s => s.trim()).filter(Boolean); }
+    }
+    if (typ === "object" || typ === "json") {
+      if (typeof value === "object") return value;
+      try { return JSON.parse(value); }
+      catch { return value; }
+    }
+    return value;
+  }
+
   async function callTool(toolName) {
     toolCalling = true;
     toolResult = null;
     toolResultError = null;
     try {
+      const props = expandedTool?.inputSchema?.properties || {};
+      const parsedArgs = {};
+      for (const [k, v] of Object.entries(toolArgs)) {
+        parsedArgs[k] = parseArgValue(v, props[k]);
+      }
       const data = await apiFetch(`/v1/servers/${toolsModalServer.server_id}/tools/call`, {
         method: "POST",
-        body: JSON.stringify({ name: toolName, arguments: toolArgs }),
+        body: JSON.stringify({ name: toolName, arguments: parsedArgs }),
       });
       toolRawData = data;
       if (data.content) {
@@ -2223,6 +2244,11 @@
                           </label>
                         {:else if paramSchema.type === "number" || paramSchema.type === "integer"}
                           <input class="tool-arg-number" type="number" step={paramSchema.type === "integer" ? "1" : "any"} placeholder={paramSchema.description || ""} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
+                        {:else if paramSchema.type === "array"}
+                          <input class="tool-arg-input" type="text" placeholder={paramSchema.description || `["item1", "item2"]`} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
+                          <div style="font-size:0.62rem;color:#9ca3af;margin-top:2px;">JSON array ou separado por vírgulas</div>
+                        {:else if paramSchema.type === "object"}
+                          <textarea class="tool-arg-input" rows="3" placeholder={paramSchema.description || '{"key": "value"}'} oninput={(e) => toolArgs[paramName] = e.target.value}>{toolArgs[paramName] ?? ""}</textarea>
                         {:else}
                           <input class="tool-arg-input" type="text" placeholder={paramSchema.description || paramSchema.type || ""} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
                         {/if}
