@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 from contextlib import asynccontextmanager
+from typing import Any
 from urllib.parse import urlparse
 
 
@@ -1192,6 +1193,42 @@ async def list_server_tools(server_id: str, request: Request, db: Session = Depe
         return {"tools": result}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Erro ao listar tools: {e}")
+
+
+class CallToolRequest(BaseModel):
+    name: str
+    arguments: dict[str, Any] = {}
+
+
+@app.post("/v1/servers/{server_id}/tools/call")
+async def call_server_tool(server_id: str, req: CallToolRequest, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    active, err = await _get_or_start_mcp(server_id, record.apikey)
+    if err:
+        return err
+
+    from fastmcp.client.transports import StreamableHttpTransport
+    from fastmcp import Client
+
+    url = f"http://127.0.0.1:{active.port}/mcp"
+    transport = StreamableHttpTransport(url=url)
+    try:
+        async with Client(transport) as client:
+            result = await client.call_tool(req.name, req.arguments, raise_on_error=False)
+        content = []
+        for c in result.content:
+            if hasattr(c, "model_dump"):
+                content.append(c.model_dump())
+            else:
+                content.append({"type": c.type, "text": str(c)})
+        return {"content": content, "isError": result.is_error}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro ao executar tool: {e}")
 
 
 @app.get("/v1/servers/{server_id}/health")

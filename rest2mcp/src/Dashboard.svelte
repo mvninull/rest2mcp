@@ -35,6 +35,13 @@
   let toolsLoading = false;
   let toolsError = null;
   let toolsModalServer = null;
+  let expandedTool = null;
+  let toolArgs = {};
+  let toolCalling = false;
+  let toolResult = null;
+  let toolResultError = null;
+  let toolRawData = null;
+  let toolShowRaw = {};
 
   let _storeAllServers = [];
   let _storeFacets = { hostingTypes: [], categories: [] };
@@ -604,6 +611,89 @@
     toolsList = [];
     toolsError = null;
     toolsModalServer = null;
+  }
+
+  function toggleToolExpand(tool) {
+    if (expandedTool?.name === tool.name) {
+      expandedTool = null;
+      toolResult = null;
+      toolResultError = null;
+      toolRawData = null;
+      toolShowRaw = {};
+      return;
+    }
+    expandedTool = tool;
+    toolArgs = {};
+    toolResult = null;
+    toolResultError = null;
+    toolRawData = null;
+    toolShowRaw = {};
+    if (tool.inputSchema?.properties) {
+      for (const [k, v] of Object.entries(tool.inputSchema.properties)) {
+        const typ = v.type || "";
+        if (typ === "boolean") {
+          toolArgs[k] = v.default ?? false;
+        } else if (typ === "number" || typ === "integer") {
+          toolArgs[k] = v.default ?? "";
+        } else {
+          toolArgs[k] = v.default ?? "";
+        }
+      }
+    }
+  }
+
+  function formatContentItem(item) {
+    if (item.type === "image" && item.data) {
+      return `<div class="tool-result-content-image"><img src="data:${item.mimeType || "image/png"};base64,${item.data}" alt="Imagem retornada" /></div>`;
+    }
+    if (item.type === "resource" && item.resource) {
+      const r = item.resource;
+      if (r.text) {
+        const formatted = tryFormatJson(r.text);
+        return `<div class="tool-result-content-resource"><pre style="margin:0;white-space:pre-wrap;word-break:break-word">${escapeHtml(formatted)}</pre></div>`;
+      }
+      if (r.blob && r.mimeType) {
+        return `<div class="tool-result-content-image"><img src="data:${r.mimeType};base64,${r.blob}" alt="Recurso" /></div>`;
+      }
+      return `<div class="tool-result-content-resource"><pre style="margin:0;white-space:pre-wrap;word-break:break-word">${escapeHtml(JSON.stringify(r, null, 2))}</pre></div>`;
+    }
+    const text = item.text || (item.type === "text" ? "" : JSON.stringify(item));
+    const formatted = tryFormatJson(text);
+    return `<div class="tool-result-content-text">${escapeHtml(formatted)}</div>`;
+  }
+
+  function tryFormatJson(text) {
+    if (!text) return text || "";
+    const trimmed = text.trim();
+    if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+      try {
+        return JSON.stringify(JSON.parse(trimmed), null, 2);
+      } catch { /* not valid JSON, fall through */ }
+    }
+    return text;
+  }
+
+  async function callTool(toolName) {
+    toolCalling = true;
+    toolResult = null;
+    toolResultError = null;
+    try {
+      const data = await apiFetch(`/v1/servers/${toolsModalServer.server_id}/tools/call`, {
+        method: "POST",
+        body: JSON.stringify({ name: toolName, arguments: toolArgs }),
+      });
+      toolRawData = data;
+      if (data.content) {
+        toolResult = data.content.map(formatContentItem).join("\n");
+      }
+      if (data.isError) {
+        toolResultError = "Tool retornou erro";
+      }
+    } catch (err) {
+      toolResultError = err.message || "Erro ao executar tool";
+    } finally {
+      toolCalling = false;
+    }
   }
 
   function fillSandbox(command, args, extra) {
@@ -2089,14 +2179,81 @@
     {:else}
       <div class="tools-list">
         {#each toolsList as tool}
-          <div class="tool-item">
-            <div class="tool-name">{tool.name}</div>
-            {#if tool.description}
-              <div class="tool-desc">{tool.description}</div>
-            {/if}
-            {#if tool.inputSchema?.properties}
-              <div class="tool-params">
-                Parâmetros: {Object.keys(tool.inputSchema.properties).join(", ") || "nenhum"}
+          <div class="tool-item" class:expanded={expandedTool?.name === tool.name}>
+            <div class="tool-item-header" onclick={() => toggleToolExpand(tool)}>
+              <div>
+                <div class="tool-name">{tool.name}</div>
+                {#if tool.description}
+                  <div class="tool-desc">{tool.description}</div>
+                {/if}
+                {#if tool.annotations}
+                  <div class="tool-annotations">
+                    {#each formatToolAnnotations(tool.annotations) as anno}
+                      <span class="tool-anno-badge {anno.cls}">{anno.label}</span>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+              <span class="tool-chevron">{expandedTool?.name === tool.name ? "▲" : "▼"}</span>
+            </div>
+            {#if expandedTool?.name === tool.name}
+              <div class="tool-body">
+                {#if tool.inputSchema?.properties}
+                  {#each Object.entries(tool.inputSchema.properties) as [paramName, paramSchema]}
+                    <div class="tool-arg-group">
+                      <label class="tool-arg-label">
+                        {paramName}
+                        {#if (tool.inputSchema.required || []).includes(paramName)}<span class="tool-required">*</span>{/if}
+                        {#if paramSchema.type}
+                          <span class="tool-arg-type-hint">({paramSchema.type}{#if paramSchema.enum}, enum{/if})</span>
+                        {/if}
+                      </label>
+                      <!-- svelte-ignore a11y-no-static-element-interactions -->
+                      <div onclick={(e) => e.stopPropagation()} oninput={(e) => e.stopPropagation()} onchange={(e) => e.stopPropagation()}>
+                        {#if paramSchema.enum && Array.isArray(paramSchema.enum) && paramSchema.enum.length > 0}
+                          <select class="tool-arg-select" value={toolArgs[paramName] ?? ""} onchange={(e) => toolArgs[paramName] = e.target.value}>
+                            {#each paramSchema.enum as opt}
+                              <option value={opt}>{opt}</option>
+                            {/each}
+                          </select>
+                        {:else if paramSchema.type === "boolean"}
+                          <label class="tool-arg-checkbox">
+                            <input type="checkbox" checked={toolArgs[paramName] ?? false} onchange={(e) => toolArgs[paramName] = e.target.checked} />
+                            <span>{paramSchema.description || "Boolean"}</span>
+                          </label>
+                        {:else if paramSchema.type === "number" || paramSchema.type === "integer"}
+                          <input class="tool-arg-number" type="number" step={paramSchema.type === "integer" ? "1" : "any"} placeholder={paramSchema.description || ""} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
+                        {:else}
+                          <input class="tool-arg-input" type="text" placeholder={paramSchema.description || paramSchema.type || ""} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                {:else}
+                  <div style="color:#9ca3af;font-size:0.8rem;padding:0.5rem 0;">Esta tool não requer argumentos.</div>
+                {/if}
+                <button class="btn-confirm tool-run-btn" onclick={() => callTool(tool.name)} disabled={toolCalling}>
+                  {toolCalling ? "A executar..." : "Executar"}
+                </button>
+                {#if toolResult !== null || toolResultError}
+                  <div class="tool-result" class:tool-result-error={!!toolResultError}>
+                    {#if toolResult !== null}
+                      <div class="tool-result-header">
+                        <span>Resultado</span>
+                        <button class="tool-result-toggle" onclick={() => toolShowRaw[tool.name] = !toolShowRaw[tool.name]}>
+                          {toolShowRaw[tool.name] ? "Formatado" : "Raw JSON"}
+                        </button>
+                      </div>
+                      {#if toolShowRaw[tool.name]}
+                        <div class="tool-result-raw">{toolRawData ? JSON.stringify(toolRawData, null, 2) : toolResult}</div>
+                      {:else}
+                        <div class="tool-result-content">{@html toolResult}</div>
+                      {/if}
+                    {:else if toolResultError}
+                      <div class="tool-result-content tool-result-content-text">{toolResultError}</div>
+                    {/if}
+                  </div>
+                {/if}
               </div>
             {/if}
           </div>
