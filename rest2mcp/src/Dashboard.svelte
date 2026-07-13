@@ -588,25 +588,12 @@
     toolsError = null;
     toolsList = [];
     try {
-      const token = getAuthToken();
-      const headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
-      };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const resp = await fetch(`${API_BASE}/v1/${srv.server_id}/${srv.apikey}/mcp`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ method: "tools/list" }),
-      });
-      const data = await resp.json();
-      if (data.result?.tools) {
-        toolsList = data.result.tools;
-      } else if (data.error) {
-        toolsError = data.error.message || "Erro ao listar tools";
+      const data = await apiFetch(`/v1/servers/${serverId}/tools`);
+      if (data.tools) {
+        toolsList = data.tools;
       }
     } catch (err) {
-      toolsError = err.message || "Erro de conexão";
+      toolsError = err.message || "Erro ao listar tools";
     } finally {
       toolsLoading = false;
     }

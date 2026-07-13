@@ -1161,6 +1161,39 @@ async def update_server(server_id: str, req: UpdateServerRequest, request: Reque
     )
 
 
+@app.get("/v1/servers/{server_id}/tools")
+async def list_server_tools(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    active, err = await _get_or_start_mcp(server_id, record.apikey)
+    if err:
+        return err
+
+    from fastmcp.client.transports import StreamableHttpTransport
+    from fastmcp import Client
+
+    url = f"http://127.0.0.1:{active.port}/mcp"
+    transport = StreamableHttpTransport(url=url)
+    try:
+        async with Client(transport) as client:
+            tools = await client.list_tools()
+        result = []
+        for t in tools:
+            d = (
+                t.model_dump()
+                if hasattr(t, "model_dump")
+                else {"name": t.name, "description": t.description, "inputSchema": t.inputSchema}
+            )
+            result.append(d)
+        return {"tools": result}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro ao listar tools: {e}")
+
+
 @app.get("/v1/servers/{server_id}/health")
 async def check_server_health(server_id: str, request: Request, db: Session = Depends(get_db)):
     await require_auth(request)
