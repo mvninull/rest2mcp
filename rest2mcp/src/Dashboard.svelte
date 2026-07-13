@@ -586,7 +586,10 @@
     toolsList = [];
     try {
       const token = getAuthToken();
-      const headers = { "Content-Type": "application/json" };
+      const headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+      };
       if (token) headers["Authorization"] = `Bearer ${token}`;
       const resp = await fetch(`${API_BASE}/v1/${srv.server_id}/${srv.apikey}/mcp`, {
         method: "POST",
