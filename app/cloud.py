@@ -195,7 +195,7 @@ class ActiveServer:
             except ImportError:
                 from openapi import create_merged_mcp_server
 
-            merged_mcp = create_merged_mcp_server(
+            merged_mcp = await create_merged_mcp_server(
                 base_spec_url=self.spec_url,
                 base_name=self.name,
                 base_spec=spec_data,

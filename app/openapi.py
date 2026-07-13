@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import time
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -295,7 +296,7 @@ def create_mcp_server(spec_url: str, name: str) -> FastMCP:
     return manager.mcp
 
 
-def create_merged_mcp_server(
+async def create_merged_mcp_server(
     base_spec_url: str,
     base_name: str,
     base_spec: dict,
@@ -304,6 +305,30 @@ def create_merged_mcp_server(
     log_func=None,
 ) -> FastMCP:
     """Cria um servidor MCP merged: monta múltiplas sources no base com namespace."""
+    from fastmcp.tools import Tool, ToolResult
+
+    class RemoteProxyTool(Tool):
+        remote_url: str
+        remote_headers: dict | None = None
+        remote_auth: str | None = None
+        remote_tool_name: str
+
+        async def run(self, arguments: dict[str, Any]) -> ToolResult:
+            from fastmcp.client.transports import StreamableHttpTransport
+            from fastmcp import Client
+
+            t = StreamableHttpTransport(
+                url=self.remote_url,
+                headers=self.remote_headers,
+                auth=self.remote_auth,
+            )
+            async with Client(t) as c:
+                result = await c.call_tool(self.remote_tool_name, arguments, raise_on_error=False)
+            return ToolResult(
+                content=result.content,
+                structured_content=result.structured_content,
+            )
+
     base_manager = MCPServerManager(
         spec_url=base_spec_url,
         name=base_name,
@@ -317,37 +342,34 @@ def create_merged_mcp_server(
             remote_url = src["remote_url"]
             try:
                 from fastmcp.client.transports import StreamableHttpTransport
-                from fastmcp.server import create_proxy
+                from fastmcp import Client
 
-                tool_transforms = src.get("tools")
                 remote_headers = dict(src.get("remote_headers") or {})
                 auth = remote_headers.pop("Authorization", None)
+                namespace = src.get("namespace", "")
 
-                if tool_transforms:
-                    cfg = {
-                        "mcpServers": {
-                            src.get("name", f"Remote {i}"): {
-                                "url": remote_url,
-                            }
-                        }
-                    }
-                    if remote_headers:
-                        cfg["mcpServers"][src.get("name", f"Remote {i}")]["headers"] = remote_headers
-                    if auth:
-                        cfg["mcpServers"][src.get("name", f"Remote {i}")]["headers"] = dict(src.get("remote_headers") or {})
-                    if tool_transforms:
-                        cfg["mcpServers"][src.get("name", f"Remote {i}")]["tools"] = tool_transforms
-                    remote_proxy = create_proxy(cfg, name=src.get("name", f"Remote {i}"))
-                elif remote_headers or auth:
-                    transport = StreamableHttpTransport(
-                        url=remote_url,
-                        headers=remote_headers or None,
-                        auth=auth,
+                transport = StreamableHttpTransport(
+                    url=remote_url,
+                    headers=remote_headers or None,
+                    auth=auth,
+                )
+
+                async with Client(transport) as remote_client:
+                    remote_tools = await remote_client.list_tools()
+
+                for tool_def in remote_tools:
+                    tool_name = f"{namespace}_{tool_def.name}" if namespace else tool_def.name
+                    proxy_tool = RemoteProxyTool(
+                        name=tool_name,
+                        description=tool_def.description or "",
+                        parameters=tool_def.inputSchema,
+                        remote_url=remote_url,
+                        remote_headers=remote_headers or None,
+                        remote_auth=auth,
+                        remote_tool_name=tool_def.name,
                     )
-                    remote_proxy = create_proxy(transport, name=src.get("name", f"Remote {i}"))
-                else:
-                    remote_proxy = create_proxy(remote_url, name=src.get("name", f"Remote {i}"))
-                base_manager.mcp.mount(remote_proxy, namespace=src.get("namespace", ""))
+                    base_manager.mcp.add_tool(proxy_tool)
+
             except Exception as e:
                 logger.warning(f"Falha ao montar remoto {remote_url}: {e}")
         elif src.get("stdio_config"):
