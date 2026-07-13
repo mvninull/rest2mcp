@@ -27,6 +27,11 @@
   let currentUser = null;
   let currentProfile = null;
   let paypalRendered = false;
+  let showToolsModal = false;
+  let toolsList = [];
+  let toolsLoading = false;
+  let toolsError = null;
+  let toolsModalServer = null;
 
   let _storeAllServers = [];
   let _storeFacets = { hostingTypes: [], categories: [] };
@@ -79,7 +84,7 @@
     if (existing) existing.remove();
     const overlay = document.createElement("div");
     overlay.id = "appConfirmOverlay";
-    overlay.style.cssText = "positionfixed;inset:0;background:rgba(12,12,20,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000000;padding:16px;";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(12,12,20,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000000;padding:16px;";
 
     const box = document.createElement("div");
     box.style.cssText = "background:#fff;border-radius:18px;padding:32px;max-width:400px;width:min(100%,400px);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.28);border:1px solid rgba(12,12,20,0.08);";
@@ -569,6 +574,43 @@
     }
     if (mm) mm.classList.add("open");
     setTimeout(() => { const f = document.getElementById("mergeTargetSelect"); if (f) f.focus(); }, 120);
+  }
+
+  async function openToolsModal(serverId) {
+    const srv = get(servers).find(s => s.server_id === serverId);
+    if (!srv) return;
+    toolsModalServer = srv;
+    showToolsModal = true;
+    toolsLoading = true;
+    toolsError = null;
+    toolsList = [];
+    try {
+      const token = getAuthToken();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const resp = await fetch(`${API_BASE}/v1/${srv.server_id}/${srv.apikey}/mcp`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ method: "tools/list" }),
+      });
+      const data = await resp.json();
+      if (data.result?.tools) {
+        toolsList = data.result.tools;
+      } else if (data.error) {
+        toolsError = data.error.message || "Erro ao listar tools";
+      }
+    } catch (err) {
+      toolsError = err.message || "Erro de conexão";
+    } finally {
+      toolsLoading = false;
+    }
+  }
+
+  function closeToolsModal() {
+    showToolsModal = false;
+    toolsList = [];
+    toolsError = null;
+    toolsModalServer = null;
   }
 
   function fillSandbox(command, args, extra) {
@@ -2010,6 +2052,9 @@
       <button onclick={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> Merge
       </button>
+      <button onclick={() => { openToolsModal(s.server_id); closeAllMenus(); }}>
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 5h10M3 8h10M3 11h7"/></svg></span> Ver Tools
+      </button>
       <div class="menu-divider"></div>
       <button onclick={() => { toggleServerStatus(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon">
@@ -2033,6 +2078,42 @@
       </button>
     </div>
   {/if}
+</div>
+
+<!-- ── TOOLS MODAL ─────────────────────────────────────────── -->
+<div class="modal-overlay" class:open={showToolsModal} onclick={() => closeToolsModal()}>
+  <div class="modal-box tools-box" onclick={(e) => e.stopPropagation()}>
+    <div class="modal-header">
+      <h3>Tools: {toolsModalServer?.name || ""}</h3>
+      <p class="modal-sub">{toolsModalServer?.server_id || ""}</p>
+    </div>
+    {#if toolsLoading}
+      <div style="padding:2rem;text-align:center;color:#6b7280;">A carregar tools...</div>
+    {:else if toolsError}
+      <div class="modal-error" style="display:block">{toolsError}</div>
+    {:else if toolsList.length === 0}
+      <div style="padding:2rem;text-align:center;color:#6b7280;">Nenhuma tool disponível.</div>
+    {:else}
+      <div class="tools-list">
+        {#each toolsList as tool}
+          <div class="tool-item">
+            <div class="tool-name">{tool.name}</div>
+            {#if tool.description}
+              <div class="tool-desc">{tool.description}</div>
+            {/if}
+            {#if tool.inputSchema?.properties}
+              <div class="tool-params">
+                Parâmetros: {Object.keys(tool.inputSchema.properties).join(", ") || "nenhum"}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick={() => closeToolsModal()}>Fechar</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── MERGE MODAL ────────────────────────────────────────── -->

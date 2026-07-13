@@ -624,6 +624,7 @@ class ServerListItem(BaseModel):
     created_at: str
     is_merged: bool = False
     merge_info: str | None = None
+    apikey: str | None = None
 
 
 class MergeServerRequest(BaseModel):
@@ -777,6 +778,7 @@ async def list_servers(request: Request, db: Session = Depends(get_db)):
                 created_at=s.created_at.isoformat(),
                 is_merged=bool(s.is_merged),
                 merge_info=merge_info,
+                apikey=s.apikey,
             )
         )
     return result

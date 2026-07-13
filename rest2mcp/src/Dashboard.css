@@ -1001,6 +1001,43 @@ nav {
     font-size: 0.84rem;
 }
 
+.tools-box {
+    max-width: 560px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+.tools-list {
+    overflow-y: auto;
+    flex: 1;
+    margin: 0.5rem 0 1rem;
+}
+.tool-item {
+    padding: 0.85rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+    background: #f9fafb;
+}
+.tool-item .tool-name {
+    font-weight: 700;
+    font-size: 0.88rem;
+    font-family: var(--mono);
+    color: #0c0c14;
+    margin-bottom: 3px;
+}
+.tool-item .tool-desc {
+    font-size: 0.8rem;
+    color: #6b7280;
+    line-height: 1.5;
+    margin-bottom: 4px;
+}
+.tool-item .tool-params {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-family: var(--mono);
+}
+
 /* ── Merge Tabs ─────────────────────────────────────── */
 .merge-tabs {
     display: flex;
