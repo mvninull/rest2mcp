@@ -6,7 +6,10 @@
   import { installAppAlert, notifyAppAlert } from './app-alert.js';
 
   const API_BASE = (
-    localStorage.getItem("api_base") || "https://rest2mcp.fly.dev"
+    localStorage.getItem("api_base") ||
+    (location.hostname === "localhost" || location.hostname === "127.0.0.1"
+      ? "http://localhost:8080"
+      : "https://rest2mcp.fly.dev")
   ).replace(/\/+$/, "");
   const POLL_LOGS_INTERVAL = 5000;
 
