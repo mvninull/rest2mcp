@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for rest2mcp on 2026-07-08T17:01:36Z
+# fly.toml app configuration file generated for rest2mcp on 2026-07-13T16:20:20Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -12,7 +12,7 @@ primary_region = 'fra'
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
   processes = ['app']
