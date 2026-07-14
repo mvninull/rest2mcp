@@ -2,8 +2,11 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { servers, serversLoading, serversError, serverHealth, activeServerId, serverCount } from './stores/servers.js';
+  import { t } from './stores/lang.js';
   import './Dashboard.css';
   import { installAppAlert, notifyAppAlert } from './app-alert.js';
+
+  const __ = (key) => get(t)(key);
 
   const API_BASE = (
     localStorage.getItem("api_base") ||
@@ -1922,15 +1925,15 @@
 
     <div class="nav-right" id="navAuth">
       <div class="auth-user" id="authUser" style="display:none">
-        <button class="user-profile-btn" id="userProfileBtn" onclick={() => window.openProfileModal()} title="Ver perfil">
+        <button class="user-profile-btn" id="userProfileBtn" onclick={() => window.openProfileModal()} title={$t('profile.view_profile')}>
           <img class="auth-avatar" id="authAvatar" src="" alt="" onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex' }} />
           <span class="auth-avatar-fallback" id="authAvatarFallback" style="display:none"></span>
           <span class="auth-name" id="authName"></span>
           <span class="auth-plan" id="authPlan"></span>
         </button>
-        <button class="auth-btn logout-btn-nav" onclick={() => window.logout()} title="Sair da conta">
+        <button class="auth-btn logout-btn-nav" onclick={() => window.logout()} title={$t('profile.sign_out_title')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sair
+          {$t('profile.logout')}
         </button>
       </div>
       <div class="auth-login-buttons" id="authLogin" style="display:none"></div>
@@ -1944,14 +1947,14 @@
   <div class="dash-main">
     <div class="page-header">
       <div class="page-header-text">
-        <h2>Meus Servidores</h2>
-        <p class="sub">Gerencie suas pontes MCP na nuvem</p>
+        <h2>{$t('dashboard.nav.title')}</h2>
+        <p class="sub">{$t('dashboard.page_sub')}</p>
       </div>
       <button class="btn-add-server" onclick={() => window.openCreateModal()}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
         </svg>
-        Novo Servidor
+        {$t('dashboard.new_server')}
       </button>
     </div>
 
@@ -1963,16 +1966,16 @@
               <path d="M5 3h14M5 21h14M7 3v4l5 5-5 5v4M17 3v4l-5 5 5 5v4" />
             </svg>
           </div>
-          <div>Carregando servidores<span class="loading-dots"></span></div>
+          <div>{$t('dashboard.loading_servers')}<span class="loading-dots"></span></div>
         </div>
       {:else if $serversError}
         <div class="empty-state">
           <div class="empty-icon">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff5c35" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
-          <div style="color:var(--warn)">Erro ao carregar servidores:<br/>{$serversError}</div>
+          <div style="color:var(--warn)">{$t('dashboard.load_error')}<br/>{$serversError}</div>
           <button onclick={() => loadServers(true)} style="margin-top:1.2rem;padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-family:var(--mono);font-size:0.78rem;transitionall 0.2s;">
-            Tentar novamente
+            {$t('dashboard.retry')}
           </button>
         </div>
       {:else if $servers.length === 0}
@@ -1980,7 +1983,7 @@
           <div class="empty-icon">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="14" rx="2"/><path d="M9 16v4M15 16v4M9 20h6"/><path d="M9 6h6M9 10h6"/></svg>
           </div>
-          <div>Nenhum servidor ainda.<br/>Clique em <strong>+ Novo Servidor</strong> para começar.</div>
+          <div>{$t('dashboard.empty')}<br/>{$t('dashboard.empty_hint')}</div>
         </div>
       {:else}
         {#each $servers as s (s.server_id)}
@@ -2023,13 +2026,13 @@
                   {#if isMerged}
                     <span class="merge-badge">
                       <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l1.2 4.8L14 6l-4.8 1.2L8 12 6.8 7.2 2 6l4.8-1.2z"/></svg>
-                      Merged
+                      {$t('dashboard.merged_badge')}
                     </span>
                   {/if}
                 </div>
                 <div class="server-url">
                   {#if healthError}
-                    <span style="color:var(--danger)">API indisponível</span>
+                    <span style="color:var(--danger)">{$t('dashboard.api_unavailable')}</span>
                   {:else}
                     {escapeHtml(s.url_sse || s.server_id)}
                   {/if}
@@ -2042,13 +2045,13 @@
             <div class="server-actions">
               <span class="status-chip" class:active={isActive && !healthError} class:inactive={!isActive || healthError}>
                 <span class="status-chip-dot"></span>
-                {healthError ? "API indisponível" : isActive ? "Online" : "Offline"}
+                {healthError ? $t('dashboard.api_unavailable') : isActive ? $t('dashboard.online') : $t('dashboard.offline')}
               </span>
               <button class="btn-copy" disabled={!isActive} onclick={(e) => copyUrl(e.currentTarget, s.url_sse || '')}>
-                Copy URL
+                {$t('dashboard.copy_url')}
               </button>
               <div class="menu-wrapper">
-                <button class="menu-btn" onclick={(e) => toggleMenu(s.server_id, e.currentTarget)} title="Mais opções">
+                <button class="menu-btn" onclick={(e) => toggleMenu(s.server_id, e.currentTarget)} title={$t('dashboard.options')}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                     <circle cx="7" cy="2" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="7" cy="12" r="1.3"/>
                   </svg>
@@ -2066,37 +2069,37 @@
     <!-- Plan Card -->
     <div class="sidebar-card">
       <div class="sidebar-card-header">
-        <span class="sidebar-label">Plano Atual</span>
-        <span class="plan-badge">✦ Hobby</span>
+        <span class="sidebar-label">{$t('dashboard.current_plan')}</span>
+        <span class="plan-badge">{$t('dashboard.hobby_badge')}</span>
       </div>
       <div class="stat-grid">
         <div class="stat-row">
-          <span class="stat-label">Servidores ativos</span>
+          <span class="stat-label">{$t('dashboard.active_servers')}</span>
           <span class="stat-value num">{$serverCount}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">Retenção de logs</span>
+          <span class="stat-label">{$t('dashboard.log_retention')}</span>
           <span class="stat-value num">24h</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">Gateway</span>
+          <span class="stat-label">{$t('dashboard.gateway')}</span>
           <span class="stat-value ok" id="gatewayStatus">---</span>
         </div>
         <div class="stat-row" id="quotaRowServers" style="display:none">
-          <span class="stat-label">Servidores</span>
+          <span class="stat-label">{$t('dashboard.servers_label')}</span>
           <span class="stat-value" id="quotaServers">0/1</span>
         </div>
         <div class="stat-row" id="quotaRowPlan" style="display:none">
-          <span class="stat-label">Plano</span>
+          <span class="stat-label">{$t('dashboard.plan_label')}</span>
           <span class="stat-value" id="quotaPlan">Free</span>
         </div>
       </div>
       <div class="sub-section" id="subSection" style="display:none">
-        <div class="sub-title">Subscrição</div>
-        <div class="sub-quota"><span>Servidores</span><span class="val" id="subServers">0 / 1</span></div>
-        <div class="sub-quota"><span>RPM</span><span class="val" id="subRPM">10</span></div>
+        <div class="sub-title">{$t('dashboard.subscription')}</div>
+        <div class="sub-quota"><span>{$t('dashboard.servers_label')}</span><span class="val" id="subServers">0 / 1</span></div>
+        <div class="sub-quota"><span>{$t('profile.rpm_label')}</span><span class="val" id="subRPM">10</span></div>
         <div class="sub-upgrade" id="subUpgrade">
-          <button class="sub-upgrade-btn" onclick={() => window.showPayPal()}>Assinar Pro — $9.90/mês</button>
+          <button class="sub-upgrade-btn" onclick={() => window.showPayPal()}>{$t('dashboard.subscribe')}</button>
         </div>
         <div id="paypal-button-container" style="display:none"></div>
       </div>
@@ -2107,30 +2110,30 @@
       <div class="sidebar-logs-header">
         <div class="logs-header-left">
           <span class="pulse-dot"></span>
-          <span class="log-title">Logs</span>
+          <span class="log-title">{$t('dashboard.logs_title')}</span>
           <select class="log-server-select" id="logServerSelect" onchange={() => window.switchLogServer(this.value)}>
-            <option value="">Servidor...</option>
+            <option value="">{$t('dashboard.log_server_placeholder')}</option>
           </select>
         </div>
         <div class="logs-header-actions">
-          <button class="log-action-btn" title="Exportar JSON" onclick={() => window.exportLogs('json')}>↓</button>
-          <button class="log-action-btn" title="Exportar CSV" onclick={() => window.exportLogs('csv')}>⇩</button>
-          <button class="log-action-btn log-action-danger" title="Limpar logs" onclick={() => window.clearLogs()}>✕</button>
-          <button class="log-refresh-btn" title="Atualizar" onclick={() => window.pollLogs()}>↻</button>
+          <button class="log-action-btn" title={$t('dashboard.export_json')} onclick={() => window.exportLogs('json')}>↓</button>
+          <button class="log-action-btn" title={$t('dashboard.export_csv')} onclick={() => window.exportLogs('csv')}>⇩</button>
+          <button class="log-action-btn log-action-danger" title={$t('dashboard.clear_logs_btn')} onclick={() => window.clearLogs()}>✕</button>
+          <button class="log-refresh-btn" title={$t('dashboard.refresh')} onclick={() => window.pollLogs()}>↻</button>
         </div>
       </div>
       <div class="log-filter-bar">
-        <input type="text" class="log-filter-input" id="logToolFilter" placeholder="Filtrar tool..." oninput={() => window.debouncePoll()}>
+        <input type="text" class="log-filter-input" id="logToolFilter" placeholder={$t('dashboard.filter_tool')} oninput={() => window.debouncePoll()}>
         <select class="log-filter-select" id="logStatusFilter" onchange={() => window.pollLogs()}>
-          <option value="">Todos</option>
-          <option value="200-299">2xx Sucesso</option>
-          <option value="400-499">4xx Erro</option>
-          <option value="500-599">5xx Erro</option>
+          <option value="">{$t('dashboard.all')}</option>
+          <option value="200-299">{$t('dashboard.success_2xx')}</option>
+          <option value="400-499">{$t('dashboard.error_4xx')}</option>
+          <option value="500-599">{$t('dashboard.error_5xx')}</option>
         </select>
       </div>
       <div class="sidebar-logs-body" id="liveLogs">
         <div style="color: rgba(255, 255, 255, 0.2)">
-          Aguardando atividade...
+          {$t('dashboard.waiting_logs')}
         </div>
       </div>
     </div>
@@ -2148,16 +2151,16 @@
          style="position: fixed; left: {activeMenu.x}px; top: {activeMenu.y}px; z-index: 1000000; min-width: 200px;"
          onclick={(e) => e.stopPropagation()}>
       <button onclick={() => { openInspector(s.server_id); closeAllMenus(); }}>
-        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> Inspecionar
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> {$t('menu.inspect')}
       </button>
       <button onclick={() => { editServer(s.server_id, s.name || '', s.transport || 'http'); closeAllMenus(); }}>
-        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> Editar
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> {$t('menu.edit')}
       </button>
       <button onclick={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
-        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> Merge
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="3" r="1.5"/><path d="M8 7v6M5 10h6"/></svg></span> {$t('menu.merge')}
       </button>
       <button onclick={() => { openToolsModal(s.server_id); closeAllMenus(); }}>
-        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 5h10M3 8h10M3 11h7"/></svg></span> Ver Tools
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 5h10M3 8h10M3 11h7"/></svg></span> {$t('menu.tools')}
       </button>
       <div class="menu-divider"></div>
       <button onclick={() => { toggleServerStatus(s.server_id); closeAllMenus(); }}>
@@ -2168,17 +2171,17 @@
             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg>
           {/if}
         </span>
-        {s.status === "active" ? "Desativar" : "Ativar"}
+        {s.status === "active" ? $t('menu.deactivate') : $t('menu.activate')}
       </button>
       {#if s.is_merged === true}
         <div class="menu-divider"></div>
         <button onclick={() => { unmergeServer(s.server_id); closeAllMenus(); }}>
-          <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> Desfazer Merge
+          <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 3l10 10M13 3l-10 10"/></svg></span> {$t('menu.unmerge')}
         </button>
       {/if}
       <div class="menu-divider"></div>
       <button class="menu-danger" onclick={() => { deleteServer(s.server_id); closeAllMenus(); }}>
-        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> Remover
+        <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 4h12"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><path d="M3 4l1 10h8l1-10"/></svg></span> {$t('menu.delete')}
       </button>
     </div>
   {/if}
@@ -2188,15 +2191,15 @@
 <div class="modal-overlay" class:open={showToolsModal} onclick={() => closeToolsModal()}>
   <div class="modal-box tools-box" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
-      <h3>Tools: {toolsModalServer?.name || ""}</h3>
+      <h3>{$t('tools.modal.title')} {toolsModalServer?.name || ""}</h3>
       <p class="modal-sub">{toolsModalServer?.server_id || ""}</p>
     </div>
     {#if toolsLoading}
-      <div style="padding:2rem;text-align:center;color:#6b7280;">A carregar tools...</div>
+      <div style="padding:2rem;text-align:center;color:#6b7280;">{$t('tools.modal.loading')}</div>
     {:else if toolsError}
       <div class="modal-error" style="display:block">{toolsError}</div>
     {:else if toolsList.length === 0}
-      <div style="padding:2rem;text-align:center;color:#6b7280;">Nenhuma tool disponível.</div>
+      <div style="padding:2rem;text-align:center;color:#6b7280;">{$t('tools.modal.empty')}</div>
     {:else}
       <div class="tools-list">
         {#each toolsList as tool}
@@ -2246,7 +2249,7 @@
                           <input class="tool-arg-number" type="number" step={paramSchema.type === "integer" ? "1" : "any"} placeholder={paramSchema.description || ""} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
                         {:else if paramSchema.type === "array"}
                           <input class="tool-arg-input" type="text" placeholder={paramSchema.description || `["item1", "item2"]`} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
-                          <div style="font-size:0.62rem;color:#9ca3af;margin-top:2px;">JSON array ou separado por vírgulas</div>
+                          <div style="font-size:0.62rem;color:#9ca3af;margin-top:2px;">{$t('tool.array_hint')}</div>
                         {:else if paramSchema.type === "object"}
                           <textarea class="tool-arg-input" rows="3" placeholder={paramSchema.description || '{"key": "value"}'} oninput={(e) => toolArgs[paramName] = e.target.value}>{toolArgs[paramName] ?? ""}</textarea>
                         {:else}
@@ -2256,18 +2259,18 @@
                     </div>
                   {/each}
                 {:else}
-                  <div style="color:#9ca3af;font-size:0.8rem;padding:0.5rem 0;">Esta tool não requer argumentos.</div>
+                  <div style="color:#9ca3af;font-size:0.8rem;padding:0.5rem 0;">{$t('tool.no_args')}</div>
                 {/if}
                 <button class="btn-confirm tool-run-btn" onclick={() => callTool(tool.name)} disabled={toolCalling}>
-                  {toolCalling ? "A executar..." : "Executar"}
+                  {toolCalling ? $t('tool.running') : $t('tool.run')}
                 </button>
                 {#if toolResult !== null || toolResultError}
                   <div class="tool-result" class:tool-result-error={!!toolResultError}>
                     {#if toolResult !== null}
                       <div class="tool-result-header">
-                        <span>Resultado</span>
+                        <span>{$t('tool.result')}</span>
                         <button class="tool-result-toggle" onclick={() => toolShowRaw[tool.name] = !toolShowRaw[tool.name]}>
-                          {toolShowRaw[tool.name] ? "Formatado" : "Raw JSON"}
+                          {toolShowRaw[tool.name] ? $t('tool.formatted') : $t('tool.raw')}
                         </button>
                       </div>
                       {#if toolShowRaw[tool.name]}
@@ -2287,7 +2290,7 @@
       </div>
     {/if}
     <div class="modal-actions">
-      <button class="btn-cancel" onclick={() => closeToolsModal()}>Fechar</button>
+      <button class="btn-cancel" onclick={() => closeToolsModal()}>{$t('tools.modal.close')}</button>
     </div>
   </div>
 </div>
@@ -2296,48 +2299,48 @@
 <div class="modal-overlay" id="mergeModal">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>Merge de Servidores</h3>
-      <p class="modal-sub" id="mergeSub">Fusão de dois servidores MCP com namespace automático</p>
+      <h3>{$t('modal.merge.title')}</h3>
+      <p class="modal-sub" id="mergeSub">{mergeMode === 'local' ? $t('modal.merge.local') : $t('modal.merge.sandbox')}</p>
     </div>
     <div class="merge-tabs">
       <button class="merge-tab active" id="mergeTabLocal" onclick={() => window.setMergeTab('local')}>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="10" height="10" rx="2"/><path d="M8 6v4M6 8h4"/></svg>
-        Servidores no rest2mcp
+        {$t('merge.local_title')}
       </button>
       <button class="merge-tab" id="mergeTabSandbox" onclick={() => window.setMergeTab('sandbox')}>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M8 5v6"/></svg>
-        Sandbox / JSON
+        {$t('merge.sandbox_title')}
       </button>
     </div>
     <div class="form-group">
-      <label for="mergeName">Nome do Servidor Merged</label>
-      <input type="text" id="mergeName" placeholder="Ex: API Unificada" />
+      <label for="mergeName">{$t('merge.merge_label')}</label>
+      <input type="text" id="mergeName" placeholder={$t('merge.merge_placeholder')} />
     </div>
     <div id="mergeLocalFields" style="display:block">
       <div class="form-group">
-        <label for="mergeTargetSelect">Servidor alvo</label>
-        <select id="mergeTargetSelect"><option value="">Selecione um servidor...</option></select>
-        <p class="form-hint">Servidor rest2mcp que será fundido com o servidor fonte</p>
+        <label for="mergeTargetSelect">{$t('merge.target_label')}</label>
+        <select id="mergeTargetSelect"><option value="">{$t('merge.target_placeholder')}</option></select>
+        <p class="form-hint">{$t('merge.target_hint')}</p>
       </div>
     </div>
     <div id="mergeSandboxFields" style="display:none">
       <div class="store-divider"><span>ou</span></div>
       <button class="btn-store" onclick={() => window.openStoreModal()}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
-        Instalar a partir da loja
+        {$t('store.install_btn')}
       </button>
       <div class="form-group">
-        <label for="mergeStdioJson">Config JSON</label>
+        <label for="mergeStdioJson">{$t('merge.config_label')}</label>
         <textarea id="mergeStdioJson" rows="5" class="code-textarea"></textarea>
-        <p class="form-hint">Comando/args do servidor MCP. Suporta <code>mcpServers</code>, <code>url</code> (remoto), <code>command</code> (stdio), <code>tools</code> (transformações) e <code>env</code>.</p>
+        <p class="form-hint">{$t('merge.config_hint')}</p>
       </div>
       <div id="mergeEnvFields" style="display:none"></div>
       <div id="mergePackageWarning" class="store-warning" style="display:none"></div>
     </div>
     <div class="modal-error" id="mergeError"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick={() => window.closeMergeModal()}>Cancelar</button>
-      <button class="btn-confirm" id="btnMergeConfirm" onclick={() => window.confirmMerge()}>Criar Servidor Merged</button>
+      <button class="btn-cancel" onclick={() => window.closeMergeModal()}>{$t('common.cancel')}</button>
+      <button class="btn-confirm" id="btnMergeConfirm" onclick={() => window.confirmMerge()}>{$t('modal.merge.btn')}</button>
     </div>
   </div>
 </div>
@@ -2346,17 +2349,17 @@
 <div class="modal-overlay" id="storeModal">
   <div class="modal-box store-box">
     <div class="modal-header">
-      <h3>MCP Server Store</h3>
-      <p class="modal-sub">Encontre e instale servidores MCP públicos</p>
+      <h3>{$t('store.modal.title')}</h3>
+      <p class="modal-sub">{$t('store.modal_sub')}</p>
     </div>
     <div class="store-layout">
       <div class="store-sidebar">
         <div class="store-sidebar-section">
-          <div class="store-sidebar-title">Hosting</div>
+          <div class="store-sidebar-title">{$t('store.hosting')}</div>
           <div class="store-filter-bar" id="storeFilterBar"></div>
         </div>
         <div class="store-sidebar-section">
-          <div class="store-sidebar-title">Categorias</div>
+          <div class="store-sidebar-title">{$t('store.categories')}</div>
           <div class="store-cat-list" id="storeCategoryBar"></div>
         </div>
       </div>
@@ -2364,24 +2367,24 @@
         <div class="store-toolbar">
           <div class="store-search">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
-            <input type="text" id="storeSearch" placeholder="Buscar servidores MCP..." oninput={() => window.searchStore()} />
+            <input type="text" id="storeSearch" placeholder={$t('store.search_placeholder')} oninput={() => window.searchStore()} />
           </div>
           <select class="store-sort" id="storeSort" onchange={() => window.setStoreSort(this.value)}>
-            <option value="relevance">Relevância</option>
-            <option value="stars">★ Estrelas GitHub</option>
-            <option value="tools">🛠 Mais ferramentas</option>
-            <option value="name">Nome A-Z</option>
-            <option value="name_desc">Nome Z-A</option>
+            <option value="relevance">{$t('store.sort_relevance')}</option>
+            <option value="stars">{$t('store.sort_stars')}</option>
+            <option value="tools">{$t('store.sort_tools')}</option>
+            <option value="name">{$t('store.sort_name_asc')}</option>
+            <option value="name_desc">{$t('store.sort_name_desc')}</option>
           </select>
         </div>
         <div class="store-grid" id="storeGrid">
-          <div class="store-loading">A carregar loja...</div>
+          <div class="store-loading">{$t('store.loading')}</div>
         </div>
-        <button class="store-load-more" id="storeLoadMore" onclick={() => window.loadMoreStore()} style="display:none">Carregar mais servidores</button>
+        <button class="store-load-more" id="storeLoadMore" onclick={() => window.loadMoreStore()} style="display:none">{$t('store.load_more')}</button>
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick={() => window.closeStoreModal()}>Fechar</button>
+      <button class="btn-cancel" onclick={() => window.closeStoreModal()}>{$t('common.close')}</button>
     </div>
   </div>
 </div>
@@ -2390,31 +2393,31 @@
 <div class="modal-overlay" id="editModal">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>Editar Servidor</h3>
-      <p class="modal-sub">Altere as configurações do servidor MCP</p>
+      <h3>{$t('modal.edit.title')}</h3>
+      <p class="modal-sub">{$t('modal.edit.sub')}</p>
     </div>
     <div class="form-group">
-      <label for="editName">Nome do Servidor</label>
-      <input type="text" id="editName" placeholder="Ex: Minha API" />
+      <label for="editName">{$t('modal.edit.name_label')}</label>
+      <input type="text" id="editName" placeholder={$t('modal.edit.name_placeholder')} />
     </div>
     <div class="form-group">
-      <label for="editTransport">Transporte</label>
+      <label for="editTransport">{$t('modal.edit.transport_label')}</label>
       <select id="editTransport">
-        <option value="http">Streamable HTTP (recomendado)</option>
-        <option value="sse">SSE (legado)</option>
+        <option value="http">{$t('modal.create.transport_http')}</option>
+        <option value="sse">{$t('modal.create.transport_sse')}</option>
       </select>
     </div>
     <div class="form-group">
-      <label for="editStatus">Status</label>
+      <label for="editStatus">{$t('modal.edit.status_label')}</label>
       <select id="editStatus">
-        <option value="active">Online</option>
-        <option value="inactive">Offline</option>
+        <option value="active">{$t('modal.edit.status_online')}</option>
+        <option value="inactive">{$t('modal.edit.status_offline')}</option>
       </select>
     </div>
     <div class="modal-error" id="editError"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick={() => window.closeEditModal()}>Cancelar</button>
-      <button class="btn-confirm" id="btnEditConfirm" onclick={() => window.saveEdit()}>Salvar</button>
+      <button class="btn-cancel" onclick={() => window.closeEditModal()}>{$t('common.cancel')}</button>
+      <button class="btn-confirm" id="btnEditConfirm" onclick={() => window.saveEdit()}>{$t('common.save')}</button>
     </div>
   </div>
 </div>
@@ -2423,28 +2426,28 @@
 <div class="modal-overlay" id="createModal">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>Novo Servidor</h3>
-      <p class="modal-sub">Registre uma nova API para ser convertida em MCP</p>
+      <h3>{$t('dashboard.new_server')}</h3>
+      <p class="modal-sub">{$t('modal.create.sub')}</p>
     </div>
     <div class="form-group">
-      <label for="inputName">Nome do Servidor</label>
-      <input type="text" id="inputName" placeholder="Ex: Minha API Principal" />
+      <label for="inputName">{$t('modal.create.name')}</label>
+      <input type="text" id="inputName" placeholder={$t('modal.create.name_placeholder')} />
     </div>
     <div class="form-group">
-      <label for="inputSpecUrl">URL do OpenAPI Spec</label>
-      <input type="url" id="inputSpecUrl" placeholder="https://api.exemplo.com/openapi.json" />
+      <label for="inputSpecUrl">{$t('modal.create.spec_url')}</label>
+      <input type="url" id="inputSpecUrl" placeholder={$t('modal.create.url_placeholder')} />
     </div>
     <div class="form-group">
-      <label for="inputTransport">Transporte</label>
+      <label for="inputTransport">{$t('modal.create.transport')}</label>
       <select id="inputTransport">
-        <option value="http">Streamable HTTP (recomendado)</option>
-        <option value="sse">SSE (legado)</option>
+        <option value="http">{$t('modal.create.transport_http')}</option>
+        <option value="sse">{$t('modal.create.transport_sse')}</option>
       </select>
     </div>
     <div class="modal-error" id="modalError"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick={() => window.closeCreateModal()}>Cancelar</button>
-      <button class="btn-confirm" id="btnCreateConfirm" onclick={() => window.createServer()}>Criar Servidor</button>
+      <button class="btn-cancel" onclick={() => window.closeCreateModal()}>{$t('common.cancel')}</button>
+      <button class="btn-confirm" id="btnCreateConfirm" onclick={() => window.createServer()}>{$t('modal.create.btn')}</button>
     </div>
   </div>
 </div>
@@ -2453,28 +2456,28 @@
 <div class="modal-overlay" id="logDetailModal">
   <div class="modal-box log-detail-box">
     <div class="modal-header">
-      <h3>Detalhe do Log</h3>
-      <p class="modal-sub">Requisição e resposta completas</p>
+      <h3>{$t('dashboard.log_detail_title')}</h3>
+      <p class="modal-sub">{$t('dashboard.log_detail_sub')}</p>
     </div>
     <div class="log-detail-meta">
-      <span class="log-detail-meta-item"><span class="label">Tool</span> <span id="detailTool">—</span></span>
-      <span class="log-detail-meta-item"><span class="label">Method</span> <span id="detailMethod">—</span></span>
-      <span class="log-detail-meta-item"><span class="label">Status</span> <span id="detailStatus" class="status-badge">—</span></span>
-      <span class="log-detail-meta-item"><span class="label">Duração</span> <span id="detailDuration">—</span></span>
-      <span class="log-detail-meta-item"><span class="label">Data</span> <span id="detailTime">—</span></span>
+      <span class="log-detail-meta-item"><span class="label">{$t('dashboard.log_meta_tool')}</span> <span id="detailTool">—</span></span>
+      <span class="log-detail-meta-item"><span class="label">{$t('dashboard.log_meta_method')}</span> <span id="detailMethod">—</span></span>
+      <span class="log-detail-meta-item"><span class="label">{$t('dashboard.log_meta_status')}</span> <span id="detailStatus" class="status-badge">—</span></span>
+      <span class="log-detail-meta-item"><span class="label">{$t('dashboard.log_meta_duration')}</span> <span id="detailDuration">—</span></span>
+      <span class="log-detail-meta-item"><span class="label">{$t('dashboard.log_meta_date')}</span> <span id="detailTime">—</span></span>
     </div>
     <div class="log-detail-scroll">
       <div class="log-detail-section">
-        <h4>Request Body</h4>
-        <div class="log-detail-body" id="detailReqBody">(vazio)</div>
+        <h4>{$t('dashboard.request_body_label')}</h4>
+        <div class="log-detail-body" id="detailReqBody">{$t('dashboard.empty_body')}</div>
       </div>
       <div class="log-detail-section">
-        <h4>Response Body</h4>
-        <div class="log-detail-body" id="detailResBody">(vazio)</div>
+        <h4>{$t('dashboard.response_body_label')}</h4>
+        <div class="log-detail-body" id="detailResBody">{$t('dashboard.empty_body')}</div>
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick={() => window.closeLogDetail()}>Fechar</button>
+      <button class="btn-cancel" onclick={() => window.closeLogDetail()}>{$t('common.close')}</button>
     </div>
   </div>
 </div>
@@ -2496,24 +2499,24 @@
           </div>
         </div>
       </div>
-      <button class="profile-close-btn" onclick={() => window.closeProfileModal()} title="Fechar">
+      <button class="profile-close-btn" onclick={() => window.closeProfileModal()} title={$t('common.close')}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
     <div class="profile-stats-row">
       <div class="profile-stat">
-        <span class="profile-stat-label">Servidores</span>
+        <span class="profile-stat-label">{$t('profile.servers_label')}</span>
         <span class="profile-stat-value" id="profileServersCount">—</span>
       </div>
       <div class="profile-stat-divider"></div>
       <div class="profile-stat">
-        <span class="profile-stat-label">RPM</span>
+        <span class="profile-stat-label">{$t('profile.rpm_label')}</span>
         <span class="profile-stat-value" id="profileRpm">—</span>
       </div>
       <div class="profile-stat-divider"></div>
       <div class="profile-stat">
-        <span class="profile-stat-label">Membro desde</span>
+        <span class="profile-stat-label">{$t('profile.member_since')}</span>
         <span class="profile-stat-value profile-stat-date" id="profileCreatedAt">—</span>
       </div>
     </div>
@@ -2521,26 +2524,26 @@
     <div class="profile-section">
       <div class="profile-section-title">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-        Token de Acesso (Bearer)
+        {$t('profile.token')}
       </div>
       <div class="profile-token-field">
         <input type="password" id="profileToken" class="profile-token-input" readonly />
         <button class="profile-token-btn" id="toggleTokenBtn" onclick={() => window.toggleTokenVisibility()} title="Mostrar/ocultar token">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
-        <button class="profile-token-btn profile-copy-btn" id="copyTokenBtn" onclick={() => window.copyToken()} title="Copiar token">Copiar</button>
+        <button class="profile-token-btn profile-copy-btn" id="copyTokenBtn" onclick={() => window.copyToken()} title={$t('profile.copy')}>{$t('profile.copy')}</button>
       </div>
-      <p class="profile-token-hint">Use este token no cabeçalho <code>Authorization: Bearer <token></code> para autenticar pedidos à API.</p>
+      <p class="profile-token-hint">{$t('profile.token_hint')}</p>
     </div>
 
     <div class="profile-section">
       <div class="profile-section-title">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M12 2v2M4.93 4.93l1.41 1.41M2 12h2M4.93 19.07l1.41-1.41M12 20v2M19.07 19.07l-1.41-1.41M20 12h2"/></svg>
-        Detalhes da Conta
+        {$t('profile.account_details')}
       </div>
       <div class="profile-details-grid">
         <div class="profile-detail-row">
-          <span class="profile-detail-label">User ID</span>
+          <span class="profile-detail-label">{$t('profile.user_id')}</span>
           <span class="profile-detail-value profile-detail-mono" id="profileUserId">—</span>
         </div>
         <div class="profile-detail-row">

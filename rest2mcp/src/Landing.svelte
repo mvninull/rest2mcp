@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import './Landing.css';
+  import { t } from './stores/lang.js';
 
   window.sendContactEmail = function() {
     const name = document.getElementById('contact-name')?.value || '';
@@ -365,14 +366,14 @@
       <div class="nav-inner">
         <div class="logo"><span class="logo-dot"></span>rest2mcp</div>
         <ul class="nav-links">
-          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('about')}>Sobre</button></li>
-          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('features')}>Recursos</button></li>
-          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('pricing')}>Preços</button></li>
-          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('faq')}>FAQ</button></li>
-          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('contacts')}>Contacto</button></li>
+          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('about')}>{$t('nav.about')}</button></li>
+          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('features')}>{$t('nav.features')}</button></li>
+          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('pricing')}>{$t('nav.pricing')}</button></li>
+          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('faq')}>{$t('nav.faq')}</button></li>
+          <li><button class="nav-link-btn" onclick={() => window.scrollToSection('contacts')}>{$t('nav.contact')}</button></li>
         </ul>
         <div class="nav-actions">
-          <button class="nav-btn" id="dashboardBtn">Entrar com Google</button>
+          <button class="nav-btn" id="dashboardBtn">{$t('nav.login')}</button>
         </div>
       </div>
     </nav>
@@ -382,24 +383,24 @@
       <div class="hero-bg"></div>
       <div class="hero-grid"></div>
       <div class="hero-inner">
-        <div class="hero-tag"><span></span>v1.0.0 · Matias Fernando</div>
-        <h1>Converte <em>qualquer</em><br />API REST em MCP</h1>
+        <div class="hero-tag"><span></span>{$t('hero.tag')}</div>
+        <h1>{$t('hero.title')}</h1>
 <p class="hero-sub">
-           Conecte as suas APIs REST ao Claude, GPT ou qualquer cliente MCP em segundos. 100% na nuvem, sem servidor local.
+           {$t('hero.sub')}
          </p>
         <div class="hero-ctas">
-<a href="#" role="button" class="btn-primary" id="createServerBtn">Criar Servidor Grátis</a>
+<a href="#" role="button" class="btn-primary" id="createServerBtn">{$t('hero.cta')}</a>
         </div>
         <div class="hero-badges">
           <div class="badge">
-            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1L3 9h6l-2 6 8-8H9l2-8z" fill="currentColor" stroke="none"/></svg></span> <b>Segundos</b> de configuração
+            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1L3 9h6l-2 6 8-8H9l2-8z" fill="currentColor" stroke="none"/></svg></span> <b>{$t('hero.badge.seconds')}</b>
           </div>
-          <div class="badge"><span class="svg-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0l1.2 4.8L12 6l-4.8 1.2L6 12 4.8 7.2 0 6l4.8-1.2z"/></svg></span> <b>Zero</b> código necessário</div>
+          <div class="badge"><span class="svg-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0l1.2 4.8L12 6l-4.8 1.2L6 12 4.8 7.2 0 6l4.8-1.2z"/></svg></span> <b>{$t('hero.badge.zero')}</b></div>
           <div class="badge">
-            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M13 8A5 5 0 112 5.5"/><path d="M2 2v4h4"/></svg></span> <b>Suporta</b> OpenAPI 3.0 + Swagger 2.0
+            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M13 8A5 5 0 112 5.5"/><path d="M2 2v4h4"/></svg></span> <b>{$t('hero.badge.openapi')}</b>
           </div>
           <div class="badge">
-            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 5l4 4 8-8"/></svg></span> <b>Auth</b> automática (login MCP)
+            <span class="svg-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 5l4 4 8-8"/></svg></span> <b>{$t('hero.badge.auth')}</b>
           </div>
         </div>
       </div>
@@ -407,62 +408,55 @@
 
     <!-- ABOUT -->
     <section class="section" id="about">
-      <div class="section-label">// 01 — Sobre o projeto</div>
-      <h2>Por que este<br />projeto existe?</h2>
+      <div class="section-label">{$t('about.label')}</div>
+      <h2>{$t('about.title')}</h2>
       <div class="about-layout">
         <div>
           <p style="color: var(--muted); margin-bottom: 1rem; font-weight: 300">
-            LLMs modernos como Claude e GPT têm capacidades incríveis, mas não conseguem interagir
-            diretamente com APIs REST. O Protocolo MCP (Model Context Protocol) resolve isso,
-            mas exige que cada API tenha um servidor MCP dedicado.
+            {$t('about.p1')}
           </p>
           <p style="color: var(--muted); margin-bottom: 1.5rem; font-weight: 300">
-            O <strong style="color: var(--ink)">rest2mcp</strong>
-            elimina essa barreira: fornece a URL da spec OpenAPI/Swagger, e o
-            servidor gera automaticamente as ferramentas MCP — sem escrever uma única linha de código.
+            <strong style="color: var(--ink)">rest2mcp</strong>
+            {$t('about.p2')}
           </p>
 
           <div class="callout problem">
             <strong><span style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#ff5c35" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg> Problema</span></strong>
-            Cada API REST precisa de um servidor MCP dedicado. Criar um à mão para cada endpoint é inviável.
+            {$t('about.problem')}
           </div>
           <div class="callout solution">
             <strong><span style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#00d4aa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8l4 4 8-8"/></svg> Solução</span></strong>
-            Conversão automática de specs OpenAPI/Swagger para ferramentas MCP — 100% na nuvem, sem instalação local.
+            {$t('about.solution')}
           </div>
 
         </div>
 
         <div class="how-it-works">
-          <h3>Como funciona?</h3>
-            O rest2mcp corre na nossa infraestrutura na nuvem. Fornece a URL da
-            spec OpenAPI/Swagger e o servidor gera automaticamente as ferramentas
-            MCP correspondentes — sem instalar nada localmente. O LLM pode
-            chamar endpoints, fazer login, e interagir com a API como se fosse
-            uma extensão nativa.
+          <h3>{$t('about.how')}</h3>
+            {$t('about.how_desc')}
         </div>
       </div>
     </section>
 
     <!-- ARCHITECTURE & SECURITY -->
     <section class="section" id="security">
-      <div class="section-label">// Segurança</div>
-      <h2>Sua privacidade é<br />nossa prioridade.</h2>
+      <div class="section-label">{$t('security.label')}</div>
+      <h2>{$t('security.title')}</h2>
       <div style="margin-bottom: 2rem;">
-        <span class="zk-badge"><span style="display:inline-flex;align-items:center;gap:5px;"><svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0l1.2 4.8L12 6l-4.8 1.2L6 12 4.8 7.2 0 6l4.8-1.2z"/></svg> Arquitetura Zero-Knowledge</span></span>
+        <span class="zk-badge"><span style="display:inline-flex;align-items:center;gap:5px;"><svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0l1.2 4.8L12 6l-4.8 1.2L6 12 4.8 7.2 0 6l4.8-1.2z"/></svg> {$t('security.badge')}</span></span>
       </div>
       <div class="sec-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
         <div class="callout solution" style="margin: 0;">
-          <strong>Stateless</strong>
-          Não possuímos banco de dados de credenciais. Os tokens vivem apenas na memória efêmera durante a sessão.
+          <strong>{$t('security.stateless')}</strong>
+          {$t('security.stateless_desc')}
         </div>
         <div class="callout solution" style="margin: 0;">
-          <strong>End-to-End</strong>
-          A conexão é feita diretamente entre o LLM e a sua infraestrutura através da nossa ponte.
+          <strong>{$t('security.e2e')}</strong>
+          {$t('security.e2e_desc')}
         </div>
         <div class="callout solution" style="margin: 0;">
-          <strong>Auditável</strong>
-          Logs transparentes para você monitorar exatamente o que a IA está acessando.
+          <strong>{$t('security.audit')}</strong>
+          {$t('security.audit_desc')}
         </div>
       </div>
     </section>
@@ -470,77 +464,52 @@
     <!-- FEATURES -->
     <div class="features-bg">
       <div class="features-section" id="features">
-        <div class="section-label">// 03 — Recursos</div>
-        <h2 style="color: white">Tudo o que precisas,<br />pronto a usar.</h2>
+        <div class="section-label">{$t('features.label')}</div>
+        <h2 style="color: white">{$t('features.title')}</h2>
         <p class="section-desc">
-          Oito recursos que tornam o rest2mcp a escolha mais rápida para
-          conectar LLMs às tuas APIs.
+          {$t('features.desc')}
         </p>
 
         <div class="features-grid">
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></div>
-            <h3>Qualquer API, Zero Código</h3>
-            <p>
-              Apenas configura a URL da spec OpenAPI. O servidor gera automaticamente
-              todas as ferramentas MCP — sem desenvolver nada.
-            </p>
+            <h3>{$t('feat.anyapi')}</h3>
+            <p>{$t('feat.anyapi_desc')}</p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
-            <h3>Auth Automática (Login MCP)</h3>
-            <p>
-              O servidor deteta endpoints de login na spec. O LLM faz autenticação uma vez,
-              e o token JWT é injetado automaticamente em todas as chamadas seguintes.
-            </p>
+            <h3>{$t('feat.auth')}</h3>
+            <p>{$t('feat.auth_desc')}</p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg></div>
-            <h3>Múltiplas APIs + Merge</h3>
-            <p>
-              Combina várias APIs num único servidor MCP com namespaces.
-              Suporta merge de servidores locais e remotos.
-            </p>
+            <h3>{$t('feat.merge')}</h3>
+            <p>{$t('feat.merge_desc')}</p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-            <h3>Compatibilidade Total</h3>
-            <p>
-              Totalmente compatível com especificações OpenAPI 3.0 e 3.1, bem como com
-              o formato clássico Swagger 2.0.
-            </p>
+            <h3>{$t('feat.compat')}</h3>
+            <p>{$t('feat.compat_desc')}</p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg></div>
-            <h3>Logs em Tempo Real</h3>
-            <p>
-              Monitoriza todas as chamadas das IAs às tuas ferramentas: método,
-              status, duração, request e response completos.
-            </p>
+            <h3>{$t('feat.logs')}</h3>
+            <p>{$t('feat.logs_desc')}</p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
-            <h3>Proxy SSE + HTTP</h3>
-            <p>
-              Suporta Server-Sent Events (SSE) e Streamable HTTP. Ligações
-              persistentes e contínuas com a tua API.
-            </p>
+            <h3>{$t('feat.proxy')}</h3>
+            <p>{$t('feat.proxy_desc')}</p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-            <h3>Autenticação Segura</h3>
-            <p>
-              Login seguro com Google, GitHub ou e-mail/senha. Gestão de sessão,
-              recuperação de senha e perfis de utilizador protegidos.
-            </p>
+            <h3>{$t('feat.secure')}</h3>
+            <p>{$t('feat.secure_desc')}</p>
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div>
-            <h3>Subscrições PayPal</h3>
-            <p>
-              Plano Pro com pagamentos recorrentes via PayPal. Gestão automática
-              de planos, limites e notificações webhook.
-            </p>
+            <h3>{$t('feat.paypal')}</h3>
+            <p>{$t('feat.paypal_desc')}</p>
           </div>
         </div>
       </div>
@@ -549,52 +518,50 @@
     <!-- PRICING -->
     <div class="features-bg">
       <div class="features-section" id="pricing">
-        <div class="section-label">// Planos</div>
-        <h2 style="color: white">Escolha o<br />melhor plano.</h2>
-        <p class="section-desc">
-          Do hobby ao enterprise — o rest2mcp adapta-se às suas necessidades.
-        </p>
+        <div class="section-label">{$t('pricing.label')}</div>
+        <h2 style="color: white">{$t('pricing.title')}</h2>
+        <p class="section-desc">{$t('pricing.desc')}</p>
         <div class="pricing-grid">
           <div class="feat-card pricing-card">
-            <div class="pricing-name">Hobby</div>
-            <div class="pricing-price">R$ 0</div>
-            <div class="pricing-desc">Para testes e experimentação</div>
+            <div class="pricing-name">{$t('pricing.hobby')}</div>
+            <div class="pricing-price">{$t('pricing.hobby_price')}</div>
+            <div class="pricing-desc">{$t('pricing.hobby_desc')}</div>
             <ul class="pricing-features">
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 1 Servidor Ativo</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 1 Servidor Merge</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs das últimas 24h</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 requisições/minuto</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Transporte SSE + HTTP</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.hobby.feat1')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.hobby.feat2')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.hobby.feat3')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.hobby.feat4')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.hobby.feat5')}</li>
             </ul>
-            <button class="btn-ghost" style="display: block; text-align: center; color: white; border-color: rgba(255,255,255,0.2); width: 100%; cursor: pointer;" onclick={() => window.handleFreePlan()}>Começar Grátis</button>
+            <button class="btn-ghost" style="display: block; text-align: center; color: white; border-color: rgba(255,255,255,0.2); width: 100%; cursor: pointer;" onclick={() => window.handleFreePlan()}>{$t('pricing.hobby.cta')}</button>
           </div>
           <div class="feat-card pricing-card popular">
-            <span class="pricing-popular-badge">POPULAR</span>
-            <div class="pricing-name">Pro</div>
-            <div class="pricing-price">$9.90<span style="font-size: 0.9rem;">/mês</span></div>
-            <div class="pricing-desc">Para uso profissional</div>
+            <span class="pricing-popular-badge">{$t('pricing.popular')}</span>
+            <div class="pricing-name">{$t('pricing.pro')}</div>
+            <div class="pricing-price">{$t('pricing.pro_price')}<span style="font-size: 0.9rem;">{$t('pricing.pro_month')}</span></div>
+            <div class="pricing-desc">{$t('pricing.pro_desc')}</div>
             <ul class="pricing-features">
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 Servidores Ativos</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 10 Servidores Merge</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs completos (sem expiração)</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> 100 requisições/minuto</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Prioridade alta (sem cold-start)</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Suporte a APIs privadas via Tunnel</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.pro.feat1')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.pro.feat2')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.pro.feat3')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.pro.feat4')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.pro.feat5')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.pro.feat6')}</li>
             </ul>
-            <button class="btn-primary" style="display: block; text-align: center; width: 100%; cursor: pointer;" onclick={() => window.handleProPlan()}>Assinar Pro</button>
+            <button class="btn-primary" style="display: block; text-align: center; width: 100%; cursor: pointer;" onclick={() => window.handleProPlan()}>{$t('pricing.pro.cta')}</button>
           </div>
           <div class="feat-card pricing-card">
-            <div class="pricing-name">Enterprise</div>
-            <div class="pricing-price" style="font-size: 1.8rem;">Sob Consulta</div>
-            <div class="pricing-desc">Para organizações</div>
+            <div class="pricing-name">{$t('pricing.enterprise')}</div>
+            <div class="pricing-price" style="font-size: 1.8rem;">{$t('pricing.enterprise_price')}</div>
+            <div class="pricing-desc">{$t('pricing.enterprise_desc')}</div>
             <ul class="pricing-features">
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Servidores Ilimitados</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Merge Ilimitado</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Logs completos + exportação</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Rate limits personalizados</li>
-              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> Suporte dedicado + SLA</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.enterprise.feat1')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.enterprise.feat2')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.enterprise.feat3')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.enterprise.feat4')}</li>
+              <li><span class="check-icon"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 7l4 4 7-7"/></svg></span> {$t('pricing.enterprise.feat5')}</li>
             </ul>
-            <button class="btn-ghost" style="display: block; width: 100%; text-align: center; color: white; border-color: rgba(255,255,255,0.2); cursor: pointer;" onclick={() => window.location.href='mailto:m4codexp@gmail.com?subject=Consultar%20Vendas%20-%20rest2mcp&body=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20os%20planos%20e%20funcionalidades%20do%20rest2mcp.'}>Consultar Vendas</button>
+            <button class="btn-ghost" style="display: block; width: 100%; text-align: center; color: white; border-color: rgba(255,255,255,0.2); cursor: pointer;" onclick={() => window.location.href='mailto:m4codexp@gmail.com?subject=Consultar%20Vendas%20-%20rest2mcp&body=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20os%20planos%20e%20funcionalidades%20do%20rest2mcp.'}>{$t('pricing.enterprise.cta')}</button>
           </div>
         </div>
       </div>
@@ -602,17 +569,15 @@
 
     <!-- DASHBOARD PREVIEW -->
     <section class="section" id="dashboard-preview">
-      <div class="section-label">// Dashboard</div>
-      <h2>Gerencie seus<br />servidores em tempo real.</h2>
-      <p class="section-desc">
-        Interface simples e direta para criar, monitorar e gerenciar as suas pontes MCP.
-      </p>
+      <div class="section-label">{$t('dashboard.label')}</div>
+      <h2>{$t('dashboard.title')}</h2>
+      <p class="section-desc">{$t('dashboard.desc')}</p>
       <div style="background: var(--ink); border-radius: 16px; padding: 2rem; border: 1px solid rgba(255,255,255,0.08);">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-          <div style="font-family: var(--display); font-size: 1.1rem; font-weight: 700; color: white;">Meus Servidores</div>
+          <div style="font-family: var(--display); font-size: 1.1rem; font-weight: 700; color: white;">{$t('dashboard.my_servers')}</div>
           <div style="display: flex; gap: 8px;">
-            <span style="font-family: var(--mono); font-size: 0.65rem; color: var(--accent2); background: rgba(0,212,170,0.1); padding: 4px 10px; border-radius: 100px;">2 online</span>
-            <span style="font-family: var(--mono); font-size: 0.65rem; color: var(--muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 100px;">1 offline</span>
+            <span style="font-family: var(--mono); font-size: 0.65rem; color: var(--accent2); background: rgba(0,212,170,0.1); padding: 4px 10px; border-radius: 100px;">2 {$t('dashboard.online')}</span>
+            <span style="font-family: var(--mono); font-size: 0.65rem; color: var(--muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 100px;">1 {$t('dashboard.offline')}</span>
           </div>
         </div>
         <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.5rem;">
@@ -664,67 +629,37 @@
 
     <!-- FAQ -->
     <section class="section" id="faq">
-      <div class="section-label">// FAQ</div>
-      <h2>Perguntas<br />frequentes.</h2>
-      <p class="section-desc">
-        Dúvidas comuns de desenvolvedores sobre o rest2mcp.
-      </p>
+      <div class="section-label">{$t('faq.label')}</div>
+      <h2>{$t('faq.title')}</h2>
+      <p class="section-desc">{$t('faq.desc')}</p>
       <div class="faq-grid">
         <div class="qs-step">
-          <div class="qs-step-head">
-            <h3>Quais especificações são aceitas?</h3>
-          </div>
-          <div class="qs-step-body">
-            <p>Aceitamos especificações OpenAPI 3.0 e 3.1 nativamente, e também oferecemos total compatibilidade com Swagger 2.0.</p>
-          </div>
+          <div class="qs-step-head"><h3>{$t('faq.q1')}</h3></div>
+          <div class="qs-step-body"><p>{$t('faq.a1')}</p></div>
         </div>
         <div class="qs-step">
-          <div class="qs-step-head">
-            <h3>Preciso instalar alguma coisa?</h3>
-          </div>
-          <div class="qs-step-body">
-            <p>Não. O rest2mcp corre 100% na nuvem. Apenas precisa de um cliente MCP (VS Code, Claude Desktop, Cursor, etc.).</p>
-          </div>
+          <div class="qs-step-head"><h3>{$t('faq.q2')}</h3></div>
+          <div class="qs-step-body"><p>{$t('faq.a2')}</p></div>
         </div>
         <div class="qs-step">
-          <div class="qs-step-head">
-            <h3>Como funciona a autenticação?</h3>
-          </div>
-          <div class="qs-step-body">
-            <p>O servidor deteta automaticamente endpoints de login na spec. O LLM pode fazer login via ferramenta MCP e o token é gerido automaticamente. Também suportamos OAuth (Google, GitHub).</p>
-          </div>
+          <div class="qs-step-head"><h3>{$t('faq.q3')}</h3></div>
+          <div class="qs-step-body"><p>{$t('faq.a3')}</p></div>
         </div>
         <div class="qs-step">
-          <div class="qs-step-head">
-            <h3>Posso combinar várias APIs?</h3>
-          </div>
-          <div class="qs-step-body">
-            <p>Sim. Pode combinar várias APIs num único servidor MCP. Cada API mantém o seu contexto separado.</p>
-          </div>
+          <div class="qs-step-head"><h3>{$t('faq.q4')}</h3></div>
+          <div class="qs-step-body"><p>{$t('faq.a4')}</p></div>
         </div>
         <div class="qs-step">
-          <div class="qs-step-head">
-            <h3>O que é o recurso de Merge Server?</h3>
-          </div>
-          <div class="qs-step-body">
-            <p>O Merge Server permite unificar múltiplos servidores MCP (sejam locais ou remotos na nuvem) sob um único ponto de acesso. A IA interage com todas as ferramentas de forma integrada.</p>
-          </div>
+          <div class="qs-step-head"><h3>{$t('faq.q5')}</h3></div>
+          <div class="qs-step-body"><p>{$t('faq.a5')}</p></div>
         </div>
         <div class="qs-step">
-          <div class="qs-step-head">
-            <h3>O que são logs em tempo real?</h3>
-          </div>
-          <div class="qs-step-body">
-            <p>Cada chamada das IAs às ferramentas é registada: método, status, duração, request e response. Pode filtrar, exportar (JSON/CSV) e inspecionar detalhes.</p>
-          </div>
+          <div class="qs-step-head"><h3>{$t('faq.q6')}</h3></div>
+          <div class="qs-step-body"><p>{$t('faq.a6')}</p></div>
         </div>
         <div class="qs-step">
-          <div class="qs-step-head">
-            <h3>Como funciona o plano Pro?</h3>
-          </div>
-          <div class="qs-step-body">
-            <p>O plano Pro custa $9.90/mês e dá acesso a 10 servidores, logs completos, 100 req/min, prioridade alta e suporte a APIs privadas via tunnel. Pagamento via PayPal com subscrição mensal.</p>
-          </div>
+          <div class="qs-step-head"><h3>{$t('faq.q7')}</h3></div>
+          <div class="qs-step-body"><p>{$t('faq.a7')}</p></div>
         </div>
       </div>
     </section>

@@ -1,5 +1,7 @@
+import importlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -13,6 +15,58 @@ try:
     from .utils import logger
 except ImportError:
     from utils import logger
+
+
+def _resolve_route_map_types():
+    """Localiza RouteMap + o tipo EXCLUDE, em qualquer versão do fastmcp.
+
+    A localização e os nomes mudaram entre versões:
+      - Atual:         fastmcp.server.providers.openapi.{RouteMap, MCPType}
+      - Intermediária: fastmcp.server.openapi.{RouteMap, MCPType}
+      - Experimental:  fastmcp.experimental.server.openapi.{RouteMap, MCPType}
+      - Pré-2.5.0:     fastmcp.{RouteMap, RouteType}  (campo é route_type, não mcp_type)
+
+    Devolve (RouteMapCls, EnumCls, nome_do_campo_no_RouteMap) ou
+    (None, None, None) se nenhuma variante for encontrada — nesse caso a
+    exclusão de rotas é simplesmente desativada (degrada com segurança,
+    em vez de quebrar a criação do servidor).
+    """
+    candidates = [
+        ("fastmcp.server.providers.openapi", "MCPType", "mcp_type"),
+        ("fastmcp.server.openapi", "MCPType", "mcp_type"),
+        ("fastmcp.experimental.server.openapi", "MCPType", "mcp_type"),
+        ("fastmcp", "MCPType", "mcp_type"),
+        ("fastmcp", "RouteType", "route_type"),
+    ]
+    for module_name, type_attr, field_name in candidates:
+        try:
+            mod = importlib.import_module(module_name)
+            route_map_cls = getattr(mod, "RouteMap")
+            enum_cls = getattr(mod, type_attr)
+            return route_map_cls, enum_cls, field_name
+        except (ImportError, AttributeError):
+            continue
+    logger.warning(
+        "Não foi possível localizar RouteMap/MCPType nesta versão do fastmcp "
+        "instalada — a exclusão de rotas de auth (route_maps) será desativada; "
+        "tools cruas de login podem aparecer duplicadas."
+    )
+    return None, None, None
+
+
+_RouteMapCls, _RouteMapEnum, _ROUTE_MAP_TYPE_FIELD = _resolve_route_map_types()
+
+
+# Candidatos de nome de campo para o login "genérico" (schema-based).
+# A ordem só importa quando o schema tem mais de um candidato ao mesmo tempo;
+# se só existir um campo no schema, é esse que entra, seja qual for a posição aqui.
+LOGIN_IDENTIFIER_KEYS = [
+    "email", "username", "user", "login", "identifier", "identity",
+    "phone", "phone_number", "mobile", "msisdn", "telefone", "celular", "tel",
+    "api_key", "apikey",
+]
+LOGIN_PASSWORD_KEYS = ["password", "senha", "pass", "pwd"]
+LOGIN_OTP_CODE_KEYS = ["code", "otp", "otp_code", "verification_code", "pin", "token"]
 
 
 class LoggedTransport(httpx.AsyncBaseTransport):
@@ -113,14 +167,41 @@ class MCPServerManager:
             transport=transport,
         )
 
+        # Detetamos os paths de auth (login/otp/oauth) ANTES de criar o
+        # FastMCP, para podermos excluí-los (route_maps) da conversão
+        # automática em tools "cruas" — já ficam cobertos pela tool `login`.
+        auth_paths = self._detect_auth_paths()
+        exclude_paths = [
+            p
+            for p in [
+                auth_paths["email_login_path"],
+                auth_paths["otp_request_path"],
+                auth_paths["otp_verify_path"],
+                *auth_paths["oauth_paths"].values(),
+            ]
+            if p
+        ]
+        route_maps = []
+        if _RouteMapCls is not None and exclude_paths:
+            exclude_value = getattr(_RouteMapEnum, "EXCLUDE")
+            for p in exclude_paths:
+                route_maps.append(
+                    _RouteMapCls(
+                        methods=["POST"],
+                        pattern=f"^{re.escape(p if p.startswith('/') else '/' + p)}$",
+                        **{_ROUTE_MAP_TYPE_FIELD: exclude_value},
+                    )
+                )
+
         self.mcp = FastMCP.from_openapi(
             openapi_spec=self.spec,
             name=self.name,
             client=self.client,
+            route_maps=route_maps,
         )
         self.mcp._manager = self
 
-        self._setup_dynamic_login()
+        self._setup_dynamic_login(auth_paths)
 
     def load_and_convert_spec(self, url: str) -> dict:
         logger.info(f"Baixando spec de: {url}")
@@ -165,9 +246,31 @@ class MCPServerManager:
                 return schema
         return None
 
-    def _setup_dynamic_login(self):
+    @staticmethod
+    def _match_schema_key(schema: dict | None, candidates: list[str]) -> str | None:
+        """Dado o schema do body de um endpoint, devolve o nome real do campo
+        (preservando o casing original) que corresponde a um dos candidatos.
+        Ex: schema tem 'Phone_Number' e a lista inclui 'phone_number' -> devolve 'Phone_Number'.
+        """
+        if not schema:
+            return None
+        props = schema.get("properties", {})
+        by_lower = {k.lower(): k for k in props}
+        for cand in candidates:
+            if cand in by_lower:
+                return by_lower[cand]
+        return None
+
+    def _detect_auth_paths(self) -> dict:
+        """Varre a spec e identifica quais paths (POST) são de login, OTP
+        (pedir/verificar código) e OAuth. Chamado ANTES de criar o FastMCP,
+        para que esses paths possam ser excluídos da conversão automática
+        em tools "cruas" — já ficam cobertos pela tool `login` customizada.
+        """
         email_login_path = None
         fallback_auth_path = None
+        otp_request_path = None
+        otp_verify_path = None
         oauth_paths: dict[str, str] = {}
         spec_paths = self.spec.get("paths", {})
         for path, methods in spec_paths.items():
@@ -176,7 +279,20 @@ class MCPServerManager:
             lower = path.lower()
             if "register" in lower or "signup" in lower:
                 continue
-            if "login" in lower:
+
+            looks_otp = any(k in lower for k in ("otp", "one-time", "2fa", "mfa"))
+            looks_verify = "verify" in lower or "confirm" in lower
+            looks_send = "send" in lower or "resend" in lower or "request" in lower
+
+            if looks_otp or ("code" in lower and (looks_verify or looks_send)):
+                if looks_verify and otp_verify_path is None:
+                    otp_verify_path = path
+                    continue
+                if looks_send and otp_request_path is None:
+                    otp_request_path = path
+                    continue
+
+            if "login" in lower or "signin" in lower or "sign-in" in lower:
                 if email_login_path is None:
                     email_login_path = path
             elif any(k in lower for k in ["token", "auth/"]):
@@ -192,23 +308,42 @@ class MCPServerManager:
                 if provider in lower:
                     oauth_paths[provider] = path
 
+        return {
+            "email_login_path": email_login_path,
+            "otp_request_path": otp_request_path,
+            "otp_verify_path": otp_verify_path,
+            "oauth_paths": oauth_paths,
+        }
+
+    def _setup_dynamic_login(self, auth_paths: dict):
         _base_url = self.base_url
-        _email_login_path = email_login_path
-        _oauth_paths = oauth_paths
-        _spec = self.spec
+        _email_login_path = auth_paths["email_login_path"]
+        _otp_request_path = auth_paths["otp_request_path"]
+        _otp_verify_path = auth_paths["otp_verify_path"]
+        _oauth_paths = auth_paths["oauth_paths"]
 
         @self.mcp.tool(name="login")
         async def smart_login(
-            username: str | None = None,
+            identifier: str | None = None,
             password: str | None = None,
+            code: str | None = None,
             provider: str | None = None,
             provider_token: str | None = None,
         ) -> str:
             """Faz login na API e configura o token automaticamente.
 
-            Suporta múltiplos fluxos:
-            - Email/senha: informe username e password
-            - OAuth (Google/GitHub/Apple): informe provider e provider_token
+            Suporta múltiplos fluxos, conforme o que a API pedir:
+            - Email/senha, telefone/senha, ou qualquer identificador+senha:
+              informe identifier (email, telefone, username... o que a API
+              exigir) e password. O nome real do campo é detetado a partir
+              do schema da API, não é fixo.
+            - Apenas um campo (ex: magic link, API key): informe só
+              identifier, sem password.
+            - Código OTP/SMS (fluxo em 2 passos): chame login(identifier=...)
+              primeiro, sem password nem code — isto dispara o envio do
+              código. Depois chame de novo login(identifier=..., code="123456")
+              com o código recebido para concluir.
+            - OAuth (Google/GitHub/Apple): informe provider e provider_token.
             """
             if provider and provider_token:
                 provider_lower = provider.lower()
@@ -257,11 +392,15 @@ class MCPServerManager:
                             if resp.status_code not in (400, 401, 422):
                                 return f"❌ Erro ({resp.status_code}): {resp.text}"
                     return "❌ Erro (401): Nenhum formato de payload funcionou."
-            elif username and password:
-                if not _email_login_path:
-                    return "⚠️ Nenhum endpoint de login encontrado na spec."
-                url_to_call = _email_login_path if _email_login_path.startswith("/") else f"/{_email_login_path}"
-                payload = {"username": username, "password": password}
+
+            if identifier and code:
+                if not _otp_verify_path:
+                    return "⚠️ Nenhum endpoint de verificação de código foi encontrado na spec."
+                url_to_call = _otp_verify_path if _otp_verify_path.startswith("/") else f"/{_otp_verify_path}"
+                schema = self._get_body_schema(url_to_call)
+                id_key = self._match_schema_key(schema, LOGIN_IDENTIFIER_KEYS) or "identifier"
+                code_key = self._match_schema_key(schema, LOGIN_OTP_CODE_KEYS) or "code"
+                payload = {id_key: identifier, code_key: code}
                 async with httpx.AsyncClient(base_url=_base_url) as auth_client:
                     resp = await auth_client.post(url_to_call, json=payload)
                     if resp.status_code == 422:
@@ -272,10 +411,49 @@ class MCPServerManager:
                         if token:
                             self.token = token
                             return "✅ Login realizado com sucesso!"
+                        return "⚠️ Código aceite, mas token não encontrado na resposta."
+                    return f"❌ Erro ({resp.status_code}): {resp.text}"
+
+            if identifier and not password and _otp_request_path:
+                url_to_call = _otp_request_path if _otp_request_path.startswith("/") else f"/{_otp_request_path}"
+                schema = self._get_body_schema(url_to_call)
+                id_key = self._match_schema_key(schema, LOGIN_IDENTIFIER_KEYS) or "identifier"
+                async with httpx.AsyncClient(base_url=_base_url) as auth_client:
+                    resp = await auth_client.post(url_to_call, json={id_key: identifier})
+                    if resp.status_code == 422:
+                        resp = await auth_client.post(url_to_call, data={id_key: identifier})
+                    if resp.status_code in (200, 201):
+                        return "📩 Código enviado! Chame login novamente com identifier + code para concluir."
+                    return f"❌ Erro ao enviar código ({resp.status_code}): {resp.text}"
+
+            if identifier:
+                if not _email_login_path:
+                    return "⚠️ Nenhum endpoint de login encontrado na spec."
+                url_to_call = _email_login_path if _email_login_path.startswith("/") else f"/{_email_login_path}"
+                schema = self._get_body_schema(url_to_call)
+                id_key = self._match_schema_key(schema, LOGIN_IDENTIFIER_KEYS) or "username"
+                pass_key = self._match_schema_key(schema, LOGIN_PASSWORD_KEYS)
+
+                payload = {id_key: identifier}
+                if password:
+                    payload[pass_key or "password"] = password
+
+                async with httpx.AsyncClient(base_url=_base_url) as auth_client:
+                    resp = await auth_client.post(url_to_call, json=payload)
+                    if resp.status_code == 422:
+                        resp = await auth_client.post(url_to_call, data=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        token = data.get("access_token") or data.get("token") or data.get("jwt")
+                        if token:
+                            self.token = token
+                            return "✅ Login realizado com sucesso!"
+                        if _otp_verify_path:
+                            return "📩 Sem token na resposta — pode ser um fluxo OTP. Chame login novamente com identifier + code."
                         return "⚠️ Login OK, mas token não encontrado."
                     return f"❌ Erro ({resp.status_code}): {resp.text}"
-            else:
-                return "⚠️ Informe username+password (email/senha) ou provider+provider_token (OAuth)."
+
+            return "⚠️ Informe identifier (+ password, se a API pedir) ou provider+provider_token (OAuth)."
 
         @self.mcp.tool()
         async def set_token(token: str) -> str:
