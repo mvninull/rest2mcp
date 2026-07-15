@@ -25,6 +25,11 @@ except ImportError:
         SUPABASE_URL,
     )
 
+try:
+    from .utils import logger
+except ImportError:
+    from utils import logger
+
 
 
 JWKS_CACHE = None
@@ -85,6 +90,7 @@ async def validate_jwt(token: str) -> dict | None:
 
 
 async def fetch_supabase_profile(user_id: str) -> dict:
+    logger.info(f"[DEBUG] fetch_supabase_profile user_id={user_id}")
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{SUPABASE_URL}/rest/v1/profiles",
@@ -94,9 +100,10 @@ async def fetch_supabase_profile(user_id: str) -> dict:
                 "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
             },
         )
-
+        logger.info(f"[DEBUG] Supabase status={resp.status_code} body={resp.text[:500]}")
         resp.raise_for_status()
         rows = resp.json()
+        logger.info(f"[DEBUG] rows count={len(rows)}")
         if rows:
             return rows[0]
     return {"status": "active", "plan_tier": "free", "paypal_subscription_id": None}
@@ -119,10 +126,10 @@ async def upsert_supabase_profile(user_id: str, data: dict):
 
 
 async def get_cached_profile(user_id: str) -> dict:
-    # Cache desativado para evitar stale data entre instâncias Fly.io
     try:
         return await fetch_supabase_profile(user_id)
-    except Exception:
+    except Exception as e:
+        logger.error(f"[DEBUG] get_cached_profile EXCEPTION: {type(e).__name__}: {e}")
         return {"status": "active", "plan_tier": "free", "paypal_subscription_id": None}
 
 
