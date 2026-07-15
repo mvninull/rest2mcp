@@ -291,7 +291,12 @@
       async function handleStripePro() {
         const token = localStorage.getItem("supabase_token");
         if (!token) return;
-        const API_BASE = (localStorage.getItem("api_base") || "http://localhost:8080").replace(/\/+$/, "");
+        const API_BASE = (
+          localStorage.getItem("api_base") ||
+          (location.hostname === "localhost" || location.hostname === "127.0.0.1"
+            ? "http://localhost:8080"
+            : "https://rest2mcp.fly.dev")
+        ).replace(/\/+$/, "");
         const STRIPE_PUBLISHABLE_KEY = "pk_test_51TbKmaQdlPUKQK2wfBNfhgwltyLsxwfV2smHoPIxyp15rqsEjNbUM0nV1rmyZ2DFQHGm7Ee0RHAy2gzerqGJ5MJA00VAAqjNDO";
         const STRIPE_PRO_PRICE_ID = "price_1TbKy7QdlPUKQK2wQmXUzWOM";
         try {

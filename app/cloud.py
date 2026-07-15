@@ -4021,6 +4021,9 @@ async def stripe_webhook(request: Request):
         elif action == "payment_succeeded":
             invoice = event.data.object
             sub_id = invoice.get("subscription")
+            if not sub_id:
+                parent = invoice.get("parent", {})
+                sub_id = parent.get("subscription_details", {}).get("subscription")
             if sub_id:
                 try:
                     sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
@@ -4042,6 +4045,9 @@ async def stripe_webhook(request: Request):
         elif action == "payment_failed":
             invoice = event.data.object
             sub_id = invoice.get("subscription")
+            if not sub_id:
+                parent = invoice.get("parent", {})
+                sub_id = parent.get("subscription_details", {}).get("subscription")
             if sub_id:
                 try:
                     sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
