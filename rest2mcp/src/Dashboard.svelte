@@ -167,7 +167,7 @@
   }
 
   async function loginWith(provider) {
-    if (!supabaseClient) return window.showAppAlert("Supabase não configurado.");
+    if (!supabaseClient) return window.showAppAlert(__("notifications.supabase_not_configured"));
     showLoading("Redirecionando para " + provider + "...");
     const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
     if (error) {
@@ -177,7 +177,7 @@
   }
 
   async function logout() {
-    showLoading("Terminando sessão...");
+    showLoading(__("auth.ending_session"));
     try {
       if (supabaseClient) await supabaseClient.auth.signOut({ scope: 'global' });
     } catch (e) {
@@ -332,7 +332,7 @@
       console.error("Stripe error:", err);
       window.showAppAlert("Erro: " + (err.message || err));
     }
-    if (btn) { btn.disabled = false; btn.textContent = "Assinar Pro — $9.90/mês"; }
+    if (btn) { btn.disabled = false; btn.textContent = __("pricing.pro.cta"); }
   }
 
   // ─── API ───────────────────────────────────────────────
@@ -592,7 +592,7 @@
     if (sandboxFields) sandboxFields.style.display = mode === "sandbox" ? "" : "none";
     const mergeSub = document.getElementById("mergeSub");
     if (mergeSub) {
-      const labels = { local: "Fusão de servidores no rest2mcp com namespace automático", sandbox: "Instalação temporária de um servidor MCP via npx, pipx ou uv (ou JSON personalizado)" };
+      const labels = { local: __("merge.local_desc"), sandbox: __("merge.sandbox_desc") };
       mergeSub.textContent = labels[mode] || "";
     }
   }
@@ -891,7 +891,7 @@
       "hybrid": '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13 8A5 5 0 1 1 8 3"/><path d="M13 3v3h-3"/><path d="M3 8A5 5 0 1 0 8 3"/></svg>',
       "local-only": '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M6 14h4"/><path d="M8 12v2"/></svg>',
     };
-    const hostLabels = { "remote-capable": "Remoto", "hybrid": "Híbrido", "local-only": "Local" };
+    const hostLabels = { "remote-capable": __("store.remote"), "hybrid": __("store.hybrid"), "local-only": __("store.local") };
     bar.innerHTML = _storeFacets.hostingTypes.map(t =>
       `<button class="store-filter-btn${_storeFilterHosting === t ? " active" : ""}" onclick="setStoreFilterHosting('${_escHtml(t)}')">${hostIcons[t] || ""}<span>${hostLabels[t] || t}</span></button>`
     ).join("");
@@ -967,9 +967,9 @@
     const start = (_storePage - 1) * _storePerPage;
     const page = servers.slice(start, start + _storePerPage);
     const hostBadges = {
-      "remote-capable": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11 2h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h2"/><path d="M8 11v1"/><path d="M5 5.5 8 2l3 3.5"/></svg> Remoto',
-      "hybrid": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13 8A5 5 0 1 1 8 3"/><path d="M13 3v3h-3"/><path d="M3 8A5 5 0 1 0 8 3"/></svg> Híbrido',
-      "local-only": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M6 14h4"/><path d="M8 12v2"/></svg> Local',
+      "remote-capable": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11 2h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h2"/><path d="M8 11v1"/><path d="M5 5.5 8 2l3 3.5"/></svg> ' + __("store.remote"),
+      "hybrid": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13 8A5 5 0 1 1 8 3"/><path d="M13 3v3h-3"/><path d="M3 8A5 5 0 1 0 8 3"/></svg> ' + __("store.hybrid"),
+      "local-only": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M6 14h4"/><path d="M8 12v2"/></svg> ' + __("store.local"),
     };
     grid.innerHTML = page.map(s => {
       const name = s.name || s.slug || "MCP Server";
@@ -1066,10 +1066,10 @@
       }
       if (!data.exists && warning) {
         warning.style.display = "";
-        let msg = "Pacote '" + pkg + "' não encontrado no npm. Fallback ativado.";
+        let msg = __("store.package_not_found").replace("{pkg}", pkg);
         if (data.alternatives && data.alternatives.length) {
           const alt = data.alternatives[0];
-          msg += " A usar: " + alt.command + " " + (alt.args || []).join(" ");
+          msg += " " + __("store.using_alternative") + " " + alt.command + " " + (alt.args || []).join(" ");
         }
         warning.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3"/><circle cx="8" cy="11" r="0.5" fill="currentColor"/></svg> ' + _escHtml(msg);
       }
@@ -1085,7 +1085,7 @@
       return;
     }
     envContainer.style.display = "";
-    let html = '<div class="env-title">Variáveis de Ambiente / Headers</div>';
+    let html = '<div class="env-title">' + __("env.title") + '</div>';
     if (keys.length) {
       html += keys.map(k => {
         const p = props[k];
@@ -1103,7 +1103,7 @@
       html += '<div class="form-group env-field">';
       html += '<label for="env_Authorization">Authorization <span class="env-opt">(opcional)</span></label>';
       html += '<input type="text" id="env_Authorization" class="env-input" placeholder="Bearer seu-token-aqui" />';
-      html += '<p class="form-hint">Token de autenticação para servidores remotos</p>';
+      html += '<p class="form-hint">' + __("env.auth_desc") + '</p>';
       html += '</div>';
     }
     envContainer.innerHTML = html;
@@ -1118,10 +1118,10 @@
 
     if (mergeMode === "sandbox") {
       const jsonText = document.getElementById("mergeStdioJson")?.value?.trim();
-      if (!jsonText) { if (errorEl) showModalError(errorEl, "Informe a configuração JSON do servidor."); return; }
+      if (!jsonText) { if (errorEl) showModalError(errorEl, __("server.merge_config_required")); return; }
       let cfg;
       try { cfg = JSON.parse(jsonText); } catch {
-        if (errorEl) showModalError(errorEl, "JSON inválido. Verifique a sintaxe.");
+        if (errorEl) showModalError(errorEl, __("server.merge_error_json"));
         return;
       }
 
@@ -1151,7 +1151,7 @@
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
         try {
           const { missingReq, vars: envVars } = collectEnv();
-          if (missingReq) throw new Error("Preencha todos os campos obrigatórios de ambiente.");
+          if (missingReq) throw new Error(__("server.merge_error_env"));
           if (Object.keys(envVars).length) {
             const name = Object.keys(cfg.mcpServers)[0];
             cfg.mcpServers[name] = { ...cfg.mcpServers[name], env: { ...(cfg.mcpServers[name].env || {}), ...envVars } };
@@ -1177,7 +1177,7 @@
       if (cfg.url) {
         const { missingReq, vars: headersVars } = collectEnv();
         if (missingReq) {
-          if (errorEl) showModalError(errorEl, "Preencha todos os campos obrigatórios de ambiente.");
+          if (errorEl) showModalError(errorEl, __("server.merge_error_env"));
           return;
         }
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> A criar...'; }
@@ -1208,7 +1208,7 @@
       if (!cfg.command) { if (errorEl) showModalError(errorEl, "JSON precisa do campo 'command' ou 'mcpServers'."); return; }
       const { missingReq, vars: envVars } = collectEnv();
       if (missingReq) {
-        if (errorEl) showModalError(errorEl, "Preencha todos os campos obrigatórios de ambiente.");
+        if (errorEl) showModalError(errorEl, __("server.merge_error_env"));
         return;
       }
       if (Object.keys(envVars).length) {
@@ -1283,7 +1283,7 @@
     const btn = document.getElementById("btnEditConfirm");
     if (errorEl) showModalError(errorEl, "");
     if (!name) {
-      if (errorEl) showModalError(errorEl, "Nome não pode ficar vazio.");
+      if (errorEl) showModalError(errorEl, __("server.edit_name_required"));
       return;
     }
     if (btn) btn.disabled = true;
@@ -1314,7 +1314,7 @@
 
   // ─── Inspector ─────────────────────────────────────────
   async function openInspector(serverId) {
-    if (!serverId) { window.showAppAlert("ID do servidor não disponível"); return; }
+    if (!serverId) { window.showAppAlert(__("server.not_found")); return; }
     if (_inspecting) return;
     _inspecting = true;
     showLoading("A iniciar MCP Inspector...", false);
@@ -1390,7 +1390,7 @@
         }
       } else {
         if (inspectorWin && !inspectorWin.closed) inspectorWin.close();
-        window.showAppAlert("O backend não retornou um URL de inspector.");
+        window.showAppAlert(__("server.inspector_no_url"));
       }
     } catch (err) {
       if (inspectorWin && !inspectorWin.closed) inspectorWin.close();
@@ -1677,7 +1677,7 @@
     if (ppr) ppr.textContent = provider;
     if (pui) pui.textContent = userId;
     if (pca) pca.textContent = createdAt;
-    if (tokenInput) tokenInput.value = token || "(não autenticado)";
+    if (tokenInput) tokenInput.value = token || __("profile.not_authenticated");
 
     if (currentProfile) {
       if (psc) psc.textContent = `${currentProfile.servers_count ?? 0} / ${currentProfile.servers_limit ?? 1}`;
@@ -1697,7 +1697,7 @@
 
   function copyToken() {
     const val = document.getElementById("profileToken")?.value;
-    if (!val || val === "(não autenticado)") return;
+    if (!val || val === __("profile.not_authenticated")) return;
     navigator.clipboard.writeText(val).then(() => {
       const btn = document.getElementById("copyTokenBtn");
       if (!btn) return;
@@ -1756,7 +1756,7 @@
       return;
     }
     if (!supabaseClient) {
-      window.showAppAlert("Serviço indisponível de momento. Tente recarregar a página.");
+      window.showAppAlert(__("profile.service_unavailable"));
       return;
     }
     if (btn) { btn.disabled = true; btn.textContent = "A redefinir..."; }
@@ -1803,7 +1803,7 @@
       return;
     }
     if (!supabaseClient) {
-      window.showAppAlert("Serviço indisponível de momento. Tente recarregar a página.");
+      window.showAppAlert(__("profile.service_unavailable"));
       return;
     }
     if (btn) { btn.disabled = true; btn.textContent = "A guardar..."; }
@@ -2661,25 +2661,25 @@
       <div class="profile-section-title" style="cursor:pointer;" onclick={() => window.toggleChangePassword()}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         Palavra-passe
-        <button class="profile-token-btn" id="toggleChangePasswordBtn" style="margin-left:auto;font-size:0.72rem;padding:4px 10px;">Alterar Palavra-passe</button>
+        <button class="profile-token-btn" id="toggleChangePasswordBtn" style="margin-left:auto;font-size:0.72rem;padding:4px 10px;">{$t('profile.change_password')}</button>
       </div>
       <div id="changePasswordSection" style="display:none;margin-top:10px;">
         <div class="profile-token-field" style="margin-bottom:8px;">
-          <input type="password" id="newPasswordInput" class="profile-token-input" placeholder="Nova palavra-passe (mín. 6 caracteres)" style="width:100%;" />
+          <input type="password" id="newPasswordInput" class="profile-token-input" placeholder={$t('profile.new_password')} style="width:100%;" />
         </div>
         <div class="modal-error" id="changePasswordError" style="margin-bottom:8px;"></div>
         <div style="display:flex;gap:8px;">
-          <button class="btn-confirm" id="btnSavePassword" onclick={() => window.saveNewPassword()} style="flex:1;">Guardar</button>
-          <button class="btn-cancel" onclick={() => window.toggleChangePassword()}>Cancelar</button>
+          <button class="btn-confirm" id="btnSavePassword" onclick={() => window.saveNewPassword()} style="flex:1;">{$t('common.save')}</button>
+          <button class="btn-cancel" onclick={() => window.toggleChangePassword()}>{$t('common.cancel')}</button>
         </div>
       </div>
     </div>
 
     <div class="profile-modal-actions">
-      <button class="btn-cancel" onclick={() => window.closeProfileModal()}>Fechar</button>
+      <button class="btn-cancel" onclick={() => window.closeProfileModal()}>{$t('profile.close_btn')}</button>
       <button class="profile-logout-btn" onclick={() => window.logoutFromProfile()}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Terminar Sessão
+        {$t('profile.logout')}
       </button>
     </div>
   </div>
@@ -2689,12 +2689,12 @@
 <div class="modal-overlay" id="resetPasswordModal">
   <div class="modal-box" style="max-width:380px;">
     <div class="modal-header">
-      <h3>Redefinir Palavra-passe</h3>
-      <p class="modal-sub">Escolha uma nova palavra-passe para a sua conta</p>
+      <h3>{$t('profile.reset_password_title')}</h3>
+      <p class="modal-sub">{$t('profile.reset_password_sub')}</p>
     </div>
     <div class="form-group">
-      <label for="resetPasswordInput">Nova Palavra-passe</label>
-      <input type="password" id="resetPasswordInput" placeholder="Mínimo 6 caracteres" />
+      <label for="resetPasswordInput">{$t('profile.new_password_field')}</label>
+      <input type="password" id="resetPasswordInput" placeholder={$t('profile.password_min_chars')} />
     </div>
     <div class="modal-error" id="resetPasswordError"></div>
     <div class="modal-actions">

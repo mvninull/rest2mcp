@@ -105,17 +105,17 @@
         const forgotLink = document.getElementById("forgotLink");
         const confirmInput = document.getElementById("loginPasswordConfirm");
         if (isRegisterMode) {
-          if (title) title.textContent = "Criar Conta";
-          if (sub) sub.textContent = "Registe-se para começar a usar";
-          if (btnText) btnText.textContent = "Registar";
-          if (toggleEl) toggleEl.innerHTML = 'Já tem conta? <a href="#" onclick="toggleAuthMode(); return false;">Entrar</a>';
+          if (title) title.textContent = __('login.register_title');
+          if (sub) sub.textContent = __('login.register_sub');
+          if (btnText) btnText.textContent = __('login.register_btn');
+          if (toggleEl) toggleEl.innerHTML = __('login.toggle_login') + ' <a href="#" onclick="toggleAuthMode(); return false;">' + __('login.submit') + '</a>';
           if (forgotLink) forgotLink.style.display = "none";
           if (confirmInput) confirmInput.style.display = "block";
         } else {
-          if (title) title.textContent = "Entrar na sua Conta";
-          if (sub) sub.textContent = "Selecione o seu provedor favorito para continuar";
-          if (btnText) btnText.textContent = "Entrar";
-          if (toggleEl) toggleEl.innerHTML = 'Não tem conta? <a href="#" onclick="toggleAuthMode(); return false;">Registar-se</a>';
+          if (title) title.textContent = __('login.title');
+          if (sub) sub.textContent = __('login.sub');
+          if (btnText) btnText.textContent = __('login.submit');
+          if (toggleEl) toggleEl.innerHTML = __('login.toggle_register') + ' <a href="#" onclick="toggleAuthMode(); return false;">' + __('login.register_btn') + '</a>';
           if (forgotLink) forgotLink.style.display = "";
           if (confirmInput) confirmInput.style.display = "none";
         }
@@ -256,11 +256,11 @@
           if (errorEl) errorEl.textContent = "Insira um email válido.";
           return;
         }
-        if (btn) { btn.disabled = true; btn.textContent = "A enviar..."; }
+        if (btn) { btn.disabled = true; btn.textContent = __('forgot.sending'); }
         const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin + '?page=dashboard&reset=password'
         });
-        if (btn) { btn.disabled = false; btn.textContent = "Enviar Email"; }
+        if (btn) { btn.disabled = false; btn.textContent = __('forgot.send'); }
         if (error) {
           if (errorEl) errorEl.textContent = error.message;
           window.showAppAlert("Erro ao enviar email: " + error.message);
@@ -676,27 +676,27 @@
 
     <!-- CONTACTS -->
     <section class="section" id="contacts">
-      <div class="section-label">// 04 — Contacto e Suporte</div>
-      <h2>Entre em contacto<br />connosco.</h2>
+      <div class="section-label">{$t('contact.label')}</div>
+      <h2>{@html $t('contact.title')}</h2>
       <p class="section-desc">
-        Tem alguma dúvida, feedback ou precisa de suporte personalizado? Envie-nos uma mensagem diretamente.
+        {$t('contact.desc')}
       </p>
 
       <div style="margin-top: 2.5rem; display: flex; flex-direction: column; gap: 2rem;">
         <div class="contact-form">
           <div class="contact-row">
-            <input type="text" id="contact-name" placeholder="O seu nome" class="contact-input" />
-            <input type="email" id="contact-email" placeholder="O seu e-mail" class="contact-input" />
+            <input type="text" id="contact-name" placeholder={$t('contact.name')} class="contact-input" />
+            <input type="email" id="contact-email" placeholder={$t('contact.email')} class="contact-input" />
           </div>
-          <input type="text" id="contact-subject" placeholder="Assunto da mensagem" class="contact-input" />
-          <textarea id="contact-message" placeholder="Escreva a sua mensagem aqui..." class="contact-textarea"></textarea>
+          <input type="text" id="contact-subject" placeholder={$t('contact.subject')} class="contact-input" />
+          <textarea id="contact-message" placeholder={$t('contact.message')} class="contact-textarea"></textarea>
           <button type="button" class="btn-primary" style="align-self: flex-start; padding: 12px 30px; cursor: pointer; border: none;" onclick={() => window.sendContactEmail()}>
-            Enviar Mensagem
+            {$t('contact.send')}
           </button>
         </div>
         
         <div style="font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 1.5rem;">
-          <p>Se preferir, pode enviar um e-mail diretamente para: <strong><a href="mailto:m4codexp@gmail.com" style="color: var(--accent); text-decoration: none;">m4codexp@gmail.com</a></strong></p>
+          <p>{$t('contact.or')} <strong><a href="mailto:m4codexp@gmail.com" style="color: var(--accent); text-decoration: none;">m4codexp@gmail.com</a></strong></p>
         </div>
       </div>
     </section>
@@ -705,10 +705,10 @@
 
     <!-- CONFIG -->
     <section class="section" id="config">
-      <div class="section-label">// 07 — Configuração</div>
-      <h2>Clientes MCP<br />suportados.</h2>
+      <div class="section-label">{$t('config.label')}</div>
+      <h2>{@html $t('config.title')}</h2>
       <p class="section-desc">
-        O rest2mcp funciona com qualquer cliente MCP. Basta apontar para a nossa ponte na nuvem.
+        {$t('config.desc')}
       </p>
       <div class="mcp-clients">
         <div class="mcp-client" title="Visual Studio Code — suporte MCP via GitHub Copilot">
@@ -753,7 +753,7 @@
         </div>
         <div class="mcp-client" title="Qualquer cliente compatível com MCP">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-          <span>E mais...</span>
+          <span>{$t('config.more')}</span>
         </div>
       </div>
     </section>
@@ -763,28 +763,28 @@
       <div class="footer-inner">
         <div class="footer-logo">rest2mcp</div>
         <p style="color: rgba(255, 255, 255, 0.35); font-size: 0.85rem">
-          Versão 1.0.0 · Autor: Matias Fernando
+          {$t('footer.desc')}
         </p>
         <ul class="footer-links">
           <li>
-            <a href="#" role="button" onclick={() => window.scrollToSection('about')}>Sobre o Projeto</a>
+            <a href="#" role="button" onclick={() => window.scrollToSection('about')}>{$t('footer.about')}</a>
           </li>
           <li>
-            <a href="#" role="button" onclick={() => window.scrollToSection('features')}>Recursos</a>
+            <a href="#" role="button" onclick={() => window.scrollToSection('features')}>{$t('nav.features')}</a>
           </li>
           <li>
-            <a href="#" role="button" onclick={() => window.scrollToSection('pricing')}>Preços</a>
+            <a href="#" role="button" onclick={() => window.scrollToSection('pricing')}>{$t('nav.pricing')}</a>
           </li>
           <li>
-            <a href="#" role="button" onclick={() => window.scrollToSection('faq')}>Perguntas Frequentes</a>
+            <a href="#" role="button" onclick={() => window.scrollToSection('faq')}>{$t('nav.faq')}</a>
           </li>
           <li>
-            <a href="#" role="button" onclick={() => window.scrollToSection('contacts')}>Contacto</a>
+            <a href="#" role="button" onclick={() => window.scrollToSection('contacts')}>{$t('nav.contact')}</a>
           </li>
-          <li><a href="mailto:m4codexp@gmail.com">Suporte</a></li>
+          <li><a href="mailto:m4codexp@gmail.com">{$t('footer.support')}</a></li>
         </ul>
         <p class="footer-copy">
-          © 2026 rest2mcp. Todos os direitos reservados. Nenhum dado é retido nos nossos servidores.
+          {$t('footer.rights')}
         </p>
       </div>
     </footer>
@@ -793,18 +793,18 @@
     <div class="modal-overlay" id="loginModal">
       <div class="modal-box">
         <div class="modal-header">
-          <h3>Entrar na sua Conta</h3>
-          <p class="modal-sub">Selecione o seu provedor favorito para continuar</p>
+          <h3>{$t('login.title')}</h3>
+          <p class="modal-sub">{$t('login.sub')}</p>
         </div>
         <div class="social-login-container">
           <button class="social-btn google-btn" onclick={() => window.loginWith('google')}>
             <svg viewBox="0 0 24 24" class="social-icon" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-            <span class="btn-text">Entrar com o Google</span>
+            <span class="btn-text">{$t('login.google')}</span>
             <span class="spinner" style="display:none;"><svg class="spinner-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span>
           </button>
           <button class="social-btn github-btn" onclick={() => window.loginWith('github')}>
             <svg viewBox="0 0 24 24" class="social-icon" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z"/></svg>
-            <span class="btn-text">Entrar com o GitHub</span>
+            <span class="btn-text">{$t('login.github')}</span>
             <span class="spinner" style="display:none;"><svg class="spinner-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span>
           </button>
           <!--
@@ -813,22 +813,22 @@
             Entrar com a Apple
           </button>
           -->
-          <div class="email-login-divider"><span>ou use o seu email</span></div>
+          <div class="email-login-divider"><span>{$t('login.email_divider')}</span></div>
           <form class="email-login-form" onsubmit={() => window.loginWithEmail(event)}>
-            <input type="email" id="loginEmail" placeholder="O seu email" required class="auth-input" />
-            <input type="password" id="loginPassword" placeholder="Palavra-passe" required class="auth-input" />
-            <input type="password" id="loginPasswordConfirm" placeholder="Confirmar palavra-passe" class="auth-input" style="display:none;" onpaste={(e) => e.preventDefault()} />
+            <input type="email" id="loginEmail" placeholder={$t('login.email_placeholder')} required class="auth-input" />
+            <input type="password" id="loginPassword" placeholder={$t('login.password_placeholder')} required class="auth-input" />
+            <input type="password" id="loginPasswordConfirm" placeholder={$t('login.confirm_placeholder')} class="auth-input" style="display:none;" onpaste={(e) => e.preventDefault()} />
             <div style="text-align: right; margin-top: -8px; margin-bottom: 8px;">
-              <a href="#" role="button" id="forgotLink" onclick={() => { window.openForgotPasswordModal(); return false; }} style="font-size: 0.8rem; color: var(--accent); text-decoration: none;">Esqueci a minha palavra-passe</a>
+              <a href="#" role="button" id="forgotLink" onclick={() => { window.openForgotPasswordModal(); return false; }} style="font-size: 0.8rem; color: var(--accent); text-decoration: none;">{$t('login.forgot')}</a>
             </div>
-            <button type="submit" class="btn-primary auth-submit"><span class="btn-text">Entrar</span><span class="spinner" style="display:none;"><svg class="spinner-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span></button>
+            <button type="submit" class="btn-primary auth-submit"><span class="btn-text">{$t('login.submit')}</span><span class="spinner" style="display:none;"><svg class="spinner-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span></button>
             <div style="text-align: center; margin-top: 12px; font-size: 0.85rem; color: var(--muted);">
-              <span id="authToggle">Não tem conta? <a href="#" onclick={() => { window.toggleAuthMode(); return false; }}>Registar-se</a></span>
+              <span id="authToggle">{$t('login.toggle_register')} <a href="#" onclick={() => { window.toggleAuthMode(); return false; }}">{$t('login.register_btn')}</a></span>
             </div>
           </form>
         </div>
         <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: center;">
-          <button class="btn-cancel" onclick={() => window.closeLoginModal()}>Cancelar</button>
+          <button class="btn-cancel" onclick={() => window.closeLoginModal()}>{$t('login.cancel')}</button>
         </div>
       </div>
     </div>
@@ -837,12 +837,12 @@
     <div class="modal-overlay" id="stripeModal">
       <div class="modal-box" style="text-align:center;">
         <div class="modal-header">
-          <h3>Assinar Pro — $9.90/mês</h3>
-          <p class="modal-sub">Será redirecionado para o checkout seguro da Stripe</p>
+          <h3>{$t('paypal.title')}</h3>
+          <p class="modal-sub">{$t('paypal.sub')}</p>
         </div>
         <div class="modal-actions" style="justify-content:center;margin-top:1.5rem;">
-          <button class="btn-confirm" onclick={() => window.handleStripePro()} style="padding:0.7rem 2rem;">Assinar com Cartão</button>
-          <button class="btn-cancel" onclick={() => document.getElementById('stripeModal').classList.remove('open')}>Cancelar</button>
+          <button class="btn-confirm" onclick={() => window.handleStripePro()} style="padding:0.7rem 2rem;">{$t('pricing.pro.cta')}</button>
+          <button class="btn-cancel" onclick={() => document.getElementById('stripeModal').classList.remove('open')}>{$t('common.cancel')}</button>
         </div>
       </div>
     </div>
@@ -851,17 +851,17 @@
     <div class="modal-overlay" id="forgotPasswordModal">
       <div class="modal-box" style="max-width:380px;">
         <div class="modal-header">
-          <h3>Redefinir Palavra-passe</h3>
-          <p class="modal-sub">Receberá um email com instruções para redefinir a sua palavra-passe</p>
+          <h3>{$t('forgot.title')}</h3>
+          <p class="modal-sub">{$t('forgot.sub')}</p>
         </div>
         <div class="form-group">
           <label for="forgotEmailInput">Email</label>
-          <input type="email" id="forgotEmailInput" placeholder="O seu email" class="auth-input" />
+          <input type="email" id="forgotEmailInput" placeholder={$t('forgot.email_placeholder')} class="auth-input" />
         </div>
         <div class="modal-error" id="forgotError"></div>
         <div class="modal-actions" style="flex-direction:column;gap:8px;">
-          <button class="btn-confirm" id="btnForgotSend" onclick={() => window.sendForgotPasswordEmail()} style="width:100%;">Enviar Email</button>
-          <button class="btn-cancel" onclick={() => window.closeForgotPasswordModal()} style="width:100%;">Cancelar</button>
+          <button class="btn-confirm" id="btnForgotSend" onclick={() => window.sendForgotPasswordEmail()} style="width:100%;">{$t('forgot.send')}</button>
+          <button class="btn-cancel" onclick={() => window.closeForgotPasswordModal()} style="width:100%;">{$t('forgot.cancel')}</button>
         </div>
       </div>
     </div>
