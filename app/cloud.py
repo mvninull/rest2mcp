@@ -41,6 +41,7 @@ try:
         parse_event_type as stripe_parse_event_type,
         parse_webhook_event as stripe_parse_webhook,
         retrieve_checkout_session as stripe_checkout_session_retrieve,
+        sget as stripe_sget,
     )
     from .supabase_auth import (
         get_cached_profile,
@@ -65,6 +66,7 @@ except ImportError:
         parse_event_type as stripe_parse_event_type,
         parse_webhook_event as stripe_parse_webhook,
         retrieve_checkout_session as stripe_checkout_session_retrieve,
+        sget as stripe_sget,
     )
     from supabase_auth import (
         get_cached_profile,
@@ -4003,16 +4005,16 @@ async def stripe_webhook(request: Request):
     try:
         if action == "session_completed":
             session = event.data.object
-            user_id = session.get("client_reference_id", "")
+            user_id = stripe_sget(session, "client_reference_id", "")
             if not user_id:
                 return JSONResponse(status_code=200, content={"status": "ignored", "reason": "no client_reference_id"})
-            if session.get("mode") == "subscription" and session.get("payment_status") == "paid":
+            if stripe_sget(session, "mode") == "subscription" and stripe_sget(session, "payment_status") == "paid":
                 await upsert_supabase_profile(
                     user_id,
                     {
                         "plan_tier": "pro",
                         "status": "active",
-                        "stripe_subscription_id": session.get("subscription", ""),
+                        "stripe_subscription_id": stripe_sget(session, "subscription", ""),
                     },
                 )
                 invalidate_profile_cache(user_id)
@@ -4020,14 +4022,17 @@ async def stripe_webhook(request: Request):
 
         elif action == "payment_succeeded":
             invoice = event.data.object
-            sub_id = invoice.get("subscription")
+            sub_id = stripe_sget(invoice, "subscription")
             if not sub_id:
-                parent = invoice.get("parent", {})
-                sub_id = parent.get("subscription_details", {}).get("subscription")
+                parent = stripe_sget(invoice, "parent")
+                sub_details = stripe_sget(parent, "subscription_details")
+                sub_id = stripe_sget(sub_details, "subscription")
             if sub_id:
                 try:
                     sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
-                    user_id = sub.metadata.get("user_id", "")
+                    user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
+                    if not user_id:
+                        logger.warning(f"Stripe: subscrição {sub_id} sem user_id em metadata")
                     if user_id:
                         await upsert_supabase_profile(
                             user_id,
@@ -4040,28 +4045,38 @@ async def stripe_webhook(request: Request):
                         invalidate_profile_cache(user_id)
                         await notify_session_termination(user_id)
                 except Exception as e:
-                    logger.error(f"Stripe: erro ao buscar subscrição {sub_id}: {e}")
+                    logger.exception(f"Stripe: erro ao buscar subscrição {sub_id}: {e}")
 
         elif action == "payment_failed":
             invoice = event.data.object
-            sub_id = invoice.get("subscription")
+            sub_id = stripe_sget(invoice, "subscription")
             if not sub_id:
-                parent = invoice.get("parent", {})
-                sub_id = parent.get("subscription_details", {}).get("subscription")
+                parent = stripe_sget(invoice, "parent")
+                sub_details = stripe_sget(parent, "subscription_details")
+                sub_id = stripe_sget(sub_details, "subscription")
             if sub_id:
                 try:
                     sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
-                    user_id = sub.metadata.get("user_id", "")
+                    user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
                     if user_id:
                         await upsert_supabase_profile(user_id, {"status": "suspended"})
                         invalidate_profile_cache(user_id)
                         await sync_user_servers(user_id)
                 except Exception as e:
-                    logger.error(f"Stripe: erro ao processar payment_failed: {e}")
+                    logger.exception(f"Stripe: erro ao processar payment_failed: {e}")
 
         elif action == "subscription_deleted":
             sub = event.data.object
-            user_id = sub.metadata.get("user_id", "")
+            user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
+            if not user_id:
+                # fallback: metadata pode não vir no evento subscription.deleted
+                sub_id = stripe_sget(sub, "id")
+                if sub_id:
+                    try:
+                        full_sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
+                        user_id = stripe_sget(stripe_sget(full_sub, "metadata"), "user_id", "")
+                    except Exception as e:
+                        logger.exception(f"Stripe: erro ao buscar subscrição deletada {sub_id}: {e}")
             if user_id:
                 await upsert_supabase_profile(
                     user_id,
@@ -4075,7 +4090,7 @@ async def stripe_webhook(request: Request):
                 await notify_session_termination(user_id)
 
     except Exception as e:
-        logger.error(f"Erro ao processar webhook Stripe: {e}")
+        logger.exception(f"Erro ao processar webhook Stripe: {e}")
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 

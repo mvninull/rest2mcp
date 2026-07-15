@@ -54,3 +54,21 @@ EVENT_MAP = {
 
 def parse_event_type(event_type: str) -> str | None:
     return EVENT_MAP.get(event_type)
+
+
+def sget(obj, key, default=None):
+    """
+    Acesso seguro a uma chave, funciona tanto em dicts normais como em
+    objetos stripe.StripeObject (que, nesta versão da lib, NÃO implementa
+    .get() -- chamar obj.get(...) rebenta com AttributeError/KeyError('get')
+    porque __getattr__ tenta tratar "get" como uma chave do próprio objeto).
+    Usa sempre esta função em vez de obj.get(...) para qualquer objeto
+    vindo de event.data.object ou de stripe.Subscription.retrieve(...).
+    """
+    if obj is None:
+        return default
+    try:
+        value = obj[key]
+        return default if value is None else value
+    except (KeyError, TypeError, IndexError):
+        return default

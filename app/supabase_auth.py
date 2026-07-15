@@ -103,11 +103,11 @@ async def fetch_supabase_profile(user_id: str) -> dict:
 
 async def upsert_supabase_profile(user_id: str, data: dict):
     async with httpx.AsyncClient() as client:
-        resp = await client.put(
+        resp = await client.patch(
             f"{SUPABASE_URL}/rest/v1/profiles",
             params={"id": f"eq.{user_id}"},
             headers={
-                "apikey": SUPABASE_ANON_KEY,
+                "apikey": SUPABASE_SERVICE_KEY,
                 "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
                 "Content-Type": "application/json",
                 "Prefer": "return=minimal",
