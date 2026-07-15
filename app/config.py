@@ -4,7 +4,10 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(Path(__file__).resolve().parent / ".env")
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.exists():
+        env_path = Path(__file__).resolve().parent.parent / ".env"
+    load_dotenv(env_path)
 except ImportError:
     pass
 
@@ -18,6 +21,10 @@ PAYPAL_WEBHOOK_ID = os.getenv("PAYPAL_WEBHOOK_ID", "")
 PAYPAL_PRO_PLAN_ID = os.getenv("PAYPAL_PRO_PLAN_ID", "")
 PAYPAL_API_URL = os.getenv("PAYPAL_API_URL", "https://api-m.sandbox.paypal.com")
 PAYPAL_SANDBOX = os.getenv("PAYPAL_SANDBOX", "true").lower() == "true"
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "price_1TbKy7QdlPUKQK2wQmXUzWOM")
 
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8080"))

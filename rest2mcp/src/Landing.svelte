@@ -24,8 +24,7 @@
       window.openLoginModal = openLoginModal;
       window.closeLoginModal = closeLoginModal;
       window.loginWithEmail = loginWithEmail;
-      window.showPayPalModal = showPayPalModal;
-      window.closePayPalModal = closePayPalModal;
+      window.handleStripePro = handleStripePro;
       window.handleFreePlan = handleFreePlan;
       window.handleProPlan = handleProPlan;
       window.toggleAuthMode = toggleAuthMode;
@@ -167,7 +166,7 @@
             closeLoginModal();
             if (localStorage.getItem("pending_pro")) {
               localStorage.removeItem("pending_pro");
-              setTimeout(showPayPalModal, 300);
+              setTimeout(handleStripePro, 300);
             } else {
               window.history.pushState({}, '', '?page=dashboard'); window.dispatchEvent(new PopStateEvent('popstate'));
             }
@@ -209,7 +208,7 @@
               localStorage.removeItem("pending_pro");
               restoreSession();
               closeLoginModal();
-              setTimeout(showPayPalModal, 300);
+              setTimeout(handleStripePro, 300);
             } else {
               restoreSession();
             }
@@ -286,41 +285,41 @@
         document.getElementById("loginModal").classList.remove("open");
       }
 
-      let paypalRendered = false;
-      async function showPayPalModal() {
-        document.getElementById("paypalModal").classList.add("open");
-        const ppc = document.getElementById("paypal-button-container-landing");
-        if (!ppc) return;
-        ppc.style.display = "block";
-        if (typeof paypal === "undefined" || paypalRendered) return;
-        paypalRendered = true;
+      async function handleStripePro() {
+        const token = localStorage.getItem("supabase_token");
+        if (!token) return;
         const API_BASE = (localStorage.getItem("api_base") || "http://localhost:8080").replace(/\/+$/, "");
-        const token = localStorage.getItem("supabase_token") || "";
-        paypal.Buttons({
-          createSubscription: async function () {
-            const resp = await fetch(`${API_BASE}/v1/paypal/subscription`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-            });
-            if (!resp.ok) throw new Error("Falha ao criar subscrição");
-            const sub = await resp.json();
-            return sub.id;
-          },
-          onApprove: function(data) {
-            window.showAppAlert("Subscrição ativada!");
-            document.getElementById("paypalModal").classList.remove("open");
-          },
-          onError: function(err) {
-            console.error("PayPal error:", err);
-            window.showAppAlert("Erro ao processar pagamento.");
+        const STRIPE_PUBLISHABLE_KEY = "pk_test_51TbKmaQdlPUKQK2wfBNfhgwltyLsxwfV2smHoPIxyp15rqsEjNbUM0nV1rmyZ2DFQHGm7Ee0RHAy2gzerqGJ5MJA00VAAqjNDO";
+        const STRIPE_PRO_PRICE_ID = "price_1TbKy7QdlPUKQK2wQmXUzWOM";
+        try {
+          const payload = {
+            price_id: STRIPE_PRO_PRICE_ID,
+            user_id: token,
+            success_url: window.location.origin + "/?page=dashboard",
+            cancel_url: window.location.origin,
+          };
+          const resp = await fetch(`${API_BASE}/v1/checkout-session`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.detail || `Erro ${resp.status} do servidor`);
           }
-        }).render("#paypal-button-container-landing");
-      }
-      function closePayPalModal() {
-        document.getElementById("paypalModal").classList.remove("open");
+          const data = await resp.json();
+          if (data.url) { window.location.href = data.url; return; }
+          if (data.sessionId || data.session_id) {
+            const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+            const { error } = await stripe.redirectToCheckout({ sessionId: data.sessionId || data.session_id });
+            if (error) throw new Error(error.message);
+            return;
+          }
+          throw new Error("Resposta inesperada do servidor");
+        } catch (err) {
+          console.error("Stripe error:", err);
+          window.showAppAlert("Erro: " + (err.message || err));
+        }
       }
 
       function handleFreePlan() {
@@ -332,7 +331,7 @@
       }
       function handleProPlan() {
         if (localStorage.getItem("supabase_token")) {
-          showPayPalModal();
+          handleStripePro();
         } else {
           localStorage.setItem("pending_pro", "true");
           openLoginModal();
@@ -510,8 +509,8 @@
           </div>
           <div class="feat-card">
             <div class="feat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.6" stroke-linecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div>
-            <h3>{$t('feat.paypal')}</h3>
-            <p>{$t('feat.paypal_desc')}</p>
+            <h3>{$t('feat.stripe')}</h3>
+            <p>{$t('feat.stripe_desc')}</p>
           </div>
         </div>
       </div>
@@ -825,18 +824,16 @@
       </div>
     </div>
 
-    <!-- PAYPAL SUBSCRIPTION MODAL -->
-    <div class="modal-overlay" id="paypalModal">
-      <div class="modal-box">
+    <!-- STRIPE CHECKOUT MODAL -->
+    <div class="modal-overlay" id="stripeModal">
+      <div class="modal-box" style="text-align:center;">
         <div class="modal-header">
-          <h3>Assinar Pro</h3>
-          <p class="modal-sub">Finalize a sua subscrição mensal</p>
+          <h3>Assinar Pro — $9.90/mês</h3>
+          <p class="modal-sub">Será redirecionado para o checkout seguro da Stripe</p>
         </div>
-        <div class="social-login-container">
-          <div id="paypal-button-container-landing" style="display:block; min-height:200px;"></div>
-        </div>
-        <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: center;">
-          <button class="btn-cancel" onclick={() => window.closePayPalModal()}>Cancelar</button>
+        <div class="modal-actions" style="justify-content:center;margin-top:1.5rem;">
+          <button class="btn-confirm" onclick="window.handleStripePro()" style="padding:0.7rem 2rem;">Assinar com Cartão</button>
+          <button class="btn-cancel" onclick="document.getElementById('stripeModal').classList.remove('open')">Cancelar</button>
         </div>
       </div>
     </div>

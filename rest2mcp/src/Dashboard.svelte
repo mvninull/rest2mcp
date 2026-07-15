@@ -32,7 +32,6 @@
   let supabaseClient = null;
   let currentUser = null;
   let currentProfile = null;
-  let paypalRendered = false;
   let showToolsModal = false;
   let toolsList = [];
   let toolsLoading = false;
@@ -204,8 +203,26 @@
       }
       currentUser = data.user;
       await fetchProfile();
+      try { await verifyPendingCheckout(); } catch {}
     } catch {
       logout();
+    }
+  }
+
+  async function verifyPendingCheckout() {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    if (!sessionId || !currentUser) return;
+    try {
+      await apiFetch("/v1/checkout-session/verify", {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId, user_id: currentUser.id }),
+      });
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+      await fetchProfile();
+    } catch (err) {
+      console.error("Verify checkout error:", err);
     }
   }
 
@@ -279,29 +296,42 @@
     if (upg) upg.style.display = isPro ? "none" : "block";
   }
 
-  function showPayPal() {
-    const ppc = document.getElementById("paypal-button-container");
-    if (!ppc) return;
-    ppc.style.display = "block";
-    if (typeof paypal !== "undefined" && currentUser && !paypalRendered) {
-      paypalRendered = true;
-      paypal.Buttons({
-        createSubscription: function(data, actions) {
-          return actions.subscription.create({
-            plan_id: "P-26B313696D799031LNIFNUDQ",
-            custom_id: currentUser.id,
-          });
-        },
-        onApprove: function(data) {
-          window.showAppAlert("Subscrição ativada!");
-          document.getElementById("paypalModal").classList.remove("open");
-        },
-        onError: function(err) {
-          console.error("PayPal error:", err);
-          window.showAppAlert("Erro ao processar pagamento.");
-        },
-      }).render("#paypal-button-container");
+  async function handleStripePro() {
+    if (!currentUser) return;
+    const btn = document.getElementById("subUpgradeBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "A redirecionar..."; }
+    const STRIPE_PUBLISHABLE_KEY = "pk_test_51TbKmaQdlPUKQK2wfBNfhgwltyLsxwfV2smHoPIxyp15rqsEjNbUM0nV1rmyZ2DFQHGm7Ee0RHAy2gzerqGJ5MJA00VAAqjNDO";
+    const STRIPE_PRO_PRICE_ID = "price_1TbKy7QdlPUKQK2wQmXUzWOM";
+    try {
+      const payload = {
+        price_id: STRIPE_PRO_PRICE_ID,
+        user_id: currentUser.id,
+        success_url: window.location.origin + "/?page=dashboard",
+        cancel_url: window.location.origin
+      };
+      const resp = await fetch(`${API_BASE}/v1/checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.detail || `Erro ${resp.status} do servidor`);
+      }
+      const data = await resp.json();
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.sessionId || data.session_id) {
+        const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+        const { error } = await stripe.redirectToCheckout({ sessionId: data.sessionId || data.session_id });
+        if (error) throw new Error(error.message);
+        return;
+      }
+      throw new Error("Resposta inesperada do servidor");
+    } catch (err) {
+      console.error("Stripe error:", err);
+      window.showAppAlert("Erro: " + (err.message || err));
     }
+    if (btn) { btn.disabled = false; btn.textContent = "Assinar Pro — $9.90/mês"; }
   }
 
   // ─── API ───────────────────────────────────────────────
@@ -1843,7 +1873,7 @@
     window.loadServers = () => loadServers(true);
     window.switchLogServer = switchLogServer;
     window.debouncePoll = debouncePoll;
-    window.showPayPal = showPayPal;
+    window.handleStripePro = handleStripePro;
     window.pollLogs = pollLogs;
     window.setMergeTab = setMergeTab;
     window.openMergeModalFromMenu = openMergeModalFromMenu;
@@ -2168,9 +2198,8 @@
         <div class="sub-quota"><span>{$t('dashboard.servers_label')}</span><span class="val" id="subServers">0 / 1</span></div>
         <div class="sub-quota"><span>{$t('profile.rpm_label')}</span><span class="val" id="subRPM">10</span></div>
         <div class="sub-upgrade" id="subUpgrade">
-          <button class="sub-upgrade-btn" onclick={() => window.showPayPal()}>{$t('dashboard.subscribe')}</button>
+          <button class="sub-upgrade-btn" id="subUpgradeBtn" onclick={() => window.handleStripePro()}>{$t('dashboard.subscribe')}</button>
         </div>
-        <div id="paypal-button-container" style="display:none"></div>
       </div>
     </div>
 

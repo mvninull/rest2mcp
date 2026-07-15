@@ -35,6 +35,13 @@ try:
     )
     from .openapi import MCPServerManager, create_mcp_server
     from .paypal import parse_webhook_event, verify_webhook_signature
+    from .stripe_service import (
+        create_checkout_session as stripe_create_checkout_session,
+        get_subscription as stripe_get_subscription,
+        parse_event_type as stripe_parse_event_type,
+        parse_webhook_event as stripe_parse_webhook,
+        retrieve_checkout_session as stripe_checkout_session_retrieve,
+    )
     from .supabase_auth import (
         get_cached_profile,
         get_tier_limits,
@@ -52,6 +59,13 @@ except ImportError:
     )
     from openapi import MCPServerManager
     from paypal import parse_webhook_event, verify_webhook_signature
+    from stripe_service import (
+        create_checkout_session as stripe_create_checkout_session,
+        get_subscription as stripe_get_subscription,
+        parse_event_type as stripe_parse_event_type,
+        parse_webhook_event as stripe_parse_webhook,
+        retrieve_checkout_session as stripe_checkout_session_retrieve,
+    )
     from supabase_auth import (
         get_cached_profile,
         get_tier_limits,
@@ -666,6 +680,18 @@ class LogEntry(BaseModel):
     duration_ms: float
     request_body: str | None = None
     response_body: str | None = None
+
+
+class CheckoutSessionRequest(BaseModel):
+    price_id: str
+    user_id: str
+    success_url: str
+    cancel_url: str
+
+
+class VerifyCheckoutSessionRequest(BaseModel):
+    session_id: str
+    user_id: str
 
 
 # ─── Management API ────────────────────────────────────────────────────────────
@@ -3899,6 +3925,149 @@ async def paypal_webhook(request: Request):
         await notify_session_termination(user_id)
     except Exception as e:
         logger.error(f"Erro ao processar webhook PayPal: {e}")
+
+    return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+# ─── Stripe ───────────────────────────────────────────────────────────────────
+
+
+@app.post("/v1/checkout-session", status_code=201)
+def create_checkout_session(req: CheckoutSessionRequest):
+    try:
+        session = stripe_create_checkout_session(
+            price_id=req.price_id,
+            user_id=req.user_id,
+            success_url=req.success_url,
+            cancel_url=req.cancel_url,
+        )
+        return {"sessionId": session.id, "url": session.url}
+    except Exception as e:
+        logger.error(f"Stripe create_checkout_session error: {e}")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@app.post("/v1/checkout-session/verify")
+async def verify_checkout_session(req: VerifyCheckoutSessionRequest):
+    try:
+        session = await asyncio.to_thread(stripe_checkout_session_retrieve, req.session_id)
+        if session.status != "complete":
+            return {"status": "pending", "session_status": session.status}
+        if session.mode == "subscription":
+            await upsert_supabase_profile(
+                req.user_id,
+                {
+                    "plan_tier": "pro",
+                    "status": "active",
+                    "stripe_subscription_id": session.get("subscription", ""),
+                },
+            )
+            invalidate_profile_cache(req.user_id)
+            await notify_session_termination(req.user_id)
+            return {"status": "upgraded", "payment_status": session.payment_status}
+        if session.payment_status == "paid":
+            await upsert_supabase_profile(
+                req.user_id,
+                {
+                    "plan_tier": "pro",
+                    "status": "active",
+                    "stripe_subscription_id": session.get("subscription", ""),
+                },
+            )
+            invalidate_profile_cache(req.user_id)
+            await notify_session_termination(req.user_id)
+            return {"status": "upgraded"}
+        return {"status": "pending", "payment_status": session.payment_status}
+    except Exception as e:
+        logger.error(f"Stripe verify_checkout_session error: {e}")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@app.post("/v1/webhooks/stripe")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    event = stripe_parse_webhook(payload, sig_header)
+    if not event:
+        return JSONResponse(status_code=400, content={"detail": "Invalid signature"})
+
+    action = stripe_parse_event_type(event.type)
+    if not action:
+        return JSONResponse(status_code=200, content={"status": "ignored"})
+
+    logger.info(f"Webhook Stripe: {event.type}")
+
+    try:
+        if action == "session_completed":
+            session = event.data.object
+            user_id = session.get("client_reference_id", "")
+            if not user_id:
+                return JSONResponse(status_code=200, content={"status": "ignored", "reason": "no client_reference_id"})
+            if session.get("mode") == "subscription" and session.get("payment_status") == "paid":
+                await upsert_supabase_profile(
+                    user_id,
+                    {
+                        "plan_tier": "pro",
+                        "status": "active",
+                        "stripe_subscription_id": session.get("subscription", ""),
+                    },
+                )
+                invalidate_profile_cache(user_id)
+                await notify_session_termination(user_id)
+
+        elif action == "payment_succeeded":
+            invoice = event.data.object
+            sub_id = invoice.get("subscription")
+            if sub_id:
+                try:
+                    sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
+                    user_id = sub.metadata.get("user_id", "")
+                    if user_id:
+                        await upsert_supabase_profile(
+                            user_id,
+                            {
+                                "plan_tier": "pro",
+                                "status": "active",
+                                "stripe_subscription_id": sub_id,
+                            },
+                        )
+                        invalidate_profile_cache(user_id)
+                        await notify_session_termination(user_id)
+                except Exception as e:
+                    logger.error(f"Stripe: erro ao buscar subscrição {sub_id}: {e}")
+
+        elif action == "payment_failed":
+            invoice = event.data.object
+            sub_id = invoice.get("subscription")
+            if sub_id:
+                try:
+                    sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
+                    user_id = sub.metadata.get("user_id", "")
+                    if user_id:
+                        await upsert_supabase_profile(user_id, {"status": "suspended"})
+                        invalidate_profile_cache(user_id)
+                        await sync_user_servers(user_id)
+                except Exception as e:
+                    logger.error(f"Stripe: erro ao processar payment_failed: {e}")
+
+        elif action == "subscription_deleted":
+            sub = event.data.object
+            user_id = sub.metadata.get("user_id", "")
+            if user_id:
+                await upsert_supabase_profile(
+                    user_id,
+                    {
+                        "plan_tier": "free",
+                        "stripe_subscription_id": None,
+                    },
+                )
+                invalidate_profile_cache(user_id)
+                await sync_user_servers(user_id)
+                await notify_session_termination(user_id)
+
+    except Exception as e:
+        logger.error(f"Erro ao processar webhook Stripe: {e}")
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 

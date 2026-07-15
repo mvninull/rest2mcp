@@ -8,3 +8,4 @@ bcrypt==3.2.2
 fastmcp>=3.0.0,<3.3
 httpx
 python-dotenv
+stripe==15.1.0
