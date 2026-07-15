@@ -55,6 +55,8 @@
   let _storeEnvSchemas = {};
   let _storeCacheFetched = false;
   let _storeSort = "relevance";
+  let _storePage = 1;
+  let _storePerPage = 20;
 
   function debug(...args) {
     console.log("[dashboard-debug]", ...args);
@@ -767,7 +769,7 @@
     modal.classList.add("open");
     _storeFilterHosting = "";
     _storeFilterCategory = "";
-    if (_storeCacheFetched) {
+    if (_storeAllServers.length) {
       _renderStoreFilters();
       searchStore();
       return;
@@ -793,24 +795,48 @@
     }
   }
 
-  async function loadMoreStore() {
-    if (_storeLoading || !_storePageInfo.hasNextPage) return;
-    _storeLoading = true;
-    const btn = document.getElementById("storeLoadMore");
-    if (btn) btn.textContent = "A carregar...";
+  async function _fetchStoreServers() {
+    if (_storeCacheFetched) return;
     try {
-      const data = await apiFetch("/v1/store/servers?cursor=" + encodeURIComponent(_storePageInfo.endCursor));
-      const newServers = data.servers || [];
-      _storeAllServers = _storeAllServers.concat(newServers);
-      _storePageInfo = data.pageInfo || { hasNextPage: false, endCursor: "" };
-      _renderStoreFilters();
-      searchStore();
-    } catch (err) {
-      if (btn) btn.textContent = "Erro ao carregar. Tentar novamente";
-    } finally {
-      _storeLoading = false;
-    }
+      let cursor = "";
+      let hasNext = true;
+      while (hasNext) {
+        const url = cursor ? "/v1/store/servers?cursor=" + encodeURIComponent(cursor) : "/v1/store/servers";
+        const data = await apiFetch(url);
+        const batch = data.servers || [];
+        _storeAllServers = _storeAllServers.concat(batch);
+        _storeFacets = data.facets || _storeFacets;
+        batch.forEach(s => {
+          if (s.id && s.environmentVariablesJsonSchema) {
+            _storeEnvSchemas[s.id] = s.environmentVariablesJsonSchema;
+          }
+        });
+        const grid = document.getElementById("storeGrid");
+        const modal = document.getElementById("storeModal");
+        if (grid && modal && modal.classList.contains("open")) {
+          _renderStoreFilters();
+          const q = (document.getElementById("storeSearch")?.value || "").toLowerCase();
+          let filtered = _storeAllServers;
+          if (q) filtered = filtered.filter(s => (s.name || "").toLowerCase().includes(q) || (s.description || "").toLowerCase().includes(q) || (s.namespace || "").toLowerCase().includes(q) || (s.slug || "").toLowerCase().includes(q));
+          if (_storeFilterHosting) filtered = filtered.filter(s => (s.attributes || []).includes("hosting:" + _storeFilterHosting));
+          if (_storeFilterCategory) filtered = filtered.filter(s => (s.categories || []).includes(_storeFilterCategory));
+          const savedPage = _storePage;
+          _renderStoreGrid(_sortServers(filtered, _storeSort));
+          if (_storePage !== savedPage) {
+            _storePage = Math.min(savedPage, Math.ceil(_storeAllServers.length / _storePerPage));
+            _renderStoreGrid(_sortServers(filtered, _storeSort));
+          }
+        }
+        const info = data.pageInfo || { hasNextPage: false, endCursor: "" };
+        hasNext = info.hasNextPage && !!info.endCursor;
+        cursor = info.endCursor || "";
+      }
+      _storePageInfo = { hasNextPage: false, endCursor: "" };
+      _storeCacheFetched = true;
+    } catch (_) {}
   }
+
+  async function loadMoreStore() {}
 
   function setStoreFilterHosting(type) {
     _storeFilterHosting = _storeFilterHosting === type ? "" : type;
@@ -855,6 +881,7 @@
 
   function searchStore() {
     const q = (document.getElementById("storeSearch")?.value || "").toLowerCase();
+    _storePage = 1;
     let filtered = _storeAllServers;
     if (q) {
       filtered = filtered.filter(s =>
@@ -893,17 +920,27 @@
     const grid = document.getElementById("storeGrid");
     if (!grid) return;
     if (!servers.length) {
-      grid.innerHTML = "<div class='store-loading'>Nenhum servidor encontrado.</div>";
+      const q = (document.getElementById("storeSearch")?.value || "").trim();
+      if (q && !_storeCacheFetched) {
+        grid.innerHTML = "<div class='store-loading'>A pesquisar em mais servidores...</div>";
+      } else {
+        grid.innerHTML = "<div class='store-loading'>Nenhum servidor encontrado.</div>";
+      }
       const loadMore = document.getElementById("storeLoadMore");
       if (loadMore) loadMore.style.display = "none";
+      _renderStorePagination(servers);
       return;
     }
+    const totalPages = Math.ceil(servers.length / _storePerPage);
+    if (_storePage > totalPages) _storePage = totalPages;
+    const start = (_storePage - 1) * _storePerPage;
+    const page = servers.slice(start, start + _storePerPage);
     const hostBadges = {
       "remote-capable": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11 2h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h2"/><path d="M8 11v1"/><path d="M5 5.5 8 2l3 3.5"/></svg> Remoto',
       "hybrid": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13 8A5 5 0 1 1 8 3"/><path d="M13 3v3h-3"/><path d="M3 8A5 5 0 1 0 8 3"/></svg> Híbrido',
       "local-only": '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M6 14h4"/><path d="M8 12v2"/></svg> Local',
     };
-    grid.innerHTML = servers.map(s => {
+    grid.innerHTML = page.map(s => {
       const name = s.name || s.slug || "MCP Server";
       const desc = s.description || "";
       const hostType = (s.attributes || []).find(a => a.startsWith("hosting:"))?.split(":")[1] || "";
@@ -921,17 +958,46 @@
             ${badge ? `<span class="store-card-badge">${badge}</span>` : ""}
             ${namespace ? `<span class="store-card-cmd">${_escHtml(namespace)}</span>` : ""}
             ${toolCount > 0 ? `<span class="store-card-tag">${toolCount} tools</span>` : ""}
-            ${stars > 0 ? `<span class="store-card-star"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2 4.5 4.9.5-3.7 3.2L12.5 14 8 11.5 3.5 14l1.3-4.8L1 6l4.9-.5z"/></svg> ${stars}</span>` : ""}
+            ${stars > 0 ? `<span class="store-card-star"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2 4.5 4.9.5-3.7 3.2L12.5 14 8 11.5 3.5 14l1.3-4.8L 1 6l4.9-.5z"/></svg> ${stars}</span>` : ""}
           </div>
         </div>
       </div>`;
     }).join("");;
     const loadMore = document.getElementById("storeLoadMore");
-    if (loadMore) {
-      const showMore = _storePageInfo.hasNextPage && !_storeFilterHosting && !_storeFilterCategory && !(document.getElementById("storeSearch")?.value || "");
-      loadMore.style.display = showMore ? "" : "none";
-      if (!_storeLoading) loadMore.textContent = "Carregar mais servidores (" + _storeAllServers.length + "+)";
-    }
+    if (loadMore) loadMore.style.display = "none";
+    _renderStorePagination(servers);
+  }
+
+  function _renderStorePagination(servers) {
+    const el = document.getElementById("storePagination");
+    if (!el) return;
+    const total = servers.length;
+    const totalPages = Math.ceil(total / _storePerPage);
+    if (totalPages <= 1) { el.style.display = "none"; return; }
+    el.style.display = "flex";
+    let html = `<button class="store-page-btn" onclick="window._prevPage()"${_storePage <= 1 ? ' disabled' : ''}>&#9664; ${__('pagination.prev')}</button>`;
+    html += `<span class="store-page-info">${_storePage} / ${totalPages}</span>`;
+    html += `<button class="store-page-btn" onclick="window._nextPage()"${_storePage >= totalPages ? ' disabled' : ''}>${__('pagination.next')} &#9654;</button>`;
+    el.innerHTML = html;
+  }
+
+  function _prevPage() {
+    if (_storePage <= 1) return;
+    _storePage--;
+    const q = (document.getElementById("storeSearch")?.value || "").toLowerCase();
+    let filtered = _storeAllServers;
+    if (q) filtered = filtered.filter(s => (s.name || "").toLowerCase().includes(q) || (s.description || "").toLowerCase().includes(q) || (s.namespace || "").toLowerCase().includes(q) || (s.slug || "").toLowerCase().includes(q));
+    _renderStoreGrid(filtered);
+  }
+
+  function _nextPage() {
+    const q = (document.getElementById("storeSearch")?.value || "").toLowerCase();
+    let filtered = _storeAllServers;
+    if (q) filtered = filtered.filter(s => (s.name || "").toLowerCase().includes(q) || (s.description || "").toLowerCase().includes(q) || (s.namespace || "").toLowerCase().includes(q) || (s.slug || "").toLowerCase().includes(q));
+    const totalPages = Math.ceil(filtered.length / _storePerPage);
+    if (_storePage >= totalPages) return;
+    _storePage++;
+    _renderStoreGrid(filtered);
   }
 
   function _escHtml(str) {
@@ -1797,6 +1863,8 @@
     window.installFromStore = installFromStore;
     window.searchStore = searchStore;
     window.loadMoreStore = loadMoreStore;
+    window._prevPage = _prevPage;
+    window._nextPage = _nextPage;
     window.setStoreSort = setStoreSort;
     window.setStoreFilterHosting = setStoreFilterHosting;
     window.setStoreFilterCategory = setStoreFilterCategory;
@@ -1857,6 +1925,7 @@
       await loadServers(true);
       _initialized = true;
       startLogsPolling();
+      _fetchStoreServers();
 
       if (supabaseClient) {
         const { data: listener } = supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -2380,6 +2449,7 @@
         <div class="store-grid" id="storeGrid">
           <div class="store-loading">{$t('store.loading')}</div>
         </div>
+        <div class="store-pagination" id="storePagination" style="display:none"></div>
         <button class="store-load-more" id="storeLoadMore" onclick={() => window.loadMoreStore()} style="display:none">{$t('store.load_more')}</button>
       </div>
     </div>

@@ -2088,6 +2088,7 @@ textarea.tool-arg-input {
     max-height: 85vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 .store-layout {
     display: flex;
@@ -2176,10 +2177,11 @@ textarea.tool-arg-input {
 }
 .store-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
     gap: 8px;
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     min-height: 0;
 }
 .store-card {
@@ -2298,6 +2300,42 @@ textarea.tool-arg-input {
 .store-error {
     color: var(--warn);
 }
+.store-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 0 4px;
+    flex-shrink: 0;
+}
+.store-page-btn {
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: white;
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+}
+.store-page-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.store-page-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.store-page-info {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    min-width: 60px;
+    text-align: center;
+}
 .store-load-more {
     display: flex;
     align-items: center;
@@ -2412,4 +2450,53 @@ textarea.tool-arg-input {
 }
 .store-cat-item.active .store-cat-count {
     color: var(--accent);
+}
+
+@media (max-width: 768px) {
+    .store-box {
+        max-width: 100% !important;
+        width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+        margin: 0;
+    }
+    .store-layout {
+        flex-direction: column;
+    }
+    .store-sidebar {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 6px;
+        padding-bottom: 4px;
+    }
+    .store-sidebar-section {
+        flex-shrink: 0;
+    }
+    .store-grid {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 480px) {
+    .store-card {
+        padding: 8px 10px;
+    }
+    .store-card-icon {
+        width: 30px;
+        height: 30px;
+    }
+    .store-card-icon svg {
+        width: 15px;
+        height: 15px;
+    }
+    .store-card-name {
+        font-size: 0.75rem;
+    }
+    .store-card-desc {
+        font-size: 0.68rem;
+    }
+    .store-toolbar {
+        flex-wrap: wrap;
+    }
 }

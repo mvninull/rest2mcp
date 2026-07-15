@@ -1,7 +1,9 @@
 <script>
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import './Landing.css';
   import { t } from './stores/lang.js';
+  const __ = (key) => get(t)(key);
 
   window.sendContactEmail = function() {
     const name = document.getElementById('contact-name')?.value || '';
@@ -183,7 +185,7 @@
           // Utilizador já autenticado -> Ajusta botões
           const dbBtn = document.getElementById("dashboardBtn");
           if (dbBtn) {
-            dbBtn.textContent = "Ir para Dashboard";
+            dbBtn.textContent = __('nav.go_to_dashboard');
             dbBtn.onclick = (e) => { 
               e.preventDefault();
               window.history.pushState({}, '', '?page=dashboard'); window.dispatchEvent(new PopStateEvent('popstate')); 
@@ -191,7 +193,7 @@
           }
           const createBtn = document.getElementById("createServerBtn");
           if (createBtn) {
-            createBtn.textContent = "Ir para Dashboard";
+            createBtn.textContent = __('nav.go_to_dashboard');
             createBtn.href = "?page=dashboard";
           }
         }
