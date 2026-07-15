@@ -832,8 +832,8 @@
           <p class="modal-sub">Será redirecionado para o checkout seguro da Stripe</p>
         </div>
         <div class="modal-actions" style="justify-content:center;margin-top:1.5rem;">
-          <button class="btn-confirm" onclick="window.handleStripePro()" style="padding:0.7rem 2rem;">Assinar com Cartão</button>
-          <button class="btn-cancel" onclick="document.getElementById('stripeModal').classList.remove('open')">Cancelar</button>
+          <button class="btn-confirm" onclick={() => window.handleStripePro()} style="padding:0.7rem 2rem;">Assinar com Cartão</button>
+          <button class="btn-cancel" onclick={() => document.getElementById('stripeModal').classList.remove('open')}>Cancelar</button>
         </div>
       </div>
     </div>
