@@ -96,7 +96,7 @@ async def fetch_supabase_profile(user_id: str) -> dict:
             f"{SUPABASE_URL}/rest/v1/profiles",
             params={"id": f"eq.{user_id}"},
             headers={
-                "apikey": SUPABASE_ANON_KEY,
+                "apikey": SUPABASE_SERVICE_KEY,
                 "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
             },
         )
@@ -130,7 +130,7 @@ async def get_cached_profile(user_id: str) -> dict:
         return await fetch_supabase_profile(user_id)
     except Exception as e:
         logger.error(f"[DEBUG] get_cached_profile EXCEPTION: {type(e).__name__}: {e}")
-        return {"status": "active", "plan_tier": "free", "paypal_subscription_id": None}
+        raise  
 
 
 def invalidate_profile_cache(user_id: str):
