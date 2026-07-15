@@ -94,6 +94,7 @@ async def fetch_supabase_profile(user_id: str) -> dict:
                 "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
             },
         )
+
         resp.raise_for_status()
         rows = resp.json()
         if rows:
@@ -118,17 +119,11 @@ async def upsert_supabase_profile(user_id: str, data: dict):
 
 
 async def get_cached_profile(user_id: str) -> dict:
-    now = time.time()
-    if user_id in PROFILE_CACHE:
-        data, expires = PROFILE_CACHE[user_id]
-        if now < expires:
-            return data
+    # Cache desativado para evitar stale data entre instâncias Fly.io
     try:
-        profile = await fetch_supabase_profile(user_id)
+        return await fetch_supabase_profile(user_id)
     except Exception:
         return {"status": "active", "plan_tier": "free", "paypal_subscription_id": None}
-    PROFILE_CACHE[user_id] = (profile, now + 60)
-    return profile
 
 
 def invalidate_profile_cache(user_id: str):
