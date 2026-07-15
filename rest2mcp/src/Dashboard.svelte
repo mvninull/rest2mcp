@@ -306,6 +306,7 @@
       const payload = {
         price_id: STRIPE_PRO_PRICE_ID,
         user_id: currentUser.id,
+        email: currentUser.email,
         success_url: window.location.origin + "/?page=dashboard",
         cancel_url: window.location.origin
       };

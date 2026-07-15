@@ -687,6 +687,7 @@ class CheckoutSessionRequest(BaseModel):
     user_id: str
     success_url: str
     cancel_url: str
+    email: str | None = None
 
 
 class VerifyCheckoutSessionRequest(BaseModel):
@@ -3940,6 +3941,7 @@ def create_checkout_session(req: CheckoutSessionRequest):
             user_id=req.user_id,
             success_url=req.success_url,
             cancel_url=req.cancel_url,
+            customer_email=req.email,
         )
         return {"sessionId": session.id, "url": session.url}
     except Exception as e:

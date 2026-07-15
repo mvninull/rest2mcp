@@ -8,17 +8,22 @@ except ImportError:
 stripe.api_key = STRIPE_SECRET_KEY
 
 
-def create_checkout_session(price_id: str, user_id: str, success_url: str, cancel_url: str):
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        line_items=[{"price": price_id, "quantity": 1}],
-        client_reference_id=user_id,
-        subscription_data={
+def create_checkout_session(
+    price_id: str, user_id: str, success_url: str, cancel_url: str, customer_email: str | None = None
+):
+    params = {
+        "mode": "subscription",
+        "line_items": [{"price": price_id, "quantity": 1}],
+        "client_reference_id": user_id,
+        "subscription_data": {
             "metadata": {"user_id": user_id},
         },
-        success_url=success_url,
-        cancel_url=cancel_url,
-    )
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+    }
+    if customer_email:
+        params["customer_email"] = customer_email
+    session = stripe.checkout.Session.create(**params)
     return session
 
 

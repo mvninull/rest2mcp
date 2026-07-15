@@ -202,7 +202,10 @@
       supabaseClient?.auth?.onAuthStateChange((event, session) => {
         if (session?.access_token) {
           localStorage.setItem("supabase_token", session.access_token);
-          if (session.user) localStorage.setItem("supabase_user_id", session.user.id);
+          if (session.user) {
+            localStorage.setItem("supabase_user_id", session.user.id);
+            if (session.user.email) localStorage.setItem("supabase_user_email", session.user.email);
+          }
           if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
             if (localStorage.getItem("pending_pro")) {
               localStorage.removeItem("pending_pro");
@@ -294,7 +297,8 @@
         try {
           const payload = {
             price_id: STRIPE_PRO_PRICE_ID,
-            user_id: token,
+            user_id: localStorage.getItem("supabase_user_id") || token,
+            email: localStorage.getItem("supabase_user_email") || "",
             success_url: window.location.origin + "/?page=dashboard",
             cancel_url: window.location.origin,
           };
