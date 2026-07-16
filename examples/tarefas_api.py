@@ -62,14 +62,14 @@ class TokenResponse(BaseModel):
 
 
 class User(BaseModel):
-    username: str
+    email: str
     hashed_password: str
     nome: str
 
 
 fake_users_db = [
     User(
-        username="admin",
+        email="admin@email.com",
         hashed_password=pwd_context.hash("123456"),
         nome="Administrador",
     ),
@@ -87,13 +87,13 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        email = payload.get("sub")
+        if not email:
             raise HTTPException(status_code=401, detail="Token invalido")
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalido ou expirado")
     for user in fake_users_db:
-        if user.username == username:
+        if user.email == email:
             return user
     raise HTTPException(status_code=401, detail="Usuario nao encontrado")
 
@@ -105,12 +105,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     summary="Login",
 )
 def login(
-    username: str = Form(...),
+    email: str = Form(...),
     password: str = Form(...),
 ):
     for user in fake_users_db:
-        if user.username == username and pwd_context.verify(password, user.hashed_password):
-            token = create_access_token({"sub": user.username})
+        if user.email == email and pwd_context.verify(password, user.hashed_password):
+            token = create_access_token({"sub": user.email})
             return TokenResponse(access_token=token)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -124,7 +124,7 @@ def login(
     summary="Dados do usuario atual",
 )
 def me(usuario: User = Depends(get_current_user)):
-    return {"username": usuario.username, "nome": usuario.nome}
+    return {"email": usuario.email, "nome": usuario.nome}
 
 
 # ========== TAREFAS ==========
