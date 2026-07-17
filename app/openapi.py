@@ -61,9 +61,21 @@ _RouteMapCls, _RouteMapEnum, _ROUTE_MAP_TYPE_FIELD = _resolve_route_map_types()
 # A ordem só importa quando o schema tem mais de um candidato ao mesmo tempo;
 # se só existir um campo no schema, é esse que entra, seja qual for a posição aqui.
 LOGIN_IDENTIFIER_KEYS = [
-    "email", "username", "user", "login", "identifier", "identity",
-    "phone", "phone_number", "mobile", "msisdn", "telefone", "celular", "tel",
-    "api_key", "apikey",
+    "email",
+    "username",
+    "user",
+    "login",
+    "identifier",
+    "identity",
+    "phone",
+    "phone_number",
+    "mobile",
+    "msisdn",
+    "telefone",
+    "celular",
+    "tel",
+    "api_key",
+    "apikey",
 ]
 LOGIN_PASSWORD_KEYS = ["password", "senha", "pass", "pwd"]
 LOGIN_OTP_CODE_KEYS = ["code", "otp", "otp_code", "verification_code", "pin", "token"]
@@ -135,6 +147,7 @@ class MCPServerManager:
         self.server_id = server_id
         self.log_func = log_func
         self.token = None
+        self.login_required_fields = []
 
         if spec is not None:
             self.spec = spec
@@ -169,8 +182,9 @@ class MCPServerManager:
 
         # Detetamos os paths de auth (login/otp/oauth) ANTES de criar o
         # FastMCP, para podermos excluí-los (route_maps) da conversão
-        # automática em tools "cruas" — já ficam cobertos pela tool `login`.
+        # automática em tools "cruas".
         auth_paths = self._detect_auth_paths()
+        self.email_login_path = auth_paths.get("email_login_path")
         exclude_paths = [
             p
             for p in [
@@ -234,6 +248,18 @@ class MCPServerManager:
                 if os.path.exists(f):
                     os.remove(f)
 
+    def _resolve_schema_ref(self, schema: dict) -> dict:
+        if not schema or "$ref" not in schema:
+            return schema
+        try:
+            ref_path = schema["$ref"].lstrip("#/").split("/")
+            current = self.spec
+            for part in ref_path:
+                current = current.get(part, {})
+            return current
+        except Exception:
+            return {}
+
     def _get_body_schema(self, path: str) -> dict | None:
         methods = self.spec.get("paths", {}).get(path, {})
         if not methods:
@@ -243,7 +269,7 @@ class MCPServerManager:
         for ct in ("application/json", "application/x-www-form-urlencoded"):
             schema = content.get(ct, {}).get("schema", {})
             if schema:
-                return schema
+                return self._resolve_schema_ref(schema)
         return None
 
     @staticmethod
@@ -322,139 +348,6 @@ class MCPServerManager:
         _otp_verify_path = auth_paths["otp_verify_path"]
         _oauth_paths = auth_paths["oauth_paths"]
 
-        @self.mcp.tool(name="login")
-        async def smart_login(
-            identifier: str | None = None,
-            password: str | None = None,
-            code: str | None = None,
-            provider: str | None = None,
-            provider_token: str | None = None,
-        ) -> str:
-            """Faz login na API e configura o token automaticamente.
-
-            Suporta múltiplos fluxos, conforme o que a API pedir:
-            - Email/senha, telefone/senha, ou qualquer identificador+senha:
-              informe identifier (email, telefone, username... o que a API
-              exigir) e password. O nome real do campo é detetado a partir
-              do schema da API, não é fixo.
-            - Apenas um campo (ex: magic link, API key): informe só
-              identifier, sem password.
-            - Código OTP/SMS (fluxo em 2 passos): chame login(identifier=...)
-              primeiro, sem password nem code — isto dispara o envio do
-              código. Depois chame de novo login(identifier=..., code="123456")
-              com o código recebido para concluir.
-            - OAuth (Google/GitHub/Apple): informe provider e provider_token.
-            """
-            if provider and provider_token:
-                provider_lower = provider.lower()
-                oauth_path = _oauth_paths.get(provider_lower)
-                if oauth_path:
-                    url_to_call = oauth_path if oauth_path.startswith("/") else f"/{oauth_path}"
-                elif _email_login_path:
-                    url_to_call = _email_login_path if _email_login_path.startswith("/") else f"/{_email_login_path}"
-                else:
-                    url_to_call = f"/auth/{provider_lower}"
-
-                payload_candidates = [
-                    {"token": provider_token},
-                    {"access_token": provider_token},
-                    {"id_token": provider_token},
-                    {"code": provider_token},
-                    {"credential": provider_token},
-                ]
-                schema = self._get_body_schema(url_to_call)
-                if schema:
-                    props = schema.get("properties", {})
-                    if props:
-                        body_key = next(iter(props), None)
-                        if body_key:
-                            payload_candidates.insert(0, {body_key: provider_token})
-
-                async with httpx.AsyncClient(base_url=_base_url) as auth_client:
-                    for payload in payload_candidates:
-                        for attempt in range(2):
-                            if attempt == 0:
-                                resp = await auth_client.post(url_to_call, json=payload)
-                            else:
-                                resp = await auth_client.post(url_to_call, data=payload)
-                            if resp.status_code in (200, 201):
-                                data = resp.json()
-                                token = (
-                                    data.get("access_token")
-                                    or data.get("token")
-                                    or data.get("jwt")
-                                    or data.get("id_token")
-                                )
-                                if token:
-                                    self.token = token
-                                    return "✅ Login realizado com sucesso!"
-                                return "⚠️ Login OK, mas token não encontrado."
-                            if resp.status_code not in (400, 401, 422):
-                                return f"❌ Erro ({resp.status_code}): {resp.text}"
-                    return "❌ Erro (401): Nenhum formato de payload funcionou."
-
-            if identifier and code:
-                if not _otp_verify_path:
-                    return "⚠️ Nenhum endpoint de verificação de código foi encontrado na spec."
-                url_to_call = _otp_verify_path if _otp_verify_path.startswith("/") else f"/{_otp_verify_path}"
-                schema = self._get_body_schema(url_to_call)
-                id_key = self._match_schema_key(schema, LOGIN_IDENTIFIER_KEYS) or "identifier"
-                code_key = self._match_schema_key(schema, LOGIN_OTP_CODE_KEYS) or "code"
-                payload = {id_key: identifier, code_key: code}
-                async with httpx.AsyncClient(base_url=_base_url) as auth_client:
-                    resp = await auth_client.post(url_to_call, json=payload)
-                    if resp.status_code == 422:
-                        resp = await auth_client.post(url_to_call, data=payload)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        token = data.get("access_token") or data.get("token") or data.get("jwt")
-                        if token:
-                            self.token = token
-                            return "✅ Login realizado com sucesso!"
-                        return "⚠️ Código aceite, mas token não encontrado na resposta."
-                    return f"❌ Erro ({resp.status_code}): {resp.text}"
-
-            if identifier and not password and _otp_request_path:
-                url_to_call = _otp_request_path if _otp_request_path.startswith("/") else f"/{_otp_request_path}"
-                schema = self._get_body_schema(url_to_call)
-                id_key = self._match_schema_key(schema, LOGIN_IDENTIFIER_KEYS) or "identifier"
-                async with httpx.AsyncClient(base_url=_base_url) as auth_client:
-                    resp = await auth_client.post(url_to_call, json={id_key: identifier})
-                    if resp.status_code == 422:
-                        resp = await auth_client.post(url_to_call, data={id_key: identifier})
-                    if resp.status_code in (200, 201):
-                        return "📩 Código enviado! Chame login novamente com identifier + code para concluir."
-                    return f"❌ Erro ao enviar código ({resp.status_code}): {resp.text}"
-
-            if identifier:
-                if not _email_login_path:
-                    return "⚠️ Nenhum endpoint de login encontrado na spec."
-                url_to_call = _email_login_path if _email_login_path.startswith("/") else f"/{_email_login_path}"
-                schema = self._get_body_schema(url_to_call)
-                id_key = self._match_schema_key(schema, LOGIN_IDENTIFIER_KEYS) or "username"
-                pass_key = self._match_schema_key(schema, LOGIN_PASSWORD_KEYS)
-
-                payload = {id_key: identifier}
-                if password:
-                    payload[pass_key or "password"] = password
-
-                async with httpx.AsyncClient(base_url=_base_url) as auth_client:
-                    resp = await auth_client.post(url_to_call, json=payload)
-                    if resp.status_code == 422:
-                        resp = await auth_client.post(url_to_call, data=payload)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        token = data.get("access_token") or data.get("token") or data.get("jwt")
-                        if token:
-                            self.token = token
-                            return "✅ Login realizado com sucesso!"
-                        if _otp_verify_path:
-                            return "📩 Sem token na resposta — pode ser um fluxo OTP. Chame login novamente com identifier + code."
-                        return "⚠️ Login OK, mas token não encontrado."
-                    return f"❌ Erro ({resp.status_code}): {resp.text}"
-
-            return "⚠️ Informe identifier (+ password, se a API pedir) ou provider+provider_token (OAuth)."
-
         @self.mcp.tool()
         async def set_token(token: str) -> str:
             """Define manualmente um token JWT para autenticação nas chamadas seguintes.
@@ -466,6 +359,12 @@ class MCPServerManager:
         async def session_status() -> str:
             """Verifica o estado atual da autenticação."""
             return f"Autenticado: {bool(self.token)} | API: {self.base_url}"
+
+        if _email_login_path:
+            _schema = self._get_body_schema(_email_login_path)
+            _id_key = self._match_schema_key(_schema, LOGIN_IDENTIFIER_KEYS)
+            _pass_key = self._match_schema_key(_schema, LOGIN_PASSWORD_KEYS)
+            self.login_required_fields = [k for k in (_id_key, _pass_key) if k]
 
 
 # ESTA FUNÇÃO PRECISA ESTAR FORA DA CLASSE (NA RAIZ DO ARQUIVO)

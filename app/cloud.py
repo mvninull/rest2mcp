@@ -1260,6 +1260,83 @@ async def call_server_tool(server_id: str, req: CallToolRequest, request: Reques
         raise HTTPException(status_code=502, detail=f"Erro ao executar tool: {e}")
 
 
+@app.get("/v1/servers/{server_id}/auth")
+async def server_auth_schema(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    active, err = await _get_or_start_mcp(server_id, record.apikey)
+    if err:
+        return err
+
+    if not active.manager:
+        return {"required_fields": [], "login_url": None}
+
+    fields = getattr(active.manager, "login_required_fields", [])
+    login_url = getattr(active.manager, "email_login_path", None)
+    return {
+        "required_fields": fields,
+        "authenticated": bool(active.manager and active.manager.token),
+        "login_url": f"{active.manager.base_url}{login_url}" if login_url else None,
+    }
+
+
+@app.post("/v1/servers/{server_id}/auth/login")
+async def server_auth_login(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    active, err = await _get_or_start_mcp(server_id, record.apikey)
+    if err:
+        return err
+
+    if not active.manager:
+        raise HTTPException(status_code=500, detail="Manager não inicializado")
+
+    login_path = getattr(active.manager, "email_login_path", None)
+    if not login_path:
+        raise HTTPException(status_code=400, detail="Esta API não possui endpoint de login")
+
+    if not login_path.startswith("/"):
+        login_path = f"/{login_path}"
+
+    body = await request.json()
+    if not body:
+        raise HTTPException(status_code=400, detail="Body não enviado")
+
+    schema = active.manager._get_body_schema(login_path)
+    payload = {}
+    if schema and "properties" in schema:
+        for field in schema["properties"]:
+            if field in body:
+                payload[field] = body[field]
+    else:
+        payload = body
+
+    if not payload:
+        raise HTTPException(status_code=400, detail="Nenhum campo reconhecido enviado")
+
+    base_url = active.manager.base_url
+    async with httpx.AsyncClient(base_url=base_url) as auth_client:
+        resp = await auth_client.post(login_path, json=payload)
+        if resp.status_code == 422:
+            resp = await auth_client.post(login_path, data=payload)
+
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            token = data.get("access_token") or data.get("token") or data.get("jwt")
+            if token:
+                return {"token": token, "token_type": "bearer"}
+            raise HTTPException(status_code=502, detail="Login OK, mas token não encontrado na resposta")
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+
+
 @app.get("/v1/servers/{server_id}/health")
 async def check_server_health(server_id: str, request: Request, db: Session = Depends(get_db)):
     await require_auth(request)

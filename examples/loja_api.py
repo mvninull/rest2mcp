@@ -119,7 +119,7 @@ security = HTTPBearer()
 
 
 class LoginRequest(BaseModel):
-    username: str
+    telefone: str
     password: str
 
 
@@ -129,19 +129,19 @@ class TokenResponse(BaseModel):
 
 
 class User(BaseModel):
-    username: str
+    telefone: str
     hashed_password: str
     nome: str
 
 
 fake_users_db = [
     User(
-        username="admin",
+        telefone="+5511999999999",
         hashed_password=pwd_context.hash("123456"),
         nome="Administrador",
     ),
     User(
-        username="user",
+        telefone="+5511988888888",
         hashed_password=pwd_context.hash("senha123"),
         nome="Usuário Teste",
     ),
@@ -159,13 +159,13 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        telefone = payload.get("sub")
+        if not telefone:
             raise HTTPException(status_code=401, detail="Token inválido")
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
     for user in fake_users_db:
-        if user.username == username:
+        if user.telefone == telefone:
             return user
     raise HTTPException(status_code=401, detail="Usuário não encontrado")
 
@@ -217,16 +217,16 @@ def home():
     description="Autentica um usuário e retorna um token JWT.",
 )
 def login(
-    username: str = Form(...),
+    telefone: str = Form(...),
     password: str = Form(...),
 ):
     for user in fake_users_db:
-        if user.username == username and pwd_context.verify(password, user.hashed_password):
-            token = create_access_token({"sub": user.username})
+        if user.telefone == telefone and pwd_context.verify(password, user.hashed_password):
+            token = create_access_token({"sub": user.telefone})
             return TokenResponse(access_token=token)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Usuário ou senha inválidos",
+        detail="Telefone ou senha inválidos",
     )
 
 
@@ -237,7 +237,7 @@ def login(
     description="Retorna informações do usuário autenticado.",
 )
 def me(usuario: User = Depends(get_current_user)):
-    return {"username": usuario.username, "nome": usuario.nome}
+    return {"telefone": usuario.telefone, "nome": usuario.nome}
 
 
 # ========== PRODUCT ENDPOINTS ==========

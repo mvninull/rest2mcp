@@ -44,6 +44,15 @@
   let toolResultError = null;
   let toolRawData = null;
   let toolShowRaw = {};
+  // Auth state for MCP server login
+  let serverAuth = null;
+  let authFields = [];
+  let authValues = {};
+  let authLoggingIn = false;
+  let authSuccess = false;
+  let authError = null;
+  let serverAuthState = {};
+  let showSecurityInfo = false;
 
   let _storeAllServers = [];
   let _storeFacets = { hostingTypes: [], categories: [] };
@@ -360,6 +369,7 @@
   // ─── Load Servers (store-based) ────────────────────────
   async function loadServers(forceRefresh) {
     if (get(servers).length > 0 && !forceRefresh) return;
+    serverAuthState = {};
     serversLoading.set(true);
     serversError.set(null);
     try {
@@ -376,6 +386,7 @@
         selectServer(data[0].server_id);
       }
       _checkAllServerHealth(data || []);
+      _checkAllServerAuth(data || []);
     } catch (err) {
       console.error("[loadServers] erro:", err);
       serversError.set(err.message);
@@ -414,6 +425,29 @@
     });
     serverHealth.set(health);
     console.log("[health] todos os health checks concluídos");
+  }
+
+  async function _checkAllServerAuth(srvList) {
+    const active = srvList.filter(s => s.status === "active");
+    if (active.length === 0) return;
+    const results = await Promise.allSettled(
+      active.map(s => apiFetch(`/v1/servers/${s.server_id}/auth`))
+    );
+    for (let i = 0; i < results.length; i++) {
+      const res = results[i];
+      const srv = active[i];
+      if (res.status === "fulfilled" && res.value?.required_fields?.length) {
+        serverAuthState = {
+          ...serverAuthState,
+          [srv.server_id]: { required: true, authenticated: !!res.value.authenticated },
+        };
+      } else if (res.status === "fulfilled") {
+        serverAuthState = {
+          ...serverAuthState,
+          [srv.server_id]: { required: false },
+        };
+      }
+    }
   }
 
   // ─── Create Server ─────────────────────────────────────
@@ -505,13 +539,37 @@
     const srvList = get(servers);
     const srv = srvList.find(s => s.server_id === serverId);
     const isActive = srv?.status === "active";
+    if (isActive) {
+      try {
+        await apiFetch(`/v1/servers/${serverId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "inactive" }),
+        });
+        await loadServers(true);
+        window.showAppAlert("Servidor desativado com sucesso.");
+      } catch (err) {
+        window.showAppAlert("Erro ao alterar status: " + err.message);
+      }
+      return;
+    }
+    // Activating
     try {
       await apiFetch(`/v1/servers/${serverId}`, {
         method: "PATCH",
-        body: JSON.stringify({ status: isActive ? "inactive" : "active" }),
+        body: JSON.stringify({ status: "active" }),
       });
       await loadServers(true);
-      window.showAppAlert(`Servidor ${isActive ? "desativado" : "ativado"} com sucesso.`);
+      // Check if this server requires auth
+      try {
+        const authData = await apiFetch(`/v1/servers/${serverId}/auth`);
+        if (authData?.required_fields?.length) {
+          openToolsModal(serverId);
+          return;
+        }
+      } catch (_) {
+        // If auth check fails, just activate normally
+      }
+      window.showAppAlert("Servidor ativado com sucesso.");
     } catch (err) {
       window.showAppAlert("Erro ao alterar status: " + err.message);
     }
@@ -630,10 +688,27 @@
     toolsLoading = true;
     toolsError = null;
     toolsList = [];
+    authFields = [];
+    authValues = {};
+    authLoggingIn = false;
+    authSuccess = false;
+    authError = null;
     try {
-      const data = await apiFetch(`/v1/servers/${serverId}/tools`);
-      if (data.tools) {
-        toolsList = data.tools;
+      const [toolsData, authData] = await Promise.all([
+        apiFetch(`/v1/servers/${serverId}/tools`),
+        apiFetch(`/v1/servers/${serverId}/auth`),
+      ]);
+      if (toolsData.tools) {
+        toolsList = toolsData.tools;
+      }
+      serverAuth = authData;
+      if (authData?.required_fields?.length) {
+        authFields = authData.required_fields;
+        for (const f of authFields) authValues[f] = "";
+        serverAuthState[serverId] = { required: true, authenticated: !!authData.authenticated };
+      } else {
+        serverAuth = null;
+        serverAuthState[serverId] = { required: false };
       }
     } catch (err) {
       toolsError = err.message || "Erro ao listar tools";
@@ -647,6 +722,18 @@
     toolsList = [];
     toolsError = null;
     toolsModalServer = null;
+    serverAuth = null;
+    authFields = [];
+    authValues = {};
+    authLoggingIn = false;
+    authSuccess = false;
+    authError = null;
+    showSecurityInfo = false;
+    expandedTool = null;
+    toolResult = null;
+    toolResultError = null;
+    toolRawData = null;
+    toolShowRaw = {};
   }
 
   function toggleToolExpand(tool) {
@@ -750,6 +837,43 @@
       toolResultError = err.message || "Erro ao executar tool";
     } finally {
       toolCalling = false;
+    }
+  }
+
+  async function loginToServer() {
+    if (!toolsModalServer) return;
+    authLoggingIn = true;
+    authError = null;
+    authSuccess = false;
+    try {
+      const data = await apiFetch(`/v1/servers/${toolsModalServer.server_id}/auth/login`, {
+        method: "POST",
+        body: JSON.stringify(authValues),
+      });
+      if (data.token) {
+        await apiFetch(`/v1/servers/${toolsModalServer.server_id}/tools/call`, {
+          method: "POST",
+          body: JSON.stringify({ name: "set_token", arguments: { token: data.token } }),
+        });
+        authSuccess = true;
+        serverAuthState[toolsModalServer.server_id] = { required: true, authenticated: true };
+        for (const f of authFields) authValues[f] = "";
+      } else {
+        authError = "Resposta inesperada do servidor";
+      }
+    } catch (err) {
+      let msg = err.message || "Erro ao fazer login";
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed.detail) {
+          msg = typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail);
+        }
+      } catch (_) {
+        if (msg.includes("Object object")) msg = "Erro ao fazer login";
+      }
+      authError = msg;
+    } finally {
+      authLoggingIn = false;
     }
   }
 
@@ -2091,6 +2215,8 @@
           {@const isActive = s.status === "active"}
           {@const healthError = isActive && health === "error"}
           {@const isMerged = s.is_merged === true}
+          {@const authState = serverAuthState[s.server_id]}
+          {@const needsAuth = authState?.required && !authState?.authenticated}
           <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
           <div class="server-card"
             class:active-status={isActive}
@@ -2143,9 +2269,9 @@
               </div>
             </div>
             <div class="server-actions">
-              <span class="status-chip" class:active={isActive && !healthError} class:inactive={!isActive || healthError}>
+              <span class="status-chip" class:active={isActive && !healthError && !needsAuth} class:inactive={!isActive || healthError || needsAuth}>
                 <span class="status-chip-dot"></span>
-                {healthError ? $t('dashboard.api_unavailable') : isActive ? $t('dashboard.online') : $t('dashboard.offline')}
+                {healthError ? $t('dashboard.api_unavailable') : needsAuth ? $t('auth.needs_login') : isActive ? $t('dashboard.online') : $t('dashboard.offline')}
               </span>
               <button class="btn-copy" disabled={!isActive} onclick={(e) => copyUrl(e.currentTarget, s.url_sse || '')}>
                 {$t('dashboard.copy_url')}
@@ -2293,6 +2419,41 @@
       <h3>{$t('tools.modal.title')} {toolsModalServer?.name || ""}</h3>
       <p class="modal-sub">{toolsModalServer?.server_id || ""}</p>
     </div>
+    {#if serverAuth && !authSuccess && !serverAuth.authenticated}
+      <div style="padding:0 0 1rem;border-bottom:1px solid var(--border);margin-bottom:1rem;">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.75rem;display:flex;align-items:center;gap:6px;">
+          {$t('auth.login_title')}
+          <button class="security-info-btn" onclick={() => showSecurityInfo = !showSecurityInfo}>?</button>
+        </div>
+        <div style="font-size:0.75rem;color:#9ca3af;margin-bottom:0.75rem;line-height:1.4;">{$t('auth.login_desc')}</div>
+        {#if showSecurityInfo}
+          <div style="margin-bottom:1rem;padding:0.85rem;background:rgba(0,212,170,0.05);border:1px solid rgba(0,212,170,0.12);border-radius:10px;font-size:0.75rem;color:#9ca3af;line-height:1.6;">
+            <div style="font-weight:700;color:var(--accent2);margin-bottom:0.4rem;">{$t('auth.security_full_title')}</div>
+            <p style="margin:0 0 0.6rem;">{$t('auth.security_full_desc')}</p>
+            <div style="font-weight:600;color:var(--ink);margin-bottom:0.3rem;">{$t('auth.security_why_safer')}</div>
+            <ul style="margin:0 0 0.6rem;padding-left:1.2rem;">
+              <li style="margin-bottom:0.3rem;"><strong style="color:var(--ink);">{$t('auth.security_zero_exposure')}</strong></li>
+              <li><strong style="color:var(--ink);">{$t('auth.security_full_control')}</strong></li>
+            </ul>
+            <div style="font-weight:600;color:var(--ink);margin-bottom:0.3rem;">{$t('auth.security_token_title')}</div>
+            <p style="margin:0 0 0.6rem;">{$t('auth.security_token_desc')}</p>
+            <p style="margin:0;font-style:italic;">{$t('auth.security_peace')}</p>
+          </div>
+        {/if}
+        {#each authFields as field}
+          <div class="tool-arg-group">
+            <label class="tool-arg-label">{field}</label>
+            <input class="tool-arg-input" type={["password", "senha", "pwd", "pass", "secret", "palavra-passe", "passwd"].includes(field.toLowerCase()) ? "password" : "text"} placeholder={field} value={authValues[field] ?? ""} oninput={(e) => authValues[field] = e.target.value} />
+          </div>
+        {/each}
+        {#if authError}
+          <div style="color:var(--warn);font-size:0.8rem;margin:0.5rem 0;">{authError}</div>
+        {/if}
+        <button class="btn-confirm" style="margin-top:0.5rem;" onclick={loginToServer} disabled={authLoggingIn}>
+          {authLoggingIn ? $t('auth.authenticating') : $t('auth.authenticate')}
+        </button>
+      </div>
+    {/if}
     {#if toolsLoading}
       <div style="padding:2rem;text-align:center;color:#6b7280;">{$t('tools.modal.loading')}</div>
     {:else if toolsError}

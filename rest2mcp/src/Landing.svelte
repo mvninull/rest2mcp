@@ -689,6 +689,39 @@
       {$t("security.audit_desc")}
     </div>
   </div>
+
+  <!-- Human-in-the-loop Auth Explanation -->
+  <div style="margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--border);">
+    <h3 style="font-size: 1.15rem; margin-bottom: 0.75rem;">{$t("auth.why_title")}</h3>
+    <p style="color: var(--muted); margin-bottom: 1.5rem; font-weight: 300;">
+      {$t("auth.why_desc")}
+    </p>
+    <div class="how-it-works" style="margin-top: 0;">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 1.5rem;">
+        <div class="callout solution" style="margin: 0;">
+          <strong>{$t("auth.step1_title")}</strong>
+          {$t("auth.step1_desc")}
+        </div>
+        <div class="callout solution" style="margin: 0;">
+          <strong>{$t("auth.step2_title")}</strong>
+          {$t("auth.step2_desc")}
+        </div>
+        <div class="callout solution" style="margin: 0;">
+          <strong>{$t("auth.step3_title")}</strong>
+          {$t("auth.step3_desc")}
+        </div>
+      </div>
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <span class="zk-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> {$t("auth.zero_exposure")}</span>
+        <span class="zk-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> {$t("auth.full_control")}</span>
+      </div>
+    </div>
+    <div style="margin-top: 1.25rem; padding: 1rem 1.25rem; background: rgba(0, 212, 170, 0.06); border-radius: 12px; border: 1px solid rgba(0, 212, 170, 0.12);">
+      <p style="margin: 0; font-size: 0.85rem; color: var(--muted);">
+        <strong style="color: var(--accent2);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:3px;"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg> {$t("auth.token_management")}</strong>
+      </p>
+    </div>
+  </div>
 </section>
 
 <!-- FEATURES -->
@@ -1142,9 +1175,7 @@
         <button
           class="btn-ghost"
           style="display: block; width: 100%; text-align: center; color: white; border-color: rgba(255,255,255,0.2); cursor: pointer;"
-          onclick={() =>
-            (window.location.href =
-              "mailto:m4codexp@gmail.com?subject=Consultar%20Vendas%20-%20rest2mcp&body=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20os%20planos%20e%20funcionalidades%20do%20rest2mcp.")}
+          onclick={() => window.scrollToSection("contacts")}
           >{$t("pricing.enterprise.cta")}</button
         >
       </div>

@@ -2500,3 +2500,25 @@ textarea.tool-arg-input {
         flex-wrap: wrap;
     }
 }
+.security-info-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    padding: 0;
+    font-size: 0.7rem;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid #9ca3af;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+.security-info-btn:hover {
+    color: #00d4aa;
+    border-color: #00d4aa;
+}
