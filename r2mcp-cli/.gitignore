@@ -1,0 +1,4 @@
+/r2mcp_cli/
+/dist/
+*.egg-info/
+__pycache__/
