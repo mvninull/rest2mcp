@@ -1693,7 +1693,13 @@
           ...options,
         });
         if (res.status === 204) return null;
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { detail: text };
+        }
         if (!res.ok) throw new Error(data.detail || `Erro ${res.status}`);
         return data;
       }

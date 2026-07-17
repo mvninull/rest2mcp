@@ -66,6 +66,20 @@
   let _storePage = 1;
   let _storePerPage = 20;
 
+  // ─── Overview strip (page header quick stats) ──────────────────
+  $: onlineServers = $servers.filter((s) => {
+    const health = $serverHealth[s.server_id];
+    return s.status === "active" && health !== "error";
+  }).length;
+  $: attentionServers = $servers.filter((s) => {
+    const health = $serverHealth[s.server_id];
+    const isActive = s.status === "active";
+    const healthError = isActive && health === "error";
+    const authState = serverAuthState[s.server_id];
+    const needsAuth = authState?.required && !authState?.authenticated;
+    return healthError || !isActive || needsAuth;
+  }).length;
+
   function debug(...args) {
     console.log("[dashboard-debug]", ...args);
   }
@@ -2182,6 +2196,28 @@
       </button>
     </div>
 
+    {#if $servers.length > 0}
+      <div class="overview-strip">
+        <div class="overview-chip">
+          <span class="overview-dot overview-dot-total"></span>
+          <span class="overview-value">{$serverCount}</span>
+          <span class="overview-label">{$t('dashboard.active_servers')}</span>
+        </div>
+        <div class="overview-chip">
+          <span class="overview-dot overview-dot-ok"></span>
+          <span class="overview-value">{onlineServers}</span>
+          <span class="overview-label">{$t('dashboard.online')}</span>
+        </div>
+        {#if attentionServers > 0}
+          <div class="overview-chip overview-chip-warn">
+            <span class="overview-dot overview-dot-warn"></span>
+            <span class="overview-value">{attentionServers}</span>
+            <span class="overview-label">Precisam de atenção</span>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
     <div class="server-list" id="serverList">
       {#if $serversLoading}
         <div class="empty-state">
@@ -2198,7 +2234,7 @@
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff5c35" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <div style="color:var(--warn)">{$t('dashboard.load_error')}<br/>{$serversError}</div>
-          <button onclick={() => loadServers(true)} style="margin-top:1.2rem;padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-family:var(--mono);font-size:0.78rem;transitionall 0.2s;">
+          <button class="btn-retry" onclick={() => loadServers(true)}>
             {$t('dashboard.retry')}
           </button>
         </div>
@@ -2208,6 +2244,12 @@
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="14" rx="2"/><path d="M9 16v4M15 16v4M9 20h6"/><path d="M9 6h6M9 10h6"/></svg>
           </div>
           <div>{$t('dashboard.empty')}<br/>{$t('dashboard.empty_hint')}</div>
+          <button class="btn-add-server empty-state-cta" onclick={() => window.openCreateModal()}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            {$t('dashboard.new_server')}
+          </button>
         </div>
       {:else}
         {#each $servers as s (s.server_id)}
@@ -2257,14 +2299,17 @@
                   {/if}
                 </div>
                 <div class="server-url">
-                  {#if healthError}
-                    <span style="color:var(--danger)">{$t('dashboard.api_unavailable')}</span>
-                  {:else}
-                    {escapeHtml(s.url_sse || s.server_id)}
-                  {/if}
-                  {#if s.merge_info}
-                    <span> · {escapeHtml(s.merge_info)}</span>
-                  {/if}
+                  <span class="transport-badge">{(s.transport || "http").toUpperCase()}</span>
+                  <span class="server-url-text">
+                    {#if healthError}
+                      <span style="color:var(--danger)">{$t('dashboard.api_unavailable')}</span>
+                    {:else}
+                      {escapeHtml(s.url_sse || s.server_id)}
+                    {/if}
+                    {#if s.merge_info}
+                      <span> · {escapeHtml(s.merge_info)}</span>
+                    {/if}
+                  </span>
                 </div>
               </div>
             </div>
@@ -2300,15 +2345,24 @@
       </div>
       <div class="stat-grid">
         <div class="stat-row">
-          <span class="stat-label">{$t('dashboard.active_servers')}</span>
+          <span class="stat-label">
+            <svg class="stat-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="7" rx="1.5"/><rect x="2" y="14" width="20" height="7" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><circle cx="6" cy="17.5" r="1"/></svg>
+            {$t('dashboard.active_servers')}
+          </span>
           <span class="stat-value num">{$serverCount}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">{$t('dashboard.log_retention')}</span>
+          <span class="stat-label">
+            <svg class="stat-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            {$t('dashboard.log_retention')}
+          </span>
           <span class="stat-value num">24h</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">{$t('dashboard.gateway')}</span>
+          <span class="stat-label">
+            <svg class="stat-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l2-7 4 14 2-7h4"/></svg>
+            {$t('dashboard.gateway')}
+          </span>
           <span class="stat-value ok" id="gatewayStatus">---</span>
         </div>
         <div class="stat-row" id="quotaRowServers" style="display:none">
@@ -2332,6 +2386,9 @@
 
     <!-- Live Logs -->
     <div class="sidebar-logs">
+      <div class="sidebar-logs-chrome">
+        <span></span><span></span><span></span>
+      </div>
       <div class="sidebar-logs-header">
         <div class="logs-header-left">
           <span class="pulse-dot"></span>

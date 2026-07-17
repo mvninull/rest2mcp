@@ -565,26 +565,27 @@ async def notify_session_termination(user_id: str):
         event.set()
 
 
-async def cascade_guard(server_id: str, apikey: str, db: Session) -> ServerDB | None:
+async def cascade_guard(server_id: str, apikey: str, db: Session) -> tuple[ServerDB | None, str | None]:
+    """Retorna (server, None) se OK, ou (None, reason) se bloqueado."""
     server = _validate_server(server_id, apikey, db)
     if not server:
-        return None
+        return None, "Servidor não encontrado ou apikey inválida"
     if not server.is_active:
-        return None
+        return None, "Servidor está inativo"
     user_id = server.user_id
     if not user_id:
-        return server
+        return server, None
     try:
         profile = await get_cached_profile(user_id)
     except Exception:
-        return server
+        return server, None
     if profile.get("status") != "active":
-        return None
+        return None, f"Perfil do utilizador não está ativo (status: {profile.get('status', 'desconhecido')})"
     limits = get_tier_limits(profile.get("plan_tier", "free"))
     active_count = db.query(ServerDB).filter(ServerDB.user_id == user_id, ServerDB.is_active == True).count()
     if profile.get("plan_tier") == "free" and active_count > limits["max_servers"]:
-        return None
-    return server
+        return None, f"Limite do plano free excedido ({active_count}/{limits['max_servers']} servidores ativos)"
+    return server, None
 
 
 @asynccontextmanager
@@ -1722,9 +1723,9 @@ async def sse_connection(server_id: str, apikey: str, request: Request):
         )
     db = SessionLocal()
     try:
-        server = await cascade_guard(server_id, apikey, db)
+        server, reason = await cascade_guard(server_id, apikey, db)
         if not server:
-            return Response(status_code=403, content="Acesso negado: servidor inativo, suspenso ou limite excedido")
+            return JSONResponse(status_code=403, content={"detail": f"Acesso negado: {reason}"})
     finally:
         db.close()
 
@@ -1791,9 +1792,9 @@ async def sse_connection(server_id: str, apikey: str, request: Request):
 async def messages_endpoint(server_id: str, apikey: str, request: Request):
     db = SessionLocal()
     try:
-        server = await cascade_guard(server_id, apikey, db)
+        server, reason = await cascade_guard(server_id, apikey, db)
         if not server:
-            return Response(status_code=403, content="Acesso negado")
+            return JSONResponse(status_code=403, content={"detail": f"Acesso negado: {reason}"})
     finally:
         db.close()
 
@@ -1839,9 +1840,9 @@ async def _get_or_start_mcp(server_id: str, apikey: str):
     key = f"{server_id}:{apikey}"
     db = SessionLocal()
     try:
-        server = await cascade_guard(server_id, apikey, db)
+        server, reason = await cascade_guard(server_id, apikey, db)
         if not server:
-            return None, Response(status_code=403, content="Acesso negado")
+            return None, JSONResponse(status_code=403, content={"detail": f"Acesso negado: {reason}"})
     finally:
         db.close()
 
