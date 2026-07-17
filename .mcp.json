@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "Test-Petstore": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8080/v1/srv_dz3tr1dd/r2m_live_REDACTED/mcp"
+      ]
+    },
+    "Test-MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8080/v1/srv_djg1eocp/r2m_live_REDACTED/mcp"
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "rest2mcp"
@@ -27,9 +27,17 @@ dev = [
     "pytest",
     # "pyngrok",
 ]
+cli = [
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+r2mcp = "r2mcp_cli.main:app"
 
 [tool.setuptools.packages.find]
-where = ["app"]
+where = ["."]
+exclude = ["tests*"]
 
 [tool.ruff]
 target-version = "py310"
