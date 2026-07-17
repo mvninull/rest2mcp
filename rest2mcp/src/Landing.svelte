@@ -1,9 +1,110 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import "./Landing.css";
   import { t } from "./stores/lang.js";
   const __ = (key) => get(t)(key);
+
+  // ─── Scroll-Storytelling: Advantages section ───────────────────
+  // Cards are stacked with position:absolute in the same spot inside a
+  // sticky wrapper, so IntersectionObserver can't distinguish which
+  // card should be "active" — they all share the same bounding box and
+  // enter/leave the viewport together. Instead we track scroll
+  // progress through the tall container and pick the active index
+  // directly from that progress.
+  let advantagesContainer;
+  let activeAdvantage = 0;
+  let advantagesProgress = 0; // continuous 0–1, for the thin progress line
+  const ADVANTAGES_COUNT = 5;
+  let advantagesTicking = false;
+
+  const advantages = [
+    {
+      file: "01_instant.setup",
+      tag: "SEM CÓDIGO",
+      title: "1. Do Zero Código à IA em Segundos",
+      body: "Esqueça a complexidade de configurar servidores, gerir dependências e escrever código de integração. Basta colar o link da documentação da sua API na nossa interface e clicar em criar. Transformamos qualquer API numa ferramenta pronta para a Inteligência Artificial, de forma instantânea, sem que você precise escrever uma única linha de código.",
+      icon: "bolt"
+    },
+    {
+      file: "02_auth.guard",
+      tag: "AUTENTICAÇÃO ISOLADA",
+      title: "2. Autenticação Segura e Multiusuário",
+      body: "Proteja as credenciais dos seus clientes e da sua empresa. Em vez de delegar logins e senhas para a IA — o que gera riscos graves de segurança —, a nossa plataforma gere a autenticação de forma isolada. O login é feito diretamente pela nossa interface web, e o token de acesso é injetado de forma invisível e segura nas chamadas subsequentes. A IA apenas executa as ações, mas nunca \"vê\" nem armazena as suas senhas.",
+      icon: "lock"
+    },
+    {
+      file: "03_logs.stream",
+      tag: "LOGS EM TEMPO REAL",
+      title: "3. Transparência Total e Observabilidade",
+      body: "Diga adeus às \"caixas pretas\". Saber exatamente o que a IA está a fazer é fundamental para a confiança do negócio. A nossa plataforma oferece um painel de logs em tempo real onde você pode visualizar exatamente qual ferramenta foi chamada, quais dados foram enviados, o tempo de resposta e o status de cada requisição. Tenha controle e auditoria total sobre as ações da Inteligência Artificial.",
+      icon: "activity"
+    },
+    {
+      file: "04_gateway.proxy",
+      tag: "GATEWAY SEGURO",
+      title: "4. Gateway Inteligente e Isolamento de Rede",
+      body: "Pare de lutar contra erros de CORS, bloqueios de firewall ou limites de requisições. A nossa plataforma atua como um Gateway seguro entre a IA e as suas APIs. O tráfego é roteado e gerido pelos nossos servidores, garantindo que a Inteligência Artificial consiga aceder a serviços internos ou corporativos de forma fluida, sem expor a sua infraestrutura diretamente à internet.",
+      icon: "network"
+    },
+    {
+      file: "05_merge.apis",
+      tag: "MULTI-API",
+      title: "5. Ecossistema Unificado (Merge de APIs)",
+      body: "Não se limite a conectar uma API de cada vez. A nossa plataforma permite fundir múltiplas APIs e serviços diferentes numa única interface conectada à IA. Crie ecossistemas complexos de ferramentas com organização inteligente, permitindo que a Inteligência Artificial tenha acesso a um leque completo de capacidades do seu negócio num só lugar, trabalhando de forma integrada.",
+      icon: "layers"
+    }
+  ];
+
+  function updateActiveAdvantage() {
+    if (!advantagesContainer) return;
+    const rect = advantagesContainer.getBoundingClientRect();
+    const scrollableDistance = rect.height - window.innerHeight;
+    if (scrollableDistance <= 0) {
+      activeAdvantage = 0;
+      advantagesProgress = 0;
+      return;
+    }
+    const progress = Math.min(1, Math.max(0, -rect.top / scrollableDistance));
+    advantagesProgress = progress;
+    activeAdvantage = Math.min(
+      ADVANTAGES_COUNT - 1,
+      Math.floor(progress * ADVANTAGES_COUNT)
+    );
+  }
+
+  // Lets someone click a tab to jump straight to that card, like
+  // switching tabs in a code editor.
+  function jumpToAdvantage(i) {
+    if (!advantagesContainer) return;
+    const rect = advantagesContainer.getBoundingClientRect();
+    const scrollableDistance = rect.height - window.innerHeight;
+    if (scrollableDistance <= 0) return;
+    const targetProgress = (i + 0.5) / ADVANTAGES_COUNT;
+    const targetY = window.scrollY + rect.top + targetProgress * scrollableDistance;
+    window.scrollTo({ top: targetY, behavior: "smooth" });
+  }
+
+  function onAdvantagesScroll() {
+    if (advantagesTicking) return;
+    advantagesTicking = true;
+    window.requestAnimationFrame(() => {
+      updateActiveAdvantage();
+      advantagesTicking = false;
+    });
+  }
+
+  onMount(() => {
+    updateActiveAdvantage();
+    window.addEventListener("scroll", onAdvantagesScroll, { passive: true });
+    window.addEventListener("resize", onAdvantagesScroll, { passive: true });
+  });
+
+  onDestroy(() => {
+    if (typeof window === "undefined") return;
+    window.removeEventListener("scroll", onAdvantagesScroll);
+    window.removeEventListener("resize", onAdvantagesScroll);
+  });
 
   onMount(() => {
     // ─── Expor já os handlers ao window, ANTES de qualquer coisa
@@ -720,6 +821,72 @@
       <p style="margin: 0; font-size: 0.85rem; color: var(--muted);">
         <strong style="color: var(--accent2);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:3px;"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg> {$t("auth.token_management")}</strong>
       </p>
+    </div>
+  </div>
+</section>
+
+<!-- ADVANTAGES (Scroll-Storytelling) -->
+<section class="advantages-scroll-container" bind:this={advantagesContainer}>
+  <div class="advantages-sticky-wrapper">
+    <div class="advantages-intro">
+      <div class="section-label">// 02 — Vantagens</div>
+      <h2 class="advantages-heading">Por que escolher o rest2mcp?</h2>
+    </div>
+
+    <div class="advantages-window">
+      <div class="advantages-window-bar">
+        <div class="window-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="advantages-tabs" role="tablist" aria-label="Vantagens">
+          {#each advantages as adv, i}
+            <button
+              type="button"
+              class="advantages-tab"
+              class:active={activeAdvantage === i}
+              role="tab"
+              aria-selected={activeAdvantage === i}
+              onclick={() => jumpToAdvantage(i)}
+            >
+              <span class="tab-dot" aria-hidden="true"></span>
+              <span class="tab-file">{adv.file}</span>
+            </button>
+          {/each}
+        </div>
+        <div class="window-status" aria-hidden="true">
+          <span class="status-dot"></span>live
+        </div>
+      </div>
+
+      <div class="advantages-progress-track" aria-hidden="true">
+        <div class="advantages-progress-fill" style="width: {advantagesProgress * 100}%"></div>
+      </div>
+
+      <div class="advantages-cards-stack">
+        {#each advantages as adv, i}
+          <div class="advantage-card" class:is-visible={activeAdvantage === i}>
+            <div class="advantage-card-top">
+              <span class="advantage-icon">
+                {#if adv.icon === "bolt"}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 4 14h6l-1 7 9-11h-6l1-7Z"/></svg>
+                {:else if adv.icon === "lock"}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                {:else if adv.icon === "activity"}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 7 4-14 2 7h6"/></svg>
+                {:else if adv.icon === "network"}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><circle cx="4" cy="6" r="1.8"/><circle cx="4" cy="18" r="1.8"/><circle cx="20" cy="12" r="1.8"/><path d="M9.8 10.6 5.6 7M9.8 13.4 5.6 17M14.4 12H18"/></svg>
+                {:else if adv.icon === "layers"}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5"/><path d="M3 17.5l9 5 9-5"/></svg>
+                {/if}
+              </span>
+              <span class="advantage-number">0{i + 1}</span>
+            </div>
+            <h3>{adv.title}</h3>
+            <p>{adv.body}</p>
+            <span class="advantage-tag">{adv.tag}</span>
+          </div>
+        {/each}
+      </div>
     </div>
   </div>
 </section>
@@ -1749,3 +1916,271 @@
     alt="Buy Me a Coffee at ko-fi.com"
   />
 </a>
+
+<style>
+  /* ─── ADVANTAGES: Scroll-Storytelling ─────────────────────── */
+
+  /* Tall container that provides the scroll distance for the effect.
+     100vh per card gives each one a full screen of scroll to "own"
+     before the next one takes over. */
+  .advantages-scroll-container {
+    height: 500vh;
+    position: relative;
+  }
+
+  /* Pinned viewport-height window while scrolling through the section */
+  .advantages-sticky-wrapper {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 2rem 1.5rem;
+  }
+
+  .advantages-intro {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .advantages-intro .section-label {
+    margin-bottom: 0.75rem;
+  }
+
+  .advantages-heading {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  /* The whole thing reads as a single "code editor" window: dark
+     chrome on top, light content pane below — echoing the dashboard
+     mockup used elsewhere on the page, so the section feels native to
+     the product rather than a generic card grid. */
+  .advantages-window {
+    width: 100%;
+    max-width: 820px;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 30px 70px rgba(12, 12, 20, 0.16);
+    border: 1px solid var(--border, rgba(12, 12, 20, 0.08));
+  }
+
+  .advantages-window-bar {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: #0c0c14;
+    padding: 0.85rem 1.1rem;
+  }
+
+  .window-dots {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .window-dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .advantages-tabs {
+    display: flex;
+    flex: 1;
+    gap: 0.35rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .advantages-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .advantages-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    font-family: var(--mono, monospace);
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  .advantages-tab:hover {
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .advantages-tab.active {
+    color: white;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .tab-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
+    transition: background 0.3s ease;
+  }
+
+  .advantages-tab.active .tab-dot {
+    background: var(--accent2, #00d4aa);
+  }
+
+  .window-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--mono, monospace);
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.35);
+    flex-shrink: 0;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent2, #00d4aa);
+    box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.5);
+    animation: advantages-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes advantages-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(0, 212, 170, 0); }
+  }
+
+  .advantages-progress-track {
+    height: 2px;
+    background: rgba(12, 12, 20, 0.06);
+  }
+
+  .advantages-progress-fill {
+    height: 100%;
+    background: var(--accent, #2f6fed);
+    transition: width 0.1s linear;
+  }
+
+  .advantages-cards-stack {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    background: white;
+  }
+
+  .advantage-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 2.75rem 3rem;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+  }
+
+  .advantage-card.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .advantage-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+
+  .advantage-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(0, 212, 170, 0.1);
+    color: var(--accent2, #00d4aa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .advantage-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .advantage-number {
+    font-family: var(--mono, monospace);
+    font-size: 0.75rem;
+    color: rgba(12, 12, 20, 0.25);
+    letter-spacing: 0.05em;
+  }
+
+  .advantage-card h3 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 0 0 0.85rem;
+    color: #0c0c14;
+  }
+
+  .advantage-card p {
+    font-size: 1.02rem;
+    line-height: 1.6;
+    color: #4b5563;
+    margin: 0;
+    flex: 1;
+  }
+
+  .advantage-tag {
+    align-self: flex-start;
+    margin-top: 1.5rem;
+    font-family: var(--mono, monospace);
+    font-size: 0.65rem;
+    letter-spacing: 0.03em;
+    color: var(--accent2, #00d4aa);
+    background: rgba(0, 212, 170, 0.1);
+    padding: 4px 10px;
+    border-radius: 100px;
+  }
+
+  @media (max-width: 640px) {
+    .advantages-window-bar {
+      gap: 0.75rem;
+    }
+    .tab-file {
+      display: none;
+    }
+    .advantages-cards-stack {
+      height: 460px;
+    }
+    .advantage-card {
+      padding: 2rem 1.5rem;
+    }
+    .advantage-card h3 {
+      font-size: 1.3rem;
+    }
+    .advantage-card p {
+      font-size: 0.95rem;
+    }
+  }
+</style>
