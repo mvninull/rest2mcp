@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 from pathlib import Path
 from typing import Any, Callable
 
@@ -140,6 +141,34 @@ def _set_child_resource_limits():
         pass
 
 
+def _start_memory_monitor(proc: subprocess.Popen, limit_bytes: int) -> threading.Timer | None:
+    """Monitoriza a memória do processo filho numa thread daemon.
+    Mata o processo se exceder o limite. Usado no Windows onde
+    resource.setrlimit não está disponível."""
+    import psutil
+
+    def _check():
+        if proc.poll() is not None:
+            return
+        try:
+            p = psutil.Process(proc.pid)
+            mem = p.memory_info().rss
+            if mem > limit_bytes:
+                proc.kill()
+                return
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return
+        # Re-agenda a verificação a cada 500ms enquanto o processo corre
+        t = threading.Timer(0.5, _check)
+        t.daemon = True
+        t.start()
+
+    t = threading.Timer(0.5, _check)
+    t.daemon = True
+    t.start()
+    return t
+
+
 class Sandbox:
     def __init__(self, tool_map: dict[str, dict], timeout: int = 15):
         self._tool_map = tool_map
@@ -219,12 +248,24 @@ async def {name}(**kwargs):
                 **popen_kwargs,
             )
 
+            # No Windows, o resource.setrlimit não existe, por isso
+            # monitorizamos a memória do processo filho via psutil numa
+            # thread separada. No Linux, o setrlimit via preexec_fn já
+            # faz esta proteção ao nível do SO antes de qualquer código
+            # correr, por isso não precisamos da thread adicional.
+            _mem_killer = None
+            if sys.platform == "win32":
+                _mem_killer = _start_memory_monitor(proc, 256 * 1024 * 1024)
+
             try:
                 stdout, stderr = proc.communicate(timeout=self._timeout)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait(timeout=5)
                 return {"error": f"Timeout de {self._timeout}s excedido", "output": "", "result": None}
+            finally:
+                if _mem_killer is not None:
+                    _mem_killer.cancel()
 
             if proc.returncode != 0:
                 return {"error": f"Processo terminou com codigo {proc.returncode}", "output": stderr, "result": None}
