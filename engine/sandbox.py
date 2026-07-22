@@ -1,7 +1,6 @@
 import ast
 import json
 import os
-import resource
 import subprocess
 import sys
 import tempfile
@@ -133,7 +132,12 @@ def validate_code(code: str) -> str:
 # preexec_fn corre no processo filho, depois do fork() e antes do exec(),
 # por isso só afeta a sandbox — nunca o processo pai (o servidor).
 def _set_child_resource_limits():
-    resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
+    try:
+        import resource
+
+        resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
+    except (ImportError, AttributeError):
+        pass
 
 
 class Sandbox:
@@ -193,15 +197,26 @@ async def {name}(**kwargs):
                 "PYTHONDONTWRITEBYTECODE": "1",
                 "PYTHONUNBUFFERED": "1",
             }
+            if sys.platform == "win32":
+                # WinError 10106: o Winsock precisa de SYSTEMROOT para
+                # carregar o provedor de serviços (dll de socket). Sem
+                # isto, asyncio (importado no wrapper) crasha ao tentar
+                # importar _overlapped no processo filho.
+                env.setdefault("SYSTEMROOT", os.environ.get("SYSTEMROOT", r"C:\Windows"))
 
-            proc = subprocess.Popen(
-                [sys.executable, "-I", "-u", str(wrapper_path)],
+            popen_kwargs = dict(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,
                 cwd=str(tmpdir),
                 text=True,
-                preexec_fn=_set_child_resource_limits,
+            )
+            if sys.platform != "win32":
+                popen_kwargs["preexec_fn"] = _set_child_resource_limits
+
+            proc = subprocess.Popen(
+                [sys.executable, "-I", "-u", str(wrapper_path)],
+                **popen_kwargs,
             )
 
             try:
