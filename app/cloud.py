@@ -1917,6 +1917,13 @@ async def mcp_get_stream(server_id: str, apikey: str, request: Request):
 # ─── Health Check ──────────────────────────────────────────────────────────────
 
 
+# ─── Engine Routes ──────────────────────────────────────────────────────────
+
+from .engine_routes import router as engine_router
+
+app.include_router(engine_router)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "active_servers": len(active_servers)}

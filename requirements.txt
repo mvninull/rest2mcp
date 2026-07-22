@@ -9,3 +9,5 @@ fastmcp>=3.0.0,<3.3
 httpx
 python-dotenv
 stripe==14.0.0
+fastembed>=0.8.0
+rank-bm25>=0.2.0
