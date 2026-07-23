@@ -15,6 +15,14 @@
         "mcp-remote",
         "http://localhost:8080/v1/srv_djg1eocp/r2m_live_REDACTED/mcp"
       ]
+    },
+    "Engine-MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8080/v1/engine/mcp"
+      ]
     }
   }
 }

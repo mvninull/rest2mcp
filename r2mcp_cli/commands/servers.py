@@ -1,3 +1,5 @@
+from typing import List
+
 import typer
 from rich import box
 from rich.console import Console
@@ -142,3 +144,43 @@ def resume(server_id: str = typer.Argument(..., help="ID do servidor")):
             raise typer.Exit(1)
 
     console.print(f"[green]Servidor '{server_id}' retomado.[/green]")
+
+
+@servers_app.command()
+def credentials(
+    server_id: str = typer.Argument(..., help="ID do servidor"),
+    key_value: List[str] = typer.Option(
+        [], "--set", "-s", help="Par chave=valor (ex: -s username=admin -s password=123456)"
+    ),
+):
+    _require_auth()
+    client = APIClient()
+
+    if key_value:
+        creds = {}
+        for kv in key_value:
+            if "=" not in kv:
+                console.print(f"[red]Formato invalido: '{kv}'. Use chave=valor.[/red]")
+                raise typer.Exit(1)
+            k, v = kv.split("=", 1)
+            creds[k] = v
+        try:
+            result = client.set_credentials(server_id, creds)
+            client.close()
+            console.print(f"[green]Credenciais salvas para '{server_id}'.[/green]")
+        except APIError as e:
+            client.close()
+            console.print(f"[red]Erro: {e.detail}[/red]")
+            raise typer.Exit(1)
+    else:
+        try:
+            info = client.check_credentials(server_id)
+            client.close()
+        except APIError as e:
+            client.close()
+            console.print(f"[red]Erro: {e.detail}[/red]")
+            raise typer.Exit(1)
+        if info.get("has_credentials"):
+            console.print(f"[green]Servidor '{server_id}' tem credenciais configuradas.[/green]")
+        else:
+            console.print(f"[yellow]Servidor '{server_id}' nao tem credenciais configuradas.[/yellow]")

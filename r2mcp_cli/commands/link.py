@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -84,7 +83,7 @@ def _read_json(path: Path) -> dict:
 @link_app.callback(invoke_without_command=True)
 def link(
     editor: str = typer.Argument(..., help="Editor: claude-code, cursor, vscode, opencode"),
-    server_id: str = typer.Argument(..., help="ID do servidor ou 'engine' para ligar ao motor de orquestracao"),
+    server_id: str = typer.Argument("engine", help="ID do servidor ou 'engine' para o motor de orquestracao"),
 ):
     _require_auth()
 
@@ -97,23 +96,18 @@ def link(
         console.print(f"[red]Nao foi possivel determinar o caminho de configuracao para '{editor}'.[/red]")
         raise typer.Exit(1)
 
-    # Suporte especial para ligar ao motor de orquestração (engine) em vez de
-    # um servidor MCP individual. A engine expõe apenas search + run.
     if server_id == "engine":
         url = f"http://localhost:8080/v1/engine/mcp"
-        transport = "streamable-http"
         name = "Engine-MCP"
     else:
-        with console.status(f"[bold green]A procurar servidor '{server_id}'..."):
-            server = _find_server(server_id)
-
+        server = _find_server(server_id)
         if not server:
             console.print(f"[red]Servidor '{server_id}' nao encontrado.[/red]")
             raise typer.Exit(1)
-
-        url = server.get("url_sse", "")
-        transport = server.get("transport", "sse")
+        apikey = server.get("apikey", "")
+        url = f"http://localhost:8080/v1/{server_id}/{apikey}/mcp"
         name = server.get("name", server_id)
+    transport = "streamable-http"
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config = _read_json(config_path)

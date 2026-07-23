@@ -139,6 +139,7 @@ class ActiveServer:
         self.spec_data = server.spec_data
         self.is_merged = server.is_merged
         self.merge_config = server.merge_config
+        self.credentials = server.credentials
         self._transport = transport
         self.manager: MCPServerManager | None = None
         self.port: int | None = None
@@ -229,6 +230,7 @@ class ActiveServer:
                 spec=spec_data,
                 server_id=self.server_id,
                 log_func=_make_log_func(self.server_id),
+                credentials=json.loads(self.credentials) if isinstance(self.credentials, str) else self.credentials,
             )
             transport_type = transport or self._transport
             self.sse_app = self.manager.mcp.http_app(transport=transport_type)
@@ -1212,15 +1214,7 @@ async def list_server_tools(server_id: str, request: Request, db: Session = Depe
     try:
         async with Client(transport) as client:
             tools = await client.list_tools()
-        result = []
-        for t in tools:
-            d = (
-                t.model_dump()
-                if hasattr(t, "model_dump")
-                else {"name": t.name, "description": t.description, "inputSchema": t.inputSchema}
-            )
-            result.append(d)
-        return {"tools": result}
+        return {"tools": [t.model_dump() for t in tools]}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Erro ao listar tools: {e}")
 
@@ -1249,7 +1243,7 @@ async def call_server_tool(server_id: str, req: CallToolRequest, request: Reques
     transport = StreamableHttpTransport(url=url)
     try:
         async with Client(transport) as client:
-            result = await client.call_tool(req.name, req.arguments, raise_on_error=False)
+            result = await client.call_tool(req.name, req.arguments or {}, raise_on_error=False)
         content = []
         for c in result.content:
             if hasattr(c, "model_dump"):
@@ -1336,6 +1330,49 @@ async def server_auth_login(server_id: str, request: Request, db: Session = Depe
                 return {"token": token, "token_type": "bearer"}
             raise HTTPException(status_code=502, detail="Login OK, mas token não encontrado na resposta")
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
+
+
+@app.put("/v1/servers/{server_id}/auth/credentials")
+async def save_server_credentials(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    body = await request.json()
+    if not body:
+        raise HTTPException(status_code=400, detail="Body não enviado")
+
+    import json
+
+    record.credentials = json.dumps(body)
+    db.commit()
+    return {"status": "ok", "message": "Credenciais salvas"}
+
+
+@app.get("/v1/servers/{server_id}/auth/credentials")
+async def check_server_credentials(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    return {"has_credentials": bool(record.credentials)}
+
+
+@app.delete("/v1/servers/{server_id}/auth/credentials")
+async def delete_server_credentials(server_id: str, request: Request, db: Session = Depends(get_db)):
+    await require_auth(request)
+    user_id = request.state.user_id
+    record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Servidor não encontrado")
+
+    record.credentials = None
+    db.commit()
+    return {"status": "ok", "message": "Credenciais removidas"}
 
 
 @app.get("/v1/servers/{server_id}/health")
@@ -1917,11 +1954,8 @@ async def mcp_get_stream(server_id: str, apikey: str, request: Request):
 # ─── Health Check ──────────────────────────────────────────────────────────────
 
 
-# ─── Engine Routes ──────────────────────────────────────────────────────────
-
-from .engine_routes import router as engine_router
-
-app.include_router(engine_router)
+# ─── Engine Routes (descontinuado) ──────────────────────────────────────────
+# Engine multi-servidor removido. Cada servidor tem o seu próprio search/run.
 
 
 @app.get("/health")

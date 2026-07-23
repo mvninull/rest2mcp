@@ -11,6 +11,10 @@ from urllib.parse import urlparse
 import httpx
 from fastmcp import FastMCP
 
+from engine.index import ToolIndex
+from engine.sandbox import Sandbox
+from engine.stubs import generate_stubs_from_tools
+
 try:
     from .utils import logger
 except ImportError:
@@ -141,13 +145,24 @@ class DynamicAuth(httpx.Auth):
 
 
 class MCPServerManager:
-    def __init__(self, spec_url: str, name: str, spec: dict | None = None, server_id: str = "", log_func=None):
+    def __init__(
+        self,
+        spec_url: str,
+        name: str,
+        spec: dict | None = None,
+        server_id: str = "",
+        log_func=None,
+        credentials: dict | None = None,
+    ):
         self.spec_url = spec_url
         self.name = name
         self.server_id = server_id
         self.log_func = log_func
         self.token = None
+        self.credentials = credentials or {}
         self.login_required_fields = []
+        self.tool_map: dict[str, dict] = {}
+        self.all_tools: list[dict] = []
 
         if spec is not None:
             self.spec = spec
@@ -180,12 +195,12 @@ class MCPServerManager:
             transport=transport,
         )
 
-        # Detetamos os paths de auth (login/otp/oauth) ANTES de criar o
-        # FastMCP, para podermos excluí-los (route_maps) da conversão
-        # automática em tools "cruas".
+        # Detetar paths de auth
         auth_paths = self._detect_auth_paths()
         self.email_login_path = auth_paths.get("email_login_path")
-        exclude_paths = [
+
+        # Construir tool_map das operacoes da spec (sem as de auth)
+        exclude_paths = {
             p
             for p in [
                 auth_paths["email_login_path"],
@@ -194,28 +209,147 @@ class MCPServerManager:
                 *auth_paths["oauth_paths"].values(),
             ]
             if p
-        ]
-        route_maps = []
-        if _RouteMapCls is not None and exclude_paths:
-            exclude_value = getattr(_RouteMapEnum, "EXCLUDE")
-            for p in exclude_paths:
-                route_maps.append(
-                    _RouteMapCls(
-                        methods=["POST"],
-                        pattern=f"^{re.escape(p if p.startswith('/') else '/' + p)}$",
-                        **{_ROUTE_MAP_TYPE_FIELD: exclude_value},
-                    )
-                )
+        }
+        self._build_tool_map(exclude_paths)
 
-        self.mcp = FastMCP.from_openapi(
-            openapi_spec=self.spec,
-            name=self.name,
-            client=self.client,
-            route_maps=route_maps,
-        )
-        self.mcp._manager = self
+        self.mcp = FastMCP(name=self.name)
 
-        self._setup_dynamic_login(auth_paths)
+        # Index semantico das tools deste servidor
+        self.tool_index = ToolIndex()
+        self.tool_index.rebuild_if_changed(self.all_tools)
+
+        self._register_search_tool()
+        self._register_run_tool()
+
+        # Detetar campos de login para auto-auth (sem registar tools set_token/session_status)
+        _email_path = auth_paths.get("email_login_path")
+        if _email_path:
+            _schema = self._get_body_schema(_email_path)
+            _id_key = self._match_schema_key(_schema, LOGIN_IDENTIFIER_KEYS)
+            _pass_key = self._match_schema_key(_schema, LOGIN_PASSWORD_KEYS)
+            self.login_required_fields = [k for k in (_id_key, _pass_key) if k]
+
+    def _build_tool_map(self, exclude_paths: set[str]):
+        paths = self.spec.get("paths", {})
+        for path, methods in paths.items():
+            for method, operation in methods.items():
+                if method not in ("get", "post", "put", "patch", "delete"):
+                    continue
+                if path in exclude_paths:
+                    continue
+                raw_op_id = operation.get("operationId")
+                if raw_op_id:
+                    if "__" in raw_op_id:
+                        op_id = raw_op_id.split("__")[0]
+                    else:
+                        op_id = raw_op_id
+                else:
+                    op_id = operation.get("summary", f"{method} {path}")
+                op_id = op_id.replace("/", "_").replace("-", "_").replace(" ", "_").replace("{", "_").replace("}", "_")
+                description = operation.get("description") or operation.get("summary", "Ferramenta MCP")
+                parameters = operation.get("parameters", [])
+                request_body = operation.get("requestBody", {})
+
+                input_schema = {"type": "object", "properties": {}, "required": []}
+                path_params = []
+                for p in parameters:
+                    pname = p.get("name", "param")
+                    input_schema["properties"][pname] = p.get("schema", {"type": "string"})
+                    if p.get("required", False):
+                        input_schema["required"].append(pname)
+                    if p.get("in") == "path":
+                        path_params.append(pname)
+
+                if request_body and "application/json" in (request_body.get("content") or {}):
+                    body_schema = request_body["content"]["application/json"].get("schema", {})
+                    for k, v in body_schema.get("properties", {}).items():
+                        input_schema["properties"][k] = v
+                    for r in body_schema.get("required", []):
+                        if r not in input_schema["required"]:
+                            input_schema["required"].append(r)
+
+                entry = {
+                    "name": op_id,
+                    "description": description,
+                    "input_schema": input_schema,
+                    "parameters": input_schema,
+                    "_method": method,
+                    "_path": path,
+                    "_path_params": path_params,
+                    "_mcp_tool_name": op_id,
+                    "_server_id": self.server_id,
+                    "_tool_key": op_id,
+                }
+                self.all_tools.append(entry)
+                self.tool_map[op_id] = entry
+
+    def _register_search_tool(self):
+        _index = self.tool_index
+
+        @self.mcp.tool()
+        async def search(query: str, top_k: int = 5) -> str:
+            results = _index.search(query, top_k=top_k)
+            return generate_stubs_from_tools(results)
+
+    def _register_run_tool(self):
+        _tool_map = self.tool_map
+        _base_url = self.base_url
+        _manager = self  # para aceder a token e DynamicAuth
+
+        @self.mcp.tool()
+        async def run(workflow: str) -> str:
+            import asyncio
+
+            sandbox = Sandbox(tool_map=_tool_map)
+
+            def caller(tool_key: str, arguments: dict) -> Any:
+                info = _tool_map.get(tool_key)
+                if not info:
+                    raise ValueError(f"Tool '{tool_key}' nao encontrada")
+                method = info["_method"]
+                path = info["_path"]
+                for k, v in arguments.items():
+                    path = path.replace("{" + k + "}", str(v))
+                body = {k: v for k, v in arguments.items() if k not in info.get("_path_params", [])}
+
+                # Auto-auth if no token but credentials exist
+                if not _manager.token and _manager.credentials and _manager.email_login_path:
+                    try:
+                        with httpx.Client(base_url=_base_url) as auth_cli:
+                            auth_resp = auth_cli.post(_manager.email_login_path, json=_manager.credentials)
+                            if auth_resp.status_code in (200, 201):
+                                data = auth_resp.json()
+                                jwt = data.get("access_token") or data.get("token") or data.get("jwt")
+                                if jwt:
+                                    _manager.token = jwt
+                    except Exception:
+                        pass
+
+                headers = {}
+                if _manager.token:
+                    headers["Authorization"] = f"Bearer {_manager.token}"
+                with httpx.Client(base_url=_base_url, timeout=30.0) as cli:
+                    resp = cli.request(method, path, json=body if body else None, headers=headers or None)
+                text = resp.text
+                try:
+                    parsed = resp.json()
+                    text = json.dumps(parsed, indent=2, ensure_ascii=False)
+                except Exception:
+                    pass
+                return [{"type": "text", "text": text}]
+
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(None, sandbox.execute, workflow, caller)
+            import json as _json
+
+            output_text = result.get("output", "")
+            error_text = result.get("error", "")
+            result_value = result.get("result")
+            if error_text:
+                return f"Erro: {error_text}\nOutput: {output_text}"
+            if output_text and result_value is None:
+                return f"Output:\n{output_text}\n\nResultado: null"
+            return _json.dumps(result_value, indent=2, default=str)
 
     def load_and_convert_spec(self, url: str) -> dict:
         logger.info(f"Baixando spec de: {url}")
@@ -340,31 +474,6 @@ class MCPServerManager:
             "otp_verify_path": otp_verify_path,
             "oauth_paths": oauth_paths,
         }
-
-    def _setup_dynamic_login(self, auth_paths: dict):
-        _base_url = self.base_url
-        _email_login_path = auth_paths["email_login_path"]
-        _otp_request_path = auth_paths["otp_request_path"]
-        _otp_verify_path = auth_paths["otp_verify_path"]
-        _oauth_paths = auth_paths["oauth_paths"]
-
-        @self.mcp.tool()
-        async def set_token(token: str) -> str:
-            """Define manualmente um token JWT para autenticação nas chamadas seguintes.
-            Use esta ferramenta quando já possui um token (ex: obtido via OAuth Google/GitHub)."""
-            self.token = token
-            return "✅ Token configurado com sucesso!"
-
-        @self.mcp.tool()
-        async def session_status() -> str:
-            """Verifica o estado atual da autenticação."""
-            return f"Autenticado: {bool(self.token)} | API: {self.base_url}"
-
-        if _email_login_path:
-            _schema = self._get_body_schema(_email_login_path)
-            _id_key = self._match_schema_key(_schema, LOGIN_IDENTIFIER_KEYS)
-            _pass_key = self._match_schema_key(_schema, LOGIN_PASSWORD_KEYS)
-            self.login_required_fields = [k for k in (_id_key, _pass_key) if k]
 
 
 # ESTA FUNÇÃO PRECISA ESTAR FORA DA CLASSE (NA RAIZ DO ARQUIVO)

@@ -12,7 +12,7 @@ class Base(DeclarativeBase):
     pass
 
 
-class ServerDB(Base): 
+class ServerDB(Base):
     __tablename__ = "servers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -27,6 +27,7 @@ class ServerDB(Base):
     is_merged = Column(Boolean, default=False)
     merge_config = Column(SA_JSON, nullable=True)
     user_id = Column(String(100), nullable=True, index=True)
+    credentials = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
@@ -67,6 +68,7 @@ def init_db():
             ("user_id", "VARCHAR(100)"),
             ("is_merged", "BOOLEAN DEFAULT 0"),
             ("merge_config", "JSON"),
+            ("credentials", "TEXT"),
         ],
     )
 

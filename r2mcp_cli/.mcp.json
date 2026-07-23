@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tarefas-api": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8080/v1/srv_s9vm1xzt/r2m_live_REDACTED/mcp"
+      ]
+    }
+  }
+}
