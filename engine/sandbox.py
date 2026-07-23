@@ -28,34 +28,45 @@ ALLOWED_IMPORTS = {"json", "math", "datetime", "re", "typing", "asyncio"}
 # chamadas dentro de um `asyncio.gather` correm concorrentemente de verdade.
 SANDBOX_WRAPPER = """\
 import sys, json, time, traceback, asyncio, inspect
+import socket as _socket
 
+# V2-sync-ipc
 _ipc_port = {ipc_port}
 
-async def _ipc_call(name, args_dict):
-    reader = writer = None
-    for _ in range(10):
+def _ipc_call_sync(name, args_dict):
+    import os as _os
+    s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    s.settimeout(10)
+    last_err = None
+    for i in range(10):
         try:
-            reader, writer = await asyncio.open_connection("127.0.0.1", _ipc_port)
+            s.connect(("127.0.0.1", _ipc_port))
+            last_err = None
             break
-        except ConnectionRefusedError:
-            await asyncio.sleep(0.1)
-    else:
-        raise ConnectionRefusedError("IPC server not reachable after 10 retries")
+        except Exception as e:
+            last_err = e
+            s.close()
+            s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+            s.settimeout(10)
+            time.sleep(0.1)
+    if last_err is not None:
+        s.close()
+        err_msg = str(last_err)
+        raise RuntimeError("IPC-V2: " + type(last_err).__name__ + ": " + err_msg)
     try:
         payload = json.dumps({{"name": name, "arguments": args_dict}}).encode()
-        writer.write(payload)
-        await writer.drain()
-        data = await reader.read(65536)
+        s.sendall(payload)
+        data = s.recv(65536)
         result = json.loads(data.decode())
         if "error" in result:
             raise RuntimeError(result["error"])
         return result.get("result")
     finally:
-        writer.close()
-        try:
-            await writer.wait_closed()
-        except Exception:
-            pass
+        s.close()
+
+async def _ipc_call(name, args_dict):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _ipc_call_sync, name, args_dict)
 
 {proxy_defs}
 
@@ -144,8 +155,12 @@ def _set_child_resource_limits():
 def _start_memory_monitor(proc: subprocess.Popen, limit_bytes: int) -> threading.Timer | None:
     """Monitoriza a memória do processo filho numa thread daemon.
     Mata o processo se exceder o limite. Usado no Windows onde
-    resource.setrlimit não está disponível."""
-    import psutil
+    resource.setrlimit não está disponível. Se psutil não estiver
+    instalado, a monitorização é silenciosamente ignorada."""
+    try:
+        import psutil
+    except ImportError:
+        return None
 
     def _check():
         if proc.poll() is not None:
@@ -169,8 +184,12 @@ def _start_memory_monitor(proc: subprocess.Popen, limit_bytes: int) -> threading
     return t
 
 
+import sys as _sys
+
+
 class Sandbox:
     def __init__(self, tool_map: dict[str, dict], timeout: int = 15):
+        print("SANDBOX_V2_INIT", file=_sys.stderr, flush=True)
         self._tool_map = tool_map
         self._timeout = timeout
 
@@ -179,6 +198,16 @@ class Sandbox:
         seen = set()
         for tool_key, info in self._tool_map.items():
             name = info.get("name", "unknown")
+            # Sanitizar: nomes de ferramentas podem ter /, -, etc. que não
+            # são válidos como identificadores Python (ex: get_/api/v1/produtos)
+            name = (
+                name.replace("/", "_")
+                .replace("-", "_")
+                .replace(" ", "_")
+                .replace(".", "_")
+                .replace("{", "_")
+                .replace("}", "_")
+            )
             if name in seen:
                 name = f"{name}_{info.get('_server_id', 'unknown')}"
             seen.add(name)
@@ -221,17 +250,16 @@ async def {name}(**kwargs):
             # não precisa de importar nada do projeto principal — só do que
             # está definido no próprio wrapper (json, math, datetime, re,
             # typing, asyncio, mais os proxies das tools).
-            env = {
-                "PATH": os.environ.get("PATH", ""),
-                "PYTHONDONTWRITEBYTECODE": "1",
-                "PYTHONUNBUFFERED": "1",
-            }
-            if sys.platform == "win32":
-                # WinError 10106: o Winsock precisa de SYSTEMROOT para
-                # carregar o provedor de serviços (dll de socket). Sem
-                # isto, asyncio (importado no wrapper) crasha ao tentar
-                # importar _overlapped no processo filho.
-                env.setdefault("SYSTEMROOT", os.environ.get("SYSTEMROOT", r"C:\Windows"))
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "PYTHONUNBUFFERED": "1",
+                }
+            )
+            for k in list(env.keys()):
+                if k.startswith(("SUPABASE_", "STRIPE_", "PAYPAL_", "SECRET", "TOKEN", "KEY")):
+                    del env[k]
 
             popen_kwargs = dict(
                 stdout=subprocess.PIPE,
@@ -244,7 +272,7 @@ async def {name}(**kwargs):
                 popen_kwargs["preexec_fn"] = _set_child_resource_limits
 
             proc = subprocess.Popen(
-                [sys.executable, "-I", "-u", str(wrapper_path)],
+                [sys.executable, "-u", str(wrapper_path)],
                 **popen_kwargs,
             )
 
