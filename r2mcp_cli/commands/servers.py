@@ -77,18 +77,41 @@ def list():
         console.print("[yellow]Nenhum servidor encontrado.[/yellow]")
         return
 
+    auth_statuses = {}
+    active = [s for s in servers if s["status"] == "active"]
+    if active:
+        client = APIClient()
+        for s in active:
+            try:
+                auth_statuses[s["server_id"]] = client.get_auth_status(s["server_id"])
+            except APIError:
+                pass
+        client.close()
+
     table = Table(box=box.SIMPLE)
     table.add_column("ID", style="cyan", no_wrap=True)
     table.add_column("Nome")
     table.add_column("Status")
+    table.add_column("Auth", no_wrap=True)
     table.add_column("Transporte")
     table.add_column("URL MCP")
     for s in servers:
         status_style = "green" if s["status"] == "active" else "red"
+        auth_info = auth_statuses.get(s["server_id"], {})
+        fields = auth_info.get("required_fields", [])
+        authenticated = auth_info.get("authenticated", False)
+        if fields:
+            if authenticated:
+                auth_cell = "[green]\u2713 autenticado[/green]"
+            else:
+                auth_cell = "[yellow]\u26a0 precisa auth[/yellow]"
+        else:
+            auth_cell = "[dim]\u2014[/dim]"
         table.add_row(
             s["server_id"],
             s["name"],
             f"[{status_style}]{s['status']}[/{status_style}]",
+            auth_cell,
             s.get("transport", "http"),
             s["url_sse"],
         )

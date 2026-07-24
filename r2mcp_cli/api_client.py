@@ -78,6 +78,10 @@ class APIClient:
         resp = self._request("GET", f"/v1/servers/{server_id}/logs", params={"limit": limit})
         return resp.json()
 
+    def get_auth_status(self, server_id: str) -> dict:
+        resp = self._request("GET", f"/v1/servers/{server_id}/auth")
+        return resp.json()
+
     def set_credentials(self, server_id: str, credentials: dict) -> dict:
         resp = self._request("PUT", f"/v1/servers/{server_id}/auth/credentials", json=credentials)
         return resp.json()
