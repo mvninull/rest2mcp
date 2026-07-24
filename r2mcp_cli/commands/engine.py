@@ -6,15 +6,20 @@ import typer
 from rich.console import Console
 from rich.syntax import Syntax
 
-from r2mcp_cli.config import get_base_url, get_token
+from r2mcp_cli.config import get_base_url, get_token, validate_token
 
 console = Console()
 engine_app = typer.Typer(help="Motor de orquestracao: search e run")
 
 
 def _require_auth():
-    if not get_token():
+    token = get_token()
+    if not token:
         console.print("[red]ERRO: Nao autenticado. Corre r2mcp login primeiro.[/red]")
+        raise typer.Exit(1)
+    ok, msg = validate_token(token)
+    if not ok:
+        console.print(f"[red]ERRO: {msg}[/red]")
         raise typer.Exit(1)
 
 

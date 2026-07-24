@@ -4,7 +4,7 @@ from rich.console import Console
 from rich.table import Table
 
 from r2mcp_cli.api_client import APIClient, APIError
-from r2mcp_cli.config import get_base_url, get_token, set_base_url, set_token, clear_token
+from r2mcp_cli.config import get_base_url, get_token, set_base_url, set_token, clear_token, validate_token
 
 console = Console()
 config_app = typer.Typer(help="Gerir configuracao local")
@@ -13,12 +13,21 @@ config_app = typer.Typer(help="Gerir configuracao local")
 def login():
     token = get_token()
     if token:
+        ok, _ = validate_token(token)
+        if not ok:
+            console.print("[yellow]Token expirado. Faz logout primeiro e depois faz login novamente.[/yellow]")
+            return
         console.print("[yellow]Ja estas autenticado. Faz logout primeiro se quiseres mudar de conta.[/yellow]")
         return
 
     token = typer.prompt("Introduz o teu JWT do Supabase", hide_input=True)
     if not token:
         console.print("[red]Token invalido.[/red]")
+        raise typer.Exit(1)
+
+    ok, msg = validate_token(token)
+    if not ok:
+        console.print(f"[red]Token invalido: {msg}[/red]")
         raise typer.Exit(1)
 
     set_token(token)
@@ -58,7 +67,11 @@ def logout():
 def me():
     token = get_token()
     if not token:
-        console.print("[red]ERRO: Nao autenticado. Por favor, corre r2mcp login primeiro.[/red]")
+        console.print("[red]ERRO: Nao autenticado. Corre r2mcp login primeiro.[/red]")
+        raise typer.Exit(1)
+    ok, msg = validate_token(token)
+    if not ok:
+        console.print(f"[red]ERRO: {msg}[/red]")
         raise typer.Exit(1)
 
     with console.status("[bold green]A obter informacoes do utilizador..."):

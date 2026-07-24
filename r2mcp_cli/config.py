@@ -1,4 +1,6 @@
+import base64
 import json
+import time
 from typing import Optional
 from pathlib import Path
 
@@ -50,3 +52,16 @@ def set_base_url(url: str):
     cfg = load_config()
     cfg["base_url"] = url.rstrip("/")
     save_config(cfg)
+
+
+def validate_token(token: str) -> tuple[bool, str]:
+    try:
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (4 - len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        exp = payload.get("exp")
+        if exp is not None and time.time() > exp:
+            return False, "Token expirado. Faz r2mcp login primeiro."
+        return True, ""
+    except (IndexError, ValueError, json.JSONDecodeError):
+        return False, "Token invalido. Faz r2mcp login primeiro."

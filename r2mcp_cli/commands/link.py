@@ -6,38 +6,20 @@ import typer
 from rich.console import Console
 
 from r2mcp_cli.api_client import APIClient, APIError
-from r2mcp_cli.config import get_token
+from r2mcp_cli.config import get_token, validate_token
 
 console = Console()
 link_app = typer.Typer(help="Ligar servidor a editor IA")
 
 
-EDITOR_CONFIGS = {
-    "claude-code": {
-        "paths": lambda: [
-            Path.cwd() / ".mcp.json",
-            Path.home() / ".claude.json",
-        ],
-        "key": "mcpServers",
-    },
-    "cursor": {
-        "paths": lambda: [Path.cwd() / ".cursor" / "mcp.json", Path.home() / ".cursor" / "mcp.json"],
-        "key": "mcpServers",
-    },
-    "vscode": {
-        "paths": lambda: [Path.cwd() / ".vscode" / "mcp.json"],
-        "key": "servers",
-    },
-    "opencode": {
-        "paths": lambda: [Path.cwd() / "opencode.json"],
-        "key": "mcp",
-    },
-}
-
-
 def _require_auth():
-    if not get_token():
-        console.print("[red]ERRO: Nao autenticado. Por favor, corre r2mcp login primeiro.[/red]")
+    token = get_token()
+    if not token:
+        console.print("[red]ERRO: Nao autenticado. Corre r2mcp login primeiro.[/red]")
+        raise typer.Exit(1)
+    ok, msg = validate_token(token)
+    if not ok:
+        console.print(f"[red]ERRO: {msg}[/red]")
         raise typer.Exit(1)
 
 

@@ -4,15 +4,20 @@ from rich.console import Console
 from rich.table import Table
 
 from r2mcp_cli.api_client import APIClient, APIError
-from r2mcp_cli.config import get_token
+from r2mcp_cli.config import get_token, validate_token
 
 console = Console()
 logs_app = typer.Typer(help="Comandos de logs")
 
 
 def _require_auth():
-    if not get_token():
-        console.print("[red]ERRO: Nao autenticado. Por favor, corre r2mcp login primeiro.[/red]")
+    token = get_token()
+    if not token:
+        console.print("[red]ERRO: Nao autenticado. Corre r2mcp login primeiro.[/red]")
+        raise typer.Exit(1)
+    ok, msg = validate_token(token)
+    if not ok:
+        console.print(f"[red]ERRO: {msg}[/red]")
         raise typer.Exit(1)
 
 
