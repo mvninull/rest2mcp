@@ -15,12 +15,14 @@ def login():
     if token:
         ok, _ = validate_token(token)
         if not ok:
-            console.print("[yellow]Token expirado. Faz logout primeiro e depois faz login novamente.[/yellow]")
+            console.print(
+                "[yellow]Token expirado. Faz logout primeiro, obtém um novo em https://rest2mcp.pages.dev/ e faz login novamente.[/yellow]"
+            )
             return
         console.print("[yellow]Ja estas autenticado. Faz logout primeiro se quiseres mudar de conta.[/yellow]")
         return
 
-    token = typer.prompt("Introduz o teu JWT do Supabase", hide_input=True)
+    token = typer.prompt("Introduz o teu JWT do Supabase (obtem em https://rest2mcp.pages.dev/)", hide_input=True)
     if not token:
         console.print("[red]Token invalido.[/red]")
         raise typer.Exit(1)
@@ -39,11 +41,11 @@ def login():
             client.close()
         except APIError as e:
             clear_token()
-            console.print(f"[red]Erro na autenticacao: {e.detail}[/red]")
+            console.print(f"[red]Erro na autenticacao: {e.detail}. Obtém um token em https://rest2mcp.pages.dev/[/red]")
             raise typer.Exit(1)
         except Exception as e:
             clear_token()
-            console.print(f"[red]Erro de conexao: {e}[/red]")
+            console.print(f"[red]Erro de conexao: {e}. Obtém um token em https://rest2mcp.pages.dev/[/red]")
             raise typer.Exit(1)
 
     table = Table(box=box.SIMPLE)
@@ -67,11 +69,13 @@ def logout():
 def me():
     token = get_token()
     if not token:
-        console.print("[red]ERRO: Nao autenticado. Corre r2mcp login primeiro.[/red]")
+        console.print(
+            "[red]ERRO: Nao autenticado. Obtém um token em https://rest2mcp.pages.dev/ e corre r2mcp login.[/red]"
+        )
         raise typer.Exit(1)
     ok, msg = validate_token(token)
     if not ok:
-        console.print(f"[red]ERRO: {msg}[/red]")
+        console.print(f"[red]ERRO: {msg}. Obtém um token novo em https://rest2mcp.pages.dev/[/red]")
         raise typer.Exit(1)
 
     with console.status("[bold green]A obter informacoes do utilizador..."):

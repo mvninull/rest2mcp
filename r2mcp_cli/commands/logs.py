@@ -13,11 +13,13 @@ logs_app = typer.Typer(help="Comandos de logs")
 def _require_auth():
     token = get_token()
     if not token:
-        console.print("[red]ERRO: Nao autenticado. Corre r2mcp login primeiro.[/red]")
+        console.print(
+            "[red]ERRO: Nao autenticado. Obtém um token em https://rest2mcp.pages.dev/ e corre r2mcp login.[/red]"
+        )
         raise typer.Exit(1)
     ok, msg = validate_token(token)
     if not ok:
-        console.print(f"[red]ERRO: {msg}[/red]")
+        console.print(f"[red]ERRO: {msg}. Obtém um token novo em https://rest2mcp.pages.dev/[/red]")
         raise typer.Exit(1)
 
 
