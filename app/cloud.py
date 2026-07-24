@@ -1327,6 +1327,7 @@ async def server_auth_login(server_id: str, request: Request, db: Session = Depe
             data = resp.json()
             token = data.get("access_token") or data.get("token") or data.get("jwt")
             if token:
+                active.manager.token = token
                 return {"token": token, "token_type": "bearer"}
             raise HTTPException(status_code=502, detail="Login OK, mas token não encontrado na resposta")
         raise HTTPException(status_code=resp.status_code, detail=resp.text)

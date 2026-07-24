@@ -865,10 +865,6 @@
         body: JSON.stringify(authValues),
       });
       if (data.token) {
-        await apiFetch(`/v1/servers/${toolsModalServer.server_id}/tools/call`, {
-          method: "POST",
-          body: JSON.stringify({ name: "set_token", arguments: { token: data.token } }),
-        });
         authSuccess = true;
         serverAuthState[toolsModalServer.server_id] = { required: true, authenticated: true };
         for (const f of authFields) authValues[f] = "";
