@@ -19,50 +19,27 @@ FORBIDDEN_NAMES = {"exec", "eval", "compile", "__import__", "open", "breakpoint"
 ALLOWED_IMPORTS = {"json", "math", "datetime", "re", "typing", "asyncio"}
 
 
-# Wrapper convertido para asyncio: antes, _ipc_call usava um socket bloqueante
-# (socket.connect/sendall/recv), o que tornava os stubs gerados em stubs.py
-# inúteis para o caso de uso principal de Programmatic Tool Calling —
-# `asyncio.gather(*[tool(x) for x in items])` — porque cada chamada
-# bloqueava a thread inteira em vez de ceder controlo ao event loop.
-# Agora _ipc_call é uma coroutine (asyncio.open_connection), por isso várias
-# chamadas dentro de um `asyncio.gather` correm concorrentemente de verdade.
 SANDBOX_WRAPPER = """\
-import sys, json, time, traceback, asyncio, inspect
-import socket as _socket
+import sys, json, time, traceback, asyncio, inspect, threading
 
-# V2-sync-ipc
-_ipc_port = {ipc_port}
+_ipc_lock = threading.Lock()
+_ipc_id = 0
 
 def _ipc_call_sync(name, args_dict):
-    import os as _os
-    s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
-    s.settimeout(10)
-    last_err = None
-    for i in range(10):
-        try:
-            s.connect(("127.0.0.1", _ipc_port))
-            last_err = None
-            break
-        except Exception as e:
-            last_err = e
-            s.close()
-            s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
-            s.settimeout(10)
-            time.sleep(0.1)
-    if last_err is not None:
-        s.close()
-        err_msg = str(last_err)
-        raise RuntimeError("IPC-V2: " + type(last_err).__name__ + ": " + err_msg)
-    try:
-        payload = json.dumps({{"name": name, "arguments": args_dict}}).encode()
-        s.sendall(payload)
-        data = s.recv(65536)
-        result = json.loads(data.decode())
-        if "error" in result:
-            raise RuntimeError(result["error"])
-        return result.get("result")
-    finally:
-        s.close()
+    global _ipc_id
+    with _ipc_lock:
+        _ipc_id += 1
+        req_id = _ipc_id
+        payload = json.dumps({{"type": "call", "id": req_id, "name": name, "arguments": args_dict}})
+        sys.stdout.write(payload + "\\n")
+        sys.stdout.flush()
+        line = sys.stdin.readline()
+    if not line:
+        raise RuntimeError("IPC: stdin closed unexpectedly")
+    response = json.loads(line)
+    if "error" in response:
+        raise RuntimeError(response["error"])
+    return response.get("result")
 
 async def _ipc_call(name, args_dict):
     loop = asyncio.get_running_loop()
@@ -74,21 +51,13 @@ async def _ipc_call(name, args_dict):
 {user_code}
 
 async def _main():
-    # globals() em vez de dir(): dentro desta função aninhada, dir() sem
-    # argumentos só devolve o escopo LOCAL de _main(), nunca encontraria
-    # run_workflow (definido ao nível do módulo). globals() vê sempre o
-    # escopo do módulo, independentemente de onde é chamado.
     if "run_workflow" not in globals():
         return None
     fn = globals()["run_workflow"]
-    # Aceita tanto `async def run_workflow()` (caminho recomendado, permite
-    # await/gather) como `def run_workflow()` síncrono, por compatibilidade
-    # com workflows antigos gerados antes desta correção.
     if inspect.iscoroutinefunction(fn):
         return await fn()
     return fn()
 
-# Capture result
 _output_buf = []
 _tools_result = None
 try:
@@ -96,7 +65,9 @@ try:
 except Exception as _exc:
     _output_buf.append(traceback.format_exc())
 finally:
-    sys.stdout.write(json.dumps({{"output": "".join(_output_buf), "result": _tools_result}}))
+    _final = json.dumps({{"type": "done", "output": "".join(_output_buf), "result": _tools_result}})
+    sys.stdout.write(_final + "\\n")
+    sys.stdout.flush()
 """
 
 
@@ -223,18 +194,11 @@ async def {name}(**kwargs):
     def execute(self, code: str, caller: Callable) -> dict:
         validate_code(code)
 
-        from .proxy import IPCServer
-
-        ipc_server = IPCServer(caller)
-        ipc_server.start()
-        ipc_port = ipc_server.port
-
         tmpdir = Path(tempfile.mkdtemp(prefix="r2mcp_sandbox_"))
 
         try:
             proxy_defs = self._generate_proxy_defs()
             wrapper_code = SANDBOX_WRAPPER.format(
-                ipc_port=ipc_port,
                 proxy_defs=proxy_defs,
                 user_code=textwrap.dedent(code),
             )
@@ -242,14 +206,6 @@ async def {name}(**kwargs):
             wrapper_path = tmpdir / "_run.py"
             wrapper_path.write_text(wrapper_code, encoding="utf-8")
 
-            # Ambiente limpo, SEM PYTHONPATH do host: a versão anterior fazia
-            # env["PYTHONPATH"] = str(Path.cwd()), que é o cwd do processo do
-            # servidor FastAPI. Isso deixava o código gerado pela LLM fazer
-            # `import cloud_models` ou `import config` e aceder diretamente
-            # a segredos do backend (ex: chaves Supabase/Stripe). A sandbox
-            # não precisa de importar nada do projeto principal — só do que
-            # está definido no próprio wrapper (json, math, datetime, re,
-            # typing, asyncio, mais os proxies das tools).
             env = os.environ.copy()
             env.update(
                 {
@@ -262,6 +218,7 @@ async def {name}(**kwargs):
                     del env[k]
 
             popen_kwargs = dict(
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,
@@ -276,38 +233,46 @@ async def {name}(**kwargs):
                 **popen_kwargs,
             )
 
-            # No Windows, o resource.setrlimit não existe, por isso
-            # monitorizamos a memória do processo filho via psutil numa
-            # thread separada. No Linux, o setrlimit via preexec_fn já
-            # faz esta proteção ao nível do SO antes de qualquer código
-            # correr, por isso não precisamos da thread adicional.
             _mem_killer = None
             if sys.platform == "win32":
                 _mem_killer = _start_memory_monitor(proc, 256 * 1024 * 1024)
 
+            stderr_lines = []
+
+            def _read_stderr():
+                for line in iter(proc.stderr.readline, ""):
+                    stderr_lines.append(line)
+
+            stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
+            stderr_thread.start()
+
             try:
-                stdout, stderr = proc.communicate(timeout=self._timeout)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=5)
-                return {"error": f"Timeout de {self._timeout}s excedido", "output": "", "result": None}
+                from .proxy import run_stdio_ipc
+
+                result = run_stdio_ipc(proc, caller)
             finally:
                 if _mem_killer is not None:
                     _mem_killer.cancel()
 
+            try:
+                proc.wait(timeout=self._timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
+                return {"error": f"Timeout de {self._timeout}s excedido", "output": "", "result": None}
+
+            stderr_output = "".join(stderr_lines)
+
+            if result is None:
+                return {"error": "IPC: processo terminou sem resposta", "output": stderr_output, "result": None}
+
             if proc.returncode != 0:
-                return {"error": f"Processo terminou com codigo {proc.returncode}", "output": stderr, "result": None}
+                result.setdefault("output", "")
+                result["output"] += f"\n[stderr]\n{stderr_output}"
 
-            if stdout.strip():
-                try:
-                    return json.loads(stdout)
-                except json.JSONDecodeError:
-                    return {"output": stdout.strip(), "result": None}
-
-            return {"output": stderr, "result": None}
+            return result
 
         finally:
             import shutil
 
             shutil.rmtree(tmpdir, ignore_errors=True)
-            ipc_server.stop()
