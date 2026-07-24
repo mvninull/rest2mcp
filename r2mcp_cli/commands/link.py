@@ -88,6 +88,18 @@ def link(
         if not server:
             console.print(f"[red]Servidor '{server_id}' nao encontrado.[/red]")
             raise typer.Exit(1)
+        if server["status"] == "active":
+            try:
+                client = APIClient()
+                auth_info = client.get_auth_status(server_id)
+                client.close()
+                if auth_info.get("required_fields") and not auth_info.get("authenticated"):
+                    console.print(
+                        "[red]ERRO: Servidor precisa de autenticacao. Faz o login primeiro com 'r2mcp servers credentials'.[/red]"
+                    )
+                    raise typer.Exit(1)
+            except APIError:
+                pass
         apikey = server.get("apikey", "")
         url = f"http://localhost:8080/v1/{server_id}/{apikey}/mcp"
         name = server.get("name", server_id)
