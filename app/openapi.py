@@ -288,6 +288,15 @@ class MCPServerManager:
 
         @self.mcp.tool()
         async def search(query: str, top_k: int = 5) -> str:
+            """Pesquisa ferramentas disponiveis e devolve stubs Python async.
+
+            Usa esta ferramenta PRIMEIRO para descobrir as ferramentas
+            disponiveis. Os stubs devolvidos mostram os nomes, parametros
+            e tipos de cada ferramenta. Usa esses stubs para escrever
+            o workflow completo que vais passar ao 'run'.
+
+            Exemplo de pesquisa: "produtos", "tarefas", "usuarios"
+            """
             results = _index.search(query, top_k=top_k)
             return generate_stubs_from_tools(results)
 
@@ -298,6 +307,28 @@ class MCPServerManager:
 
         @self.mcp.tool()
         async def run(workflow: str) -> str:
+            """Executa um workflow Python completo com TODAS as operacoes numa unica chamada.
+
+            IMPORTANTE: Nao chames esta ferramenta mais de uma vez.
+            Escreve UM unico workflow com todos os passos que precisas.
+
+            Como usar:
+            1. Primeiro usa 'search' para descobrir as ferramentas disponiveis
+            2. Escreve UM unico `async def run_workflow():` com TODAS as chamadas
+            3. Usa `await tool_name(...)` para cada operacao
+            4. Para multiplas operacoes independentes, encadeia tudo num unico workflow
+
+            Exemplo (NAO chames run duas vezes):
+            ```
+            async def run_workflow():
+                # Criar produto
+                await criar_produto(nome="MacBook", preco=12999.0, ...)
+                # Atualizar outro na mesma chamada
+                await atualizar_produto(produto_id=3, ...)
+                # Listar para ver resultado
+                return await listar_produtos()
+            ```
+            """
             import asyncio
 
             sandbox = Sandbox(tool_map=_tool_map)
