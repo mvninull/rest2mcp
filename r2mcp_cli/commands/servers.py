@@ -100,6 +100,7 @@ def list():
         auth_info = auth_statuses.get(s["server_id"], {})
         fields = auth_info.get("required_fields", [])
         authenticated = auth_info.get("authenticated", False)
+        needs_auth = bool(fields) and not authenticated
         if fields:
             if authenticated:
                 auth_cell = "[green]\u2713 autenticado[/green]"
@@ -107,13 +108,14 @@ def list():
                 auth_cell = "[yellow]\u26a0 precisa auth[/yellow]"
         else:
             auth_cell = "[dim]\u2014[/dim]"
+        url_cell = "[yellow]Faz login para liberar a url[/yellow]" if needs_auth else s["url_sse"]
         table.add_row(
             s["server_id"],
             s["name"],
             f"[{status_style}]{s['status']}[/{status_style}]",
             auth_cell,
             s.get("transport", "http"),
-            s["url_sse"],
+            url_cell,
         )
     console.print(table)
 
