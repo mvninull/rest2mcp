@@ -199,5 +199,5 @@ def remover_tarefa(
 
 if __name__ == "__main__":
     print("Iniciando Tarefas API...")
-    print("Swagger UI: http://localhost:8001/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    print("Swagger UI: http://localhost:8007/docs")
+    uvicorn.run(app, host="0.0.0.0", port=8007)
