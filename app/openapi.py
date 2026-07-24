@@ -316,7 +316,7 @@ class MCPServerManager:
                 if not _manager.token and _manager.credentials and _manager.email_login_path:
                     try:
                         with httpx.Client(base_url=_base_url) as auth_cli:
-                            auth_resp = auth_cli.post(_manager.email_login_path, json=_manager.credentials)
+                            auth_resp = auth_cli.post(_manager.email_login_path, data=_manager.credentials)
                             if auth_resp.status_code in (200, 201):
                                 data = auth_resp.json()
                                 jwt = data.get("access_token") or data.get("token") or data.get("jwt")
