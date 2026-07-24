@@ -12,6 +12,29 @@ console = Console()
 link_app = typer.Typer(help="Ligar servidor a editor IA")
 
 
+EDITOR_CONFIGS = {
+    "claude-code": {
+        "paths": lambda: [
+            Path.cwd() / ".mcp.json",
+            Path.home() / ".claude.json",
+        ],
+        "key": "mcpServers",
+    },
+    "cursor": {
+        "paths": lambda: [Path.cwd() / ".cursor" / "mcp.json", Path.home() / ".cursor" / "mcp.json"],
+        "key": "mcpServers",
+    },
+    "vscode": {
+        "paths": lambda: [Path.cwd() / ".vscode" / "mcp.json"],
+        "key": "servers",
+    },
+    "opencode": {
+        "paths": lambda: [Path.cwd() / "opencode.json"],
+        "key": "mcp",
+    },
+}
+
+
 def _require_auth():
     token = get_token()
     if not token:
