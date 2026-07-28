@@ -1,3 +1,5 @@
+import shutil
+import sys
 from typing import List
 
 import typer
@@ -61,76 +63,46 @@ def create(
 @servers_app.command()
 def list():
     _require_auth()
-    with console.status("[bold green]A listar servidores..."):
-        try:
-            client = APIClient()
-            servers = client.list_servers()
-            client.close()
-        except APIError as e:
-            console.print(f"[red]Erro: {e.detail}[/red]")
-            raise typer.Exit(1)
-        except Exception as e:
-            console.print(f"[red]Erro de conexão: {e}[/red]")
-            raise typer.Exit(1)
+    console.print("[bold green]A listar servidores...[/bold green]")
+
+    try:
+        client = APIClient()
+        servers = client.list_servers()
+        client.close()
+    except APIError as e:
+        console.print(f"[red]Erro: {e.detail}[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]Erro de conexão: {e}[/red]")
+        raise typer.Exit(1)
 
     if not servers:
         console.print("[yellow]Nenhum servidor encontrado.[/yellow]")
         return
 
-    auth_statuses = {}
-    health_statuses = {}
-    active = [s for s in servers if s["status"] == "active"]
-    if active:
-        client = APIClient()
-        for s in active:
-            try:
-                auth_statuses[s["server_id"]] = client.get_auth_status(s["server_id"])
-            except Exception:
-                pass
-            try:
-                health = client.get_server_health(s["server_id"])
-                health_statuses[s["server_id"]] = health.get("status") == "ok"
-            except Exception:
-                health_statuses[s["server_id"]] = False
-        client.close()
+    cols = shutil.get_terminal_size().columns
+    sys.stdout.write(f"\r{' ' * cols}\r")
+    sys.stdout.flush()
 
     table = Table(box=box.SIMPLE)
     table.add_column("ID", style="cyan", no_wrap=True)
-    table.add_column("Nome")
-    table.add_column("Status")
-    table.add_column("API", no_wrap=True)
-    table.add_column("Auth", no_wrap=True)
-    table.add_column("Transporte")
-    table.add_column("URL MCP")
+    table.add_column("Nome", no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Transporte", no_wrap=True)
+    table.add_column("URL MCP", no_wrap=True)
     for s in servers:
         status_style = "green" if s["status"] == "active" else "red"
-        auth_info = auth_statuses.get(s["server_id"], {})
-        fields = auth_info.get("required_fields", [])
-        authenticated = auth_info.get("authenticated", False)
-        health_ok = health_statuses.get(s["server_id"])
-        if health_ok:
-            api_cell = "[green]\u2713[/green]"
-        elif health_ok is None:
-            api_cell = "[dim]\u2014[/dim]"
-        else:
-            api_cell = "[red]\u2717 offline[/red]"
-        needs_auth = bool(fields) and not authenticated
-        if fields:
-            if authenticated:
-                auth_cell = "[green]\u2713 autenticado[/green]"
-            else:
-                auth_cell = "[yellow]\u26a0 precisa auth[/yellow]"
-        else:
-            auth_cell = "[dim]\u2014[/dim]"
-        url_cell = "[yellow]Faz login para liberar a url[/yellow]" if needs_auth else s["url_sse"]
+        sid = s["server_id"]
+        if len(sid) > 14:
+            sid = sid[:11] + "..."
+        url = s["url_sse"]
+        url_display = url if len(url) <= 50 else url[:47] + "..."
         table.add_row(
-            s["server_id"],
+            sid,
             s["name"],
             f"[{status_style}]{s['status']}[/{status_style}]",
-            api_cell,
-            auth_cell,
             s.get("transport", "http"),
-            url_cell,
+            url_display,
         )
     console.print(table)
 
