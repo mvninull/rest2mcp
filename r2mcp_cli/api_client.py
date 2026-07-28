@@ -82,6 +82,10 @@ class APIClient:
         resp = self._request("GET", f"/v1/servers/{server_id}/auth")
         return resp.json()
 
+    def get_server_health(self, server_id: str) -> dict:
+        resp = self._request("GET", f"/v1/servers/{server_id}/health")
+        return resp.json()
+
     def login_server(self, server_id: str, credentials: dict) -> dict:
         resp = self._request("POST", f"/v1/servers/{server_id}/auth/login", json=credentials)
         return resp.json()

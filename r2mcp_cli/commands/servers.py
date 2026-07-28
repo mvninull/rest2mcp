@@ -78,6 +78,7 @@ def list():
         return
 
     auth_statuses = {}
+    health_statuses = {}
     active = [s for s in servers if s["status"] == "active"]
     if active:
         client = APIClient()
@@ -86,12 +87,18 @@ def list():
                 auth_statuses[s["server_id"]] = client.get_auth_status(s["server_id"])
             except APIError:
                 pass
+            try:
+                health = client.get_server_health(s["server_id"])
+                health_statuses[s["server_id"]] = health.get("status") == "ok"
+            except APIError:
+                health_statuses[s["server_id"]] = False
         client.close()
 
     table = Table(box=box.SIMPLE)
     table.add_column("ID", style="cyan", no_wrap=True)
     table.add_column("Nome")
     table.add_column("Status")
+    table.add_column("API", no_wrap=True)
     table.add_column("Auth", no_wrap=True)
     table.add_column("Transporte")
     table.add_column("URL MCP")
@@ -100,6 +107,13 @@ def list():
         auth_info = auth_statuses.get(s["server_id"], {})
         fields = auth_info.get("required_fields", [])
         authenticated = auth_info.get("authenticated", False)
+        health_ok = health_statuses.get(s["server_id"])
+        if health_ok:
+            api_cell = "[green]\u2713[/green]"
+        elif health_ok is None:
+            api_cell = "[dim]\u2014[/dim]"
+        else:
+            api_cell = "[red]\u2717 offline[/red]"
         needs_auth = bool(fields) and not authenticated
         if fields:
             if authenticated:
@@ -113,6 +127,7 @@ def list():
             s["server_id"],
             s["name"],
             f"[{status_style}]{s['status']}[/{status_style}]",
+            api_cell,
             auth_cell,
             s.get("transport", "http"),
             url_cell,
@@ -265,5 +280,10 @@ def login(
             console.print("[red]Resposta inesperada do servidor.[/red]")
     except APIError as e:
         client.close()
-        console.print(f"[red]Erro no login: {e.detail}[/red]")
+        if "Internal Server Error" in e.detail or e.status_code == 500:
+            console.print(
+                "[red]API do servidor nao esta acessivel ou recusou o login. Verifica se a API esta online.[/red]"
+            )
+        else:
+            console.print(f"[red]Erro no login: {e.detail}[/red]")
         raise typer.Exit(1)
