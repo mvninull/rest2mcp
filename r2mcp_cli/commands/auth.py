@@ -105,6 +105,44 @@ def me():
     console.print(table)
 
 
+PROD_URL = "https://rest2mcp.fly.dev"
+LOCAL_URL = "http://localhost:8080"
+
+
+@config_app.command(name="show")
+def config_show():
+    cfg_base = get_base_url()
+    token = get_token()
+    token_status = "[green]configurado[/green]" if token else "[dim]nenhum[/dim]"
+    if cfg_base == PROD_URL:
+        env = "[blue]producao[/blue]"
+    elif cfg_base == LOCAL_URL:
+        env = "[yellow]local[/yellow]"
+    else:
+        env = f"[magenta]custom[/magenta] ({cfg_base})"
+    table = Table(box=box.SIMPLE)
+    table.add_column("Configuracao", style="bold cyan")
+    table.add_column("Valor")
+    table.add_row("Ambiente", env)
+    table.add_row("API URL", cfg_base)
+    table.add_row("Token", token_status)
+    console.print(table)
+
+
+@config_app.command(name="set-env")
+def config_set_env(
+    env: str = typer.Argument(..., help="Ambiente: local ou prod"),
+):
+    if env == "local":
+        set_base_url(LOCAL_URL)
+    elif env == "prod":
+        set_base_url(PROD_URL)
+    else:
+        console.print(f"[red]Ambiente '{env}' invalido. Usa 'local' ou 'prod'.[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]Ambiente alterado para {env}: {get_base_url()}[/green]")
+
+
 @config_app.command(name="set-base")
 def set_base(base_url: str = typer.Argument(..., help="URL base da API")):
     set_base_url(base_url)
