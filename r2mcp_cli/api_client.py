@@ -27,7 +27,10 @@ class APIClient:
 
     def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
         url = f"{self.base_url}{path}"
-        resp = self._client.request(method, url, headers=self._headers(), **kwargs)
+        try:
+            resp = self._client.request(method, url, headers=self._headers(), **kwargs)
+        except (httpx.ConnectError, httpx.ReadError, httpx.TimeoutException) as e:
+            raise APIError(0, f"Erro de conexao: {e}")
         if resp.status_code >= 400:
             detail = self._extract_detail(resp)
             raise APIError(resp.status_code, detail)

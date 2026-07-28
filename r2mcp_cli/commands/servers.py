@@ -85,12 +85,12 @@ def list():
         for s in active:
             try:
                 auth_statuses[s["server_id"]] = client.get_auth_status(s["server_id"])
-            except APIError:
+            except Exception:
                 pass
             try:
                 health = client.get_server_health(s["server_id"])
                 health_statuses[s["server_id"]] = health.get("status") == "ok"
-            except APIError:
+            except Exception:
                 health_statuses[s["server_id"]] = False
         client.close()
 
