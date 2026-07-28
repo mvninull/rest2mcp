@@ -395,6 +395,10 @@
           } else {
             restoreSession();
           }
+        } else if (event === "PASSWORD_RECOVERY") {
+          sessionStorage.setItem("pw_recovery", "1");
+          window.history.pushState({}, "", "?page=dashboard&reset=password");
+          window.dispatchEvent(new PopStateEvent("popstate"));
         } else {
           restoreSession();
         }
@@ -717,7 +721,7 @@
               height="12"
               viewBox="0 0 16 16"
               fill="none"
-              stroke="#ff5c35"
+              stroke="var(--warn)"
               stroke-width="2.2"
               stroke-linecap="round"
               ><line x1="3" y1="3" x2="13" y2="13" /><line
@@ -1356,7 +1360,7 @@
   <h2>{$t("dashboard.title")}</h2>
   <p class="section-desc">{$t("dashboard.desc")}</p>
   <div
-    style="background: var(--ink); border-radius: 16px; padding: 2rem; border: 1px solid rgba(255,255,255,0.08);"
+    style="background: #0d0d14; border-radius: 16px; padding: 2rem; border: 1px solid rgba(255,255,255,0.08);"
   >
     <div
       style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;"
@@ -1963,17 +1967,17 @@
   .advantages-window {
     width: 100%;
     max-width: 820px;
-    border-radius: 16px;
+border-radius: var(--radius);
     overflow: hidden;
-    box-shadow: 0 30px 70px rgba(12, 12, 20, 0.16);
-    border: 1px solid var(--border, rgba(12, 12, 20, 0.08));
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border);
   }
 
   .advantages-window-bar {
     display: flex;
     align-items: center;
     gap: 1.25rem;
-    background: #0c0c14;
+    background: #0d0d14;
     padding: 0.85rem 1.1rem;
   }
 
@@ -2008,7 +2012,7 @@
     gap: 0.45rem;
     background: transparent;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 0.4rem 0.7rem;
     cursor: pointer;
     font-family: var(--mono, monospace);
@@ -2067,7 +2071,7 @@
 
   .advantages-progress-track {
     height: 2px;
-    background: rgba(12, 12, 20, 0.06);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .advantages-progress-fill {
@@ -2080,7 +2084,7 @@
     position: relative;
     width: 100%;
     height: 380px;
-    background: white;
+    background: var(--card-bg);
   }
 
   .advantage-card {
@@ -2093,6 +2097,7 @@
     padding: 2.75rem 3rem;
     display: flex;
     flex-direction: column;
+    background: var(--card-bg);
     opacity: 0;
     transform: translateY(28px) scale(0.97);
     transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
@@ -2116,7 +2121,7 @@
   .advantage-icon {
     width: 44px;
     height: 44px;
-    border-radius: 12px;
+border-radius: var(--radius-sm);
     background: rgba(0, 212, 170, 0.1);
     color: var(--accent2, #00d4aa);
     display: flex;
@@ -2132,7 +2137,7 @@
   .advantage-number {
     font-family: var(--mono, monospace);
     font-size: 0.75rem;
-    color: rgba(12, 12, 20, 0.25);
+    color: rgba(255, 255, 255, 0.25);
     letter-spacing: 0.05em;
   }
 
@@ -2140,13 +2145,13 @@
     font-size: 1.6rem;
     font-weight: 800;
     margin: 0 0 0.85rem;
-    color: #0c0c14;
+    color: var(--ink);
   }
 
   .advantage-card p {
     font-size: 1.02rem;
     line-height: 1.6;
-    color: #4b5563;
+    color: var(--muted);
     margin: 0;
     flex: 1;
   }

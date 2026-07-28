@@ -121,18 +121,18 @@
     if (existing) existing.remove();
     const overlay = document.createElement("div");
     overlay.id = "appConfirmOverlay";
-    overlay.style.cssText = "position:fixed;inset:0;background:rgba(12,12,20,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000000;padding:16px;";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000000;padding:16px;";
 
     const box = document.createElement("div");
-    box.style.cssText = "background:#fff;border-radius:18px;padding:32px;max-width:400px;width:min(100%,400px);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.28);border:1px solid rgba(12,12,20,0.08);";
+    box.style.cssText = "background:var(--card-bg,#252526);border-radius:18px;padding:32px;max-width:400px;width:min(100%,400px);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);";
 
     const icon = document.createElement("h3");
     icon.textContent = "Confirmar";
-    icon.style.cssText = "margin:0;font-family:Inter,sans-serif;font-size:20px;font-weight:800;color:#0c0c14;";
+    icon.style.cssText = "margin:0;font-family:Inter,sans-serif;font-size:20px;font-weight:800;color:#d4d4d4;";
 
     const text = document.createElement("p");
     text.textContent = msg;
-    text.style.cssText = "margin:14px 0 0;font-family:Inter,sans-serif;font-size:14px;line-height:1.6;color:#4b5563;";
+    text.style.cssText = "margin:14px 0 0;font-family:Inter,sans-serif;font-size:14px;line-height:1.6;color:var(--muted);";
 
     const actions = document.createElement("div");
     actions.style.cssText = "display:flex;justify-content:center;gap:8px;margin-top:20px;";
@@ -140,12 +140,12 @@
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.textContent = "Cancelar";
-    cancelBtn.style.cssText = "border:1px solid rgba(12,12,20,0.12);background:#fff;color:#0c0c14;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:700;";
+    cancelBtn.style.cssText = "border:1px solid rgba(255,255,255,0.12);background:var(--card-bg,#252526);color:#d4d4d4;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:700;";
 
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
     confirmBtn.textContent = "Confirmar";
-    confirmBtn.style.cssText = "border:none;background:#1a56ff;color:#fff;padding:10px 24px;border-radius:10px;cursor:pointer;font-weight:700;";
+    confirmBtn.style.cssText = "border:none;background:var(--accent,#4fc1ff);color:#fff;padding:10px 24px;border-radius:10px;cursor:pointer;font-weight:700;";
 
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
@@ -1470,15 +1470,15 @@
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              background: #f8fafc;
+              background: #1e1e1e;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-              color: #0f172a;
+              color: #d4d4d4;
             }
             .spinner {
               width: 36px;
               height: 36px;
-              border: 3px solid #e2e8f0;
-              border-top-color: #6366f1;
+              border: 3px solid rgba(255, 255, 255, 0.1);
+              border-top-color: var(--accent2, #00d4aa);
               border-radius: 50%;
               animation: spin 0.8s linear infinite;
             }
@@ -1490,7 +1490,7 @@
             p {
               margin: 0;
               font-size: 0.85rem;
-              color: #64748b;
+              color: var(--muted);
             }
             @keyframes spin {
               to { transform: rotate(360deg); }
@@ -1627,7 +1627,7 @@
   }
 
   function methodBadge(method) {
-    const colors = {GET:'#00d4aa',POST:'#1a56ff',PUT:'#ff9f1c',PATCH:'#ff9f1c',DELETE:'#ff5c35'};
+    const colors = {GET:'#00d4aa',POST:'#4fc1ff',PUT:'#ff9f1c',PATCH:'#ff9f1c',DELETE:'#ff7b4a'};
     const color = colors[method] || '#7a7a8a';
     return `<span style="display:inline-block;font-size:0.58rem;font-weight:700;padding:1px 5px;border-radius:3px;background:${color}22;color:${color};margin-right:4px">${escapeHtml(method || '?')}</span>`;
   }
@@ -2084,6 +2084,29 @@
     const _stdioTa = document.getElementById("mergeStdioJson");
     if (_stdioTa) _stdioTa.placeholder = '{\n  "command": "uvx",\n  "args": ["mcp-excel-server"],\n  "env": { "KEY": "val" },\n  "tools": { "tool_name": { "name": "novo_nome", "description": "...", "arguments": { "param": { "default": "x", "hide": true } } } }\n}';
 
+    if (supabaseClient) {
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (session?.access_token) {
+          localStorage.setItem("supabase_token", session.access_token);
+          currentUser = session.user;
+
+          if (event === "PASSWORD_RECOVERY") {
+            openResetPasswordModal();
+            return;
+          }
+
+          fetchProfile();
+        } else if (event === "SIGNED_OUT") {
+          localStorage.removeItem("supabase_token");
+          localStorage.removeItem("supabase.auth.token");
+          sessionStorage.removeItem("supabase.auth.token");
+          currentUser = null;
+          currentProfile = null;
+          window.location.href = window.location.origin;
+        }
+      });
+    }
+
     (async function init() {
       await checkGateway();
       await restoreSession();
@@ -2091,31 +2114,14 @@
       _initialized = true;
       startLogsPolling();
       _fetchStoreServers();
-
-      if (supabaseClient) {
-        const { data: listener } = supabaseClient.auth.onAuthStateChange((event, session) => {
-          if (session?.access_token) {
-            localStorage.setItem("supabase_token", session.access_token);
-            currentUser = session.user;
-
-            if (event === "PASSWORD_RECOVERY") {
-              openResetPasswordModal();
-              return;
-            }
-
-            fetchProfile();
-          } else if (event === "SIGNED_OUT") {
-            localStorage.removeItem("supabase_token");
-            localStorage.removeItem("supabase.auth.token");
-            sessionStorage.removeItem("supabase.auth.token");
-            currentUser = null;
-            currentProfile = null;
-            window.location.href = window.location.origin;
-          }
-        });
-      }
     })();
   });
+
+  // Check for pending password recovery redirect
+  if (sessionStorage.getItem("pw_recovery") === "1") {
+    sessionStorage.removeItem("pw_recovery");
+    setTimeout(openResetPasswordModal, 300);
+  }
 
   let draggingId = null;
 
@@ -2227,7 +2233,7 @@
       {:else if $serversError}
         <div class="empty-state">
           <div class="empty-icon">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff5c35" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff7b4a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <div style="color:var(--warn)">{$t('dashboard.load_error')}<br/>{$serversError}</div>
           <button class="btn-retry" onclick={() => loadServers(true)}>
@@ -2277,11 +2283,11 @@
             <div class="server-info">
               <div class="status-icon" class:active={isActive && !healthError} class:inactive={!isActive || healthError}>
                 {#if healthError}
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff5c35"/><circle cx="8" cy="8" r="7" stroke="#ff5c35" stroke-width="1.5" stroke-opacity="0.3"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff7b4a"/><circle cx="8" cy="8" r="7" stroke="#ff7b4a" stroke-width="1.5" stroke-opacity="0.3"/></svg>
                 {:else if isActive}
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#00d4aa"/><circle cx="8" cy="8" r="7" stroke="#00d4aa" stroke-width="1.5" stroke-opacity="0.3"/></svg>
                 {:else}
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff5c35"/><circle cx="8" cy="8" r="7" stroke="#ff5c35" stroke-width="1.5" stroke-opacity="0.3"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="4" fill="#ff7b4a"/><circle cx="8" cy="8" r="7" stroke="#ff7b4a" stroke-width="1.5" stroke-opacity="0.3"/></svg>
                 {/if}
               </div>
               <div class="server-meta">
@@ -2478,9 +2484,9 @@
           {$t('auth.login_title')}
           <button class="security-info-btn" onclick={() => showSecurityInfo = !showSecurityInfo}>?</button>
         </div>
-        <div style="font-size:0.75rem;color:#9ca3af;margin-bottom:0.75rem;line-height:1.4;">{$t('auth.login_desc')}</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem;line-height:1.4;">{$t('auth.login_desc')}</div>
         {#if showSecurityInfo}
-          <div style="margin-bottom:1rem;padding:0.85rem;background:rgba(0,212,170,0.05);border:1px solid rgba(0,212,170,0.12);border-radius:10px;font-size:0.75rem;color:#9ca3af;line-height:1.6;">
+          <div style="margin-bottom:1rem;padding:0.85rem;background:rgba(0,212,170,0.05);border:1px solid rgba(0,212,170,0.12);border-radius:10px;font-size:0.75rem;color:var(--muted);line-height:1.6;">
             <div style="font-weight:700;color:var(--accent2);margin-bottom:0.4rem;">{$t('auth.security_full_title')}</div>
             <p style="margin:0 0 0.6rem;">{$t('auth.security_full_desc')}</p>
             <div style="font-weight:600;color:var(--ink);margin-bottom:0.3rem;">{$t('auth.security_why_safer')}</div>
@@ -2508,11 +2514,11 @@
       </div>
     {/if}
     {#if toolsLoading}
-      <div style="padding:2rem;text-align:center;color:#6b7280;">{$t('tools.modal.loading')}</div>
+      <div style="padding:2rem;text-align:center;color:var(--muted);">{$t('tools.modal.loading')}</div>
     {:else if toolsError}
       <div class="modal-error" style="display:block">{toolsError}</div>
     {:else if toolsList.length === 0}
-      <div style="padding:2rem;text-align:center;color:#6b7280;">{$t('tools.modal.empty')}</div>
+      <div style="padding:2rem;text-align:center;color:var(--muted);">{$t('tools.modal.empty')}</div>
     {:else}
       <div class="tools-list">
         {#each toolsList as tool}
@@ -2562,7 +2568,7 @@
                           <input class="tool-arg-number" type="number" step={paramSchema.type === "integer" ? "1" : "any"} placeholder={paramSchema.description || ""} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
                         {:else if paramSchema.type === "array"}
                           <input class="tool-arg-input" type="text" placeholder={paramSchema.description || `["item1", "item2"]`} value={toolArgs[paramName] ?? ""} oninput={(e) => toolArgs[paramName] = e.target.value} />
-                          <div style="font-size:0.62rem;color:#9ca3af;margin-top:2px;">{$t('tool.array_hint')}</div>
+                          <div style="font-size:0.62rem;color:var(--muted);margin-top:2px;">{$t('tool.array_hint')}</div>
                         {:else if paramSchema.type === "object"}
                           <textarea class="tool-arg-input" rows="3" placeholder={paramSchema.description || '{"key": "value"}'} oninput={(e) => toolArgs[paramName] = e.target.value}>{toolArgs[paramName] ?? ""}</textarea>
                         {:else}
@@ -2572,7 +2578,7 @@
                     </div>
                   {/each}
                 {:else}
-                  <div style="color:#9ca3af;font-size:0.8rem;padding:0.5rem 0;">{$t('tool.no_args')}</div>
+                  <div style="color:var(--muted);font-size:0.8rem;padding:0.5rem 0;">{$t('tool.no_args')}</div>
                 {/if}
                 <button class="btn-confirm tool-run-btn" onclick={() => callTool(tool.name)} disabled={toolCalling}>
                   {toolCalling ? $t('tool.running') : $t('tool.run')}

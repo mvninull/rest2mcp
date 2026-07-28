@@ -1,16 +1,21 @@
 
       :root {
-        --ink: #0a0a0f;
-        --paper: #f5f4ef;
-        --accent: #1a56ff;
+        --ink: #d4d4d4;
+        --paper: #1e1e1e;
+        --accent: #4fc1ff;
         --accent2: #00d4aa;
-        --warn: #ff6b35;
-        --muted: #6b6b7a;
-        --border: rgba(10, 10, 15, 0.1);
-        --card-bg: #ffffff;
+        --warn: #ff7b4a;
+        --muted: #858585;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.2);
+        --card-bg: #252526;
         --mono: "JetBrains Mono", monospace;
         --display: "Syne", sans-serif;
         --body: "DM Sans", sans-serif;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+        --radius-sm: 8px;
+        --radius: 12px;
       }
 
       *,
@@ -39,7 +44,7 @@
         position: sticky;
         top: 0;
         z-index: 100;
-        background: rgba(245, 244, 239, 0.85);
+        background: rgba(30, 30, 30, 0.88);
         backdrop-filter: blur(16px);
         border-bottom: 1px solid var(--border);
         padding: 0 2rem;
@@ -115,7 +120,7 @@
         background:
           radial-gradient(
             ellipse 60% 50% at 80% 20%,
-            rgba(26, 86, 255, 0.07) 0%,
+            rgba(79, 193, 255, 0.07) 0%,
             transparent 60%
           ),
           radial-gradient(
@@ -145,10 +150,10 @@
         z-index: 1;
       }
       .hero-tag {
-        display: inline-flex;
+display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: white;
+        background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 100px;
         padding: 6px 14px;
@@ -185,6 +190,7 @@
         letter-spacing: -0.04em;
         margin-bottom: 1.5rem;
         animation: fadeUp 0.7s 0.1s ease both;
+        color: #e8e8e8;
       }
       h1 em {
         font-style: normal;
@@ -207,28 +213,28 @@
         animation: fadeUp 0.7s 0.3s ease both;
       }
       .btn-primary {
-        background: var(--ink);
+        background: var(--accent);
         color: white;
         padding: 14px 28px;
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         font-family: var(--display);
         font-weight: 700;
         font-size: 0.9rem;
         text-decoration: none;
         letter-spacing: -0.01em;
         transition: all 0.2s;
-        border: 1.5px solid var(--ink);
+        border: 1.5px solid var(--accent);
       }
       .btn-primary:hover {
-        background: var(--accent);
-        border-color: var(--accent);
+        background: #6bcbff;
+        border-color: #6bcbff;
         transform: translateY(-1px);
       }
       .btn-ghost {
         background: transparent;
         color: var(--ink);
         padding: 14px 28px;
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         font-family: var(--display);
         font-weight: 600;
         font-size: 0.9rem;
@@ -238,6 +244,7 @@
       }
       .btn-ghost:hover {
         border-color: var(--ink);
+        background: rgba(255, 255, 255, 0.04);
       }
 
       .hero-badges {
@@ -266,11 +273,11 @@
         flex-wrap: wrap;
         animation: fadeUp 0.7s 0.05s ease both;
       }
-      .social-badge {
+.social-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: white;
+        background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 100px;
         padding: 5px 12px;
@@ -279,6 +286,11 @@
         color: var(--ink);
         text-decoration: none;
         transition: all 0.2s;
+      }
+      .social-badge:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        transform: translateY(-1px);
       }
       .social-badge:hover {
         border-color: var(--accent);
@@ -318,6 +330,7 @@
         letter-spacing: -0.04em;
         line-height: 1;
         margin-bottom: 1rem;
+        color: #e8e8e8;
       }
       .section-desc {
         color: var(--muted);
@@ -334,17 +347,17 @@
         align-items: start;
       }
       .callout {
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         padding: 1.25rem 1.5rem;
         margin-bottom: 1rem;
         font-size: 0.9rem;
       }
       .callout.problem {
-        background: #fff3ef;
+        background: rgba(255, 123, 74, 0.1);
         border-left: 3px solid var(--warn);
       }
       .callout.solution {
-        background: #edfbf7;
+        background: rgba(0, 212, 170, 0.08);
         border-left: 3px solid var(--accent2);
       }
       .callout strong {
@@ -357,9 +370,9 @@
       }
 
       .highlights-box {
-        background: white;
+        background: var(--card-bg);
         border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: var(--radius);
         padding: 1.5rem;
         margin-top: 1.5rem;
       }
@@ -435,7 +448,7 @@
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background: var(--ink);
+        background: #2d2d2d;
         color: white;
         font-family: var(--mono);
         font-size: 0.75rem;
@@ -458,9 +471,9 @@
       }
 
       .sse-note {
-        background: #f8f8fc;
+        background: rgba(255, 255, 255, 0.04);
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         padding: 1rem 1.25rem;
         font-size: 0.82rem;
         color: var(--muted);
@@ -469,7 +482,7 @@
       code {
         font-family: var(--mono);
         font-size: 0.82em;
-        background: rgba(26, 86, 255, 0.08);
+        background: rgba(79, 193, 255, 0.08);
         color: var(--accent);
         padding: 2px 6px;
         border-radius: 4px;
@@ -477,9 +490,7 @@
 
       /* ─── FEATURES ─── */
       .features-bg {
-        background: var(--ink);
-      }
-      .features-section {
+        background: #0d0d14;
         max-width: 1200px;
         margin: 0 auto;
         padding: 6rem 2rem;
@@ -499,12 +510,12 @@
         grid-template-columns: repeat(3, 1fr);
         gap: 1px;
         background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
         overflow: hidden;
       }
       .feat-card {
-        background: var(--ink);
+        background: #0d0d14;
         padding: 2rem 1.75rem;
         transition: background 0.2s;
       }
@@ -517,7 +528,7 @@
         width: 48px;
         height: 48px;
         background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -543,10 +554,10 @@
         gap: 1.5rem;
         margin-bottom: 2rem;
       }
-      .api-card {
-        background: white;
+.api-card {
+        background: var(--card-bg);
         border: 1px solid var(--border);
-        border-radius: 14px;
+        border-radius: var(--radius);
         overflow: hidden;
       }
       .api-card-head {
@@ -571,20 +582,20 @@
         margin-left: auto;
       }
       .api-badge.warn {
-        background: #fff3ef;
+        background: rgba(255, 123, 74, 0.12);
         color: var(--warn);
       }
       .api-badge.ok {
-        background: #edfbf7;
-        color: #00a382;
+        background: rgba(0, 212, 170, 0.12);
+        color: var(--accent2);
       }
       .api-card-body {
         padding: 1.25rem 1.5rem;
       }
 
       .code-block {
-        background: #0f1117;
-        border-radius: 8px;
+        background: #0d0d14;
+        border-radius: var(--radius-sm);
         padding: 1rem 1.25rem;
         margin-bottom: 1rem;
         overflow-x: auto;
@@ -592,7 +603,7 @@
       .code-block pre {
         font-family: var(--mono);
         font-size: 0.75rem;
-        color: #a0aec0;
+        color: var(--muted);
         line-height: 1.7;
         margin: 0;
       }
@@ -603,21 +614,21 @@
       .api-note {
         font-size: 0.8rem;
         padding: 0.75rem 1rem;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
       }
       .api-note.warn {
-        background: #fff8f5;
-        color: #a05020;
+        background: rgba(255, 123, 74, 0.1);
+        color: var(--warn);
       }
       .api-note.ok {
-        background: #f0fdf9;
-        color: #166a57;
+        background: rgba(0, 212, 170, 0.08);
+        color: var(--accent2);
       }
 
-      .multi-config {
-        background: white;
+.multi-config {
+        background: var(--card-bg);
         border: 1px solid var(--border);
-        border-radius: 14px;
+        border-radius: var(--radius);
         overflow: hidden;
       }
       .multi-config-head {
@@ -655,17 +666,17 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
         padding: 8px 18px;
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         border: 1.5px solid var(--border);
-        background: white;
+        background: var(--card-bg);
         color: var(--muted);
         cursor: pointer;
         transition: all 0.15s;
       }
       .tab-btn.active {
-        background: var(--ink);
+        background: var(--accent);
         color: white;
-        border-color: var(--ink);
+        border-color: var(--accent);
       }
       .tab-pane {
         display: none;
@@ -681,9 +692,9 @@
         gap: 1rem;
       }
       .qs-step {
-        background: white;
+        background: var(--card-bg);
         border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: var(--radius);
         overflow: hidden;
       }
       .qs-step-head {
@@ -696,8 +707,8 @@
       .qs-num {
         width: 32px;
         height: 32px;
-        border-radius: 8px;
-        background: var(--ink);
+        border-radius: var(--radius-sm);
+        background: #2d2d2d;
         color: white;
         font-family: var(--mono);
         font-size: 0.78rem;
@@ -727,9 +738,9 @@
         gap: 1.5rem;
       }
       .config-card {
-        background: white;
+        background: var(--card-bg);
         border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: var(--radius);
         overflow: hidden;
       }
       .config-card-head {
@@ -750,7 +761,7 @@
 
       /* ─── FOOTER ─── */
       footer {
-        background: var(--ink);
+        background: #0d0d14;
         color: white;
         padding: 4rem 2rem 3rem;
       }
@@ -818,7 +829,7 @@
         background: var(--accent);
         color: white;
         padding: 8px 18px;
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         font-family: var(--display);
         font-size: 0.78rem;
         font-weight: 700;
@@ -835,9 +846,9 @@
 
       /* ─── DASHBOARD MOCKUP ─── */
       .dash-card {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
         padding: 1rem 1.25rem;
         display: flex;
         align-items: center;
@@ -856,7 +867,7 @@
         color: white;
         border: none;
         padding: 6px 14px;
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         font-family: var(--mono);
         font-size: 0.65rem;
         cursor: pointer;
@@ -866,13 +877,13 @@
       .dash-copy-btn:disabled {
         background: rgba(255,255,255,0.1);
         color: rgba(255,255,255,0.3);
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid var(--border);
         cursor: not-allowed;
       }
       .dash-logs {
-        background: #0a0a0f;
+        background: #0d0d14;
         border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         overflow: hidden;
       }
       .dash-logs-header {
@@ -880,14 +891,14 @@
         align-items: center;
         gap: 8px;
         padding: 0.75rem 1rem;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
+        border-bottom: 1px solid var(--border);
       }
       .dash-logs-body {
         padding: 1rem 1.25rem;
         font-family: var(--mono);
         font-size: 0.72rem;
         line-height: 1.8;
-        color: #a0aec0;
+        color: var(--muted);
       }
       .dash-logs-body .info-line { color: var(--accent2); }
       .log-dot {
@@ -962,7 +973,7 @@
         color: var(--accent2);
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        background: #edfbf7;
+        background: rgba(0, 212, 170, 0.1);
         padding: 4px 10px;
         border-radius: 100px;
         display: inline-block;
@@ -1013,7 +1024,7 @@
       .modal-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(10, 10, 15, 0.4);
+        background: rgba(0, 0, 0, 0.65);
         backdrop-filter: blur(8px);
         z-index: 1000;
         display: flex;
@@ -1028,13 +1039,13 @@
         pointer-events: auto;
       }
       .modal-box {
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        border-radius: 16px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
         padding: 2.25rem 2rem;
         width: 100%;
         max-width: 420px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         transform: translateY(20px);
         transition: transform 0.3s ease;
         text-align: center;
@@ -1067,7 +1078,7 @@
         gap: 12px;
         width: 100%;
         padding: 12px;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         font-family: var(--display);
         font-weight: 700;
         font-size: 0.9rem;
@@ -1080,12 +1091,12 @@
         height: 18px;
       }
       .google-btn {
-        background: #ffffff;
+        background: var(--card-bg);
         color: var(--ink);
       }
       .google-btn:hover {
-        background: #f7f9fa;
-        border-color: var(--ink);
+        background: #2d2d2d;
+        border-color: var(--border-strong);
       }
       .github-btn {
         background: #24292e;
@@ -1144,12 +1155,14 @@
       }
       .auth-input {
         padding: 12px 14px;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         border: 1.5px solid var(--border);
         font-family: var(--body);
         font-size: 0.9rem;
         outline: none;
         transition: border-color 0.2s;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--ink);
       }
       .auth-input:focus {
         border-color: var(--accent);
@@ -1171,16 +1184,17 @@
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
       }
-      .contact-input,
+.contact-input,
       .contact-textarea {
         padding: 12px 14px;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         border: 1.5px solid var(--border);
         font-family: var(--body);
         font-size: 0.9rem;
         outline: none;
         transition: border-color 0.2s;
-        background: white;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--ink);
         width: 100%;
       }
       .contact-input:focus,
@@ -1201,7 +1215,7 @@
         display: none;
         position: fixed;
         inset: 0;
-        background: rgba(10, 10, 15, 0.55);
+        background: rgba(0, 0, 0, 0.65);
         backdrop-filter: blur(6px);
         -webkit-backdrop-filter: blur(6px);
         z-index: 9999;
@@ -1250,7 +1264,7 @@
         to { transform: rotate(360deg); }
       }
       .google-btn .spinner-svg {
-        stroke: #1a1a1a;
+        stroke: var(--ink);
       }
       .github-btn .spinner-svg {
         stroke: #ffffff;
@@ -1292,7 +1306,7 @@
       }
       .mcp-client:hover {
         border-color: var(--border-strong);
-        background: #f5f4ef;
+        background: #2d2d2d;
         color: var(--ink);
         transform: translateY(-1px);
         box-shadow: var(--shadow-md);
@@ -1342,8 +1356,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: white;
-  border-radius: 20px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
   box-shadow: 0 25px 60px rgba(0,0,0,0.08);
   padding: 3rem;
   display: flex;
@@ -1365,13 +1379,13 @@
   font-size: 1.8rem;
   font-weight: 800;
   margin-bottom: 1rem;
-  color: #0c0c14;
+  color: var(--ink);
 }
 
 .advantage-card p {
   font-size: 1.1rem;
   line-height: 1.6;
-  color: #4b5563;
+  color: var(--muted);
 }
 
 @media (max-width: 640px) {
