@@ -4,7 +4,7 @@ import typer
 from rich import box
 from rich.console import Console
 from rich.table import Table
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 
 from r2mcp_cli.api_client import APIClient, APIError
 from r2mcp_cli.config import get_token, validate_token
@@ -216,3 +216,54 @@ def credentials(
             console.print(f"[green]Servidor '{server_id}' tem credenciais configuradas.[/green]")
         else:
             console.print(f"[yellow]Servidor '{server_id}' nao tem credenciais configuradas.[/yellow]")
+
+
+PASSWORD_KEYS = {"password", "senha", "pwd", "pass", "secret", "palavra-passe", "passwd"}
+
+
+@servers_app.command()
+def login(
+    server_id: str = typer.Argument(..., help="ID do servidor"),
+):
+    _require_auth()
+    client = APIClient()
+    try:
+        auth_info = client.get_auth_status(server_id)
+    except APIError as e:
+        client.close()
+        console.print(f"[red]Erro: {e.detail}[/red]")
+        raise typer.Exit(1)
+
+    fields = auth_info.get("required_fields", [])
+    if not fields:
+        console.print("[yellow]Este servidor nao requer autenticacao.[/yellow]")
+        client.close()
+        return
+
+    if auth_info.get("authenticated"):
+        console.print("[green]Servidor ja esta autenticado.[/green]")
+        client.close()
+        return
+
+    console.print(f"[bold]Login no servidor {server_id}[/bold]")
+    console.print(f"[dim]Campos necessarios: {', '.join(fields)}[/dim]")
+
+    values = {}
+    for field in fields:
+        is_password = field.lower() in PASSWORD_KEYS
+        values[field] = Prompt.ask(
+            field,
+            password=is_password,
+        )
+
+    try:
+        result = client.login_server(server_id, values)
+        client.close()
+        if result.get("token"):
+            console.print("[green]Autenticado com sucesso![/green]")
+        else:
+            console.print("[red]Resposta inesperada do servidor.[/red]")
+    except APIError as e:
+        client.close()
+        console.print(f"[red]Erro no login: {e.detail}[/red]")
+        raise typer.Exit(1)
