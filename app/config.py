@@ -4,9 +4,7 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 
-    env_path = Path(__file__).resolve().parent / ".env"
-    if not env_path.exists():
-        env_path = Path(__file__).resolve().parent.parent / ".env"
+    env_path = Path(__file__).resolve().parent.parent / ".env"
     load_dotenv(env_path)
 except ImportError:
     pass
@@ -37,3 +35,15 @@ FREE_TIER_MAX_SERVERS = int(os.getenv("FREE_TIER_MAX_SERVERS", "2"))
 FREE_TIER_RPM = int(os.getenv("FREE_TIER_RPM", "10"))
 PRO_TIER_MAX_SERVERS = int(os.getenv("PRO_TIER_MAX_SERVERS", "10"))
 PRO_TIER_RPM = int(os.getenv("PRO_TIER_RPM", "100"))
+
+# Rate limiting de endpoints de autenticação (modelo Supabase: token bucket por IP).
+# O bucket tem capacidade de AUTH_RATE_LIMIT_BURST (rajada) e é recarregado a uma
+# taxa definida por endpoint (requests por hora). Excedido o limite -> HTTP 429.
+AUTH_RATE_LIMIT_BURST = int(os.getenv("AUTH_RATE_LIMIT_BURST", "30"))
+AUTH_LOGIN_RATE_PER_HOUR = int(os.getenv("AUTH_LOGIN_RATE_PER_HOUR", "360"))
+AUTH_REGISTER_RATE_PER_HOUR = int(os.getenv("AUTH_REGISTER_RATE_PER_HOUR", "30"))
+AUTH_CREDENTIALS_RATE_PER_HOUR = int(os.getenv("AUTH_CREDENTIALS_RATE_PER_HOUR", "120"))
+
+# Se True, o gateway confia em Sb-Forwarded-For / X-Forwarded-For para obter o IP real
+# do client quando está atrás de um proxy (mesmo conceito do Supabase). Default: off.
+RATE_LIMIT_TRUST_FORWARDED_HEADERS = os.getenv("RATE_LIMIT_TRUST_FORWARDED_HEADERS", "false").lower() == "true"

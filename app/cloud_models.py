@@ -48,6 +48,17 @@ class LogDB(Base):
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class WebhookEventDB(Base):
+    """Guarda os ids de eventos de webhook já processados para garantir idempotência."""
+
+    __tablename__ = "webhook_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(255), unique=True, nullable=False, index=True)
+    source = Column(String(20), nullable=False)
+    processed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

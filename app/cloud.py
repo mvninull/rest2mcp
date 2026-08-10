@@ -20,11 +20,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, desc
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 try:
-    from .cloud_models import Base, LogDB, ServerDB, SessionLocal, engine, get_db, init_db
+    from .cloud_models import Base, LogDB, ServerDB, SessionLocal, WebhookEventDB, engine, get_db, init_db
     from .config import (
+        AUTH_CREDENTIALS_RATE_PER_HOUR,
+        AUTH_LOGIN_RATE_PER_HOUR,
+        AUTH_RATE_LIMIT_BURST,
+        AUTH_REGISTER_RATE_PER_HOUR,
         FREE_TIER_MAX_SERVERS,
         FREE_TIER_RPM,
         GATEWAY_HOST,
@@ -35,6 +40,7 @@ try:
     )
     from .openapi import MCPServerManager, create_mcp_server
     from .paypal import parse_webhook_event, verify_webhook_signature
+    from .ratelimit import TokenBucketLimiter, rate_limit_dependency
     from .stripe_service import (
         create_checkout_session as stripe_create_checkout_session,
         get_subscription as stripe_get_subscription,
@@ -52,14 +58,19 @@ try:
     )
     from .utils import logger
 except ImportError:
-    from cloud_models import Base, LogDB, ServerDB, SessionLocal, engine, get_db, init_db
+    from cloud_models import Base, LogDB, ServerDB, SessionLocal, WebhookEventDB, engine, get_db, init_db
     from config import (
+        AUTH_CREDENTIALS_RATE_PER_HOUR,
+        AUTH_LOGIN_RATE_PER_HOUR,
+        AUTH_RATE_LIMIT_BURST,
+        AUTH_REGISTER_RATE_PER_HOUR,
         GATEWAY_HOST,
         GATEWAY_PORT,
         PUBLIC_URL,
     )
     from openapi import MCPServerManager
     from paypal import parse_webhook_event, verify_webhook_signature
+    from ratelimit import TokenBucketLimiter, rate_limit_dependency
     from stripe_service import (
         create_checkout_session as stripe_create_checkout_session,
         get_subscription as stripe_get_subscription,
@@ -615,6 +626,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Rate limiting de autenticação (token bucket por IP, estilo Supabase) ─────
+# Cada endpoint tem o próprio limiter. O bucket aceita uma rajada de
+# AUTH_RATE_LIMIT_BURST e recarrega à taxa configurada (requests/hora).
+require_login_rate_limit = rate_limit_dependency(
+    TokenBucketLimiter("auth_login", AUTH_RATE_LIMIT_BURST, AUTH_LOGIN_RATE_PER_HOUR / 3600)
+)
+require_register_rate_limit = rate_limit_dependency(
+    TokenBucketLimiter("auth_register", AUTH_RATE_LIMIT_BURST, AUTH_REGISTER_RATE_PER_HOUR / 3600)
+)
+require_credentials_rate_limit = rate_limit_dependency(
+    TokenBucketLimiter("auth_credentials", AUTH_RATE_LIMIT_BURST, AUTH_CREDENTIALS_RATE_PER_HOUR / 3600)
+)
+
 # ─── Schemas ───────────────────────────────────────────────────────────────────
 
 
@@ -693,6 +717,7 @@ class CheckoutSessionRequest(BaseModel):
     success_url: str
     cancel_url: str
     email: str | None = None
+    idempotency_key: str | None = None
 
 
 class VerifyCheckoutSessionRequest(BaseModel):
@@ -1280,7 +1305,12 @@ async def server_auth_schema(server_id: str, request: Request, db: Session = Dep
 
 
 @app.post("/v1/servers/{server_id}/auth/login")
-async def server_auth_login(server_id: str, request: Request, db: Session = Depends(get_db)):
+async def server_auth_login(
+    server_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _rate: None = Depends(require_login_rate_limit),
+):
     await require_auth(request)
     user_id = request.state.user_id
     record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
@@ -1334,7 +1364,12 @@ async def server_auth_login(server_id: str, request: Request, db: Session = Depe
 
 
 @app.put("/v1/servers/{server_id}/auth/credentials")
-async def save_server_credentials(server_id: str, request: Request, db: Session = Depends(get_db)):
+async def save_server_credentials(
+    server_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _rate: None = Depends(require_credentials_rate_limit),
+):
     await require_auth(request)
     user_id = request.state.user_id
     record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
@@ -1353,7 +1388,12 @@ async def save_server_credentials(server_id: str, request: Request, db: Session 
 
 
 @app.get("/v1/servers/{server_id}/auth/credentials")
-async def check_server_credentials(server_id: str, request: Request, db: Session = Depends(get_db)):
+async def check_server_credentials(
+    server_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _rate: None = Depends(require_credentials_rate_limit),
+):
     await require_auth(request)
     user_id = request.state.user_id
     record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
@@ -1364,7 +1404,12 @@ async def check_server_credentials(server_id: str, request: Request, db: Session
 
 
 @app.delete("/v1/servers/{server_id}/auth/credentials")
-async def delete_server_credentials(server_id: str, request: Request, db: Session = Depends(get_db)):
+async def delete_server_credentials(
+    server_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _rate: None = Depends(require_credentials_rate_limit),
+):
     await require_auth(request)
     user_id = request.state.user_id
     record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
@@ -3999,6 +4044,20 @@ async def reset_database():
 # ─── Webhook PayPal ───────────────────────────────────────────────────────────
 
 
+def mark_webhook_processed(event_id: str, source: str) -> bool:
+    """Regista o id de um evento de webhook. Retorna False se o evento já foi processado."""
+    db = SessionLocal()
+    try:
+        db.add(WebhookEventDB(event_id=event_id, source=source))
+        db.commit()
+        return True
+    except IntegrityError:
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
 @app.post("/v1/webhooks/paypal")
 async def paypal_webhook(request: Request):
     body = await request.body()
@@ -4010,6 +4069,11 @@ async def paypal_webhook(request: Request):
     event = parse_webhook_event(body)
     if not event:
         return JSONResponse(status_code=200, content={"status": "ignored"})
+
+    event_id = (event.get("raw") or {}).get("id", "")
+    if event_id and not mark_webhook_processed(event_id, "paypal"):
+        logger.info(f"Webhook PayPal duplicado ignorado: {event_id}")
+        return JSONResponse(status_code=200, content={"status": "already_processed"})
 
     user_id = event.get("custom_id", "")
     if not user_id:
@@ -4058,12 +4122,14 @@ async def paypal_webhook(request: Request):
 @app.post("/v1/checkout-session", status_code=201)
 def create_checkout_session(req: CheckoutSessionRequest):
     try:
+        idempotency_key = req.idempotency_key or f"checkout:{req.user_id}:{req.price_id}"
         session = stripe_create_checkout_session(
             price_id=req.price_id,
             user_id=req.user_id,
             success_url=req.success_url,
             cancel_url=req.cancel_url,
             customer_email=req.email,
+            idempotency_key=idempotency_key,
         )
         return {"sessionId": session.id, "url": session.url}
     except Exception as e:
@@ -4119,6 +4185,10 @@ async def stripe_webhook(request: Request):
     action = stripe_parse_event_type(event.type)
     if not action:
         return JSONResponse(status_code=200, content={"status": "ignored"})
+
+    if not mark_webhook_processed(event.id, "stripe"):
+        logger.info(f"Webhook Stripe duplicado ignorado: {event.id}")
+        return JSONResponse(status_code=200, content={"status": "already_processed"})
 
     logger.info(f"Webhook Stripe: {event.type}")
 
@@ -4276,7 +4346,7 @@ async def get_me(request: Request, db: Session = Depends(get_db)):
 
 
 @app.post("/v1/auth/register")
-async def auth_register(request: Request):
+async def auth_register(request: Request, _rate: None = Depends(require_register_rate_limit)):
     await require_auth(request)
     user_id = request.state.user_id
     payload = request.state.jwt_payload

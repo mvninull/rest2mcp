@@ -16,6 +16,7 @@ venv/
 ENV/
 env/
 .ruff_cache/
+*.egg-info/
 
 # Databases
 *.db

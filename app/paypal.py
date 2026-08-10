@@ -3,10 +3,24 @@ import json
 import httpx
 
 try:
-    from .config import PAYPAL_API_URL, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_PRO_PLAN_ID, PAYPAL_SANDBOX, PAYPAL_WEBHOOK_ID
+    from .config import (
+        PAYPAL_API_URL,
+        PAYPAL_CLIENT_ID,
+        PAYPAL_CLIENT_SECRET,
+        PAYPAL_PRO_PLAN_ID,
+        PAYPAL_SANDBOX,
+        PAYPAL_WEBHOOK_ID,
+    )
     from .utils import logger
 except ImportError:
-    from config import PAYPAL_API_URL, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_PRO_PLAN_ID, PAYPAL_SANDBOX, PAYPAL_WEBHOOK_ID
+    from config import (
+        PAYPAL_API_URL,
+        PAYPAL_CLIENT_ID,
+        PAYPAL_CLIENT_SECRET,
+        PAYPAL_PRO_PLAN_ID,
+        PAYPAL_SANDBOX,
+        PAYPAL_WEBHOOK_ID,
+    )
     from utils import logger
 
 
@@ -153,6 +167,7 @@ async def create_paypal_subscription(plan_id: str, user_id: str) -> dict:
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {token}",
+                "PayPal-Request-Id": f"sub-{plan_id}-{user_id}",
             },
             json={
                 "plan_id": plan_id,

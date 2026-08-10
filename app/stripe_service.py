@@ -9,7 +9,12 @@ stripe.api_key = STRIPE_SECRET_KEY
 
 
 def create_checkout_session(
-    price_id: str, user_id: str, success_url: str, cancel_url: str, customer_email: str | None = None
+    price_id: str,
+    user_id: str,
+    success_url: str,
+    cancel_url: str,
+    customer_email: str | None = None,
+    idempotency_key: str | None = None,
 ):
     params = {
         "mode": "subscription",
@@ -23,6 +28,8 @@ def create_checkout_session(
     }
     if customer_email:
         params["customer_email"] = customer_email
+    if idempotency_key:
+        params["idempotency_key"] = idempotency_key
     session = stripe.checkout.Session.create(**params)
     return session
 
