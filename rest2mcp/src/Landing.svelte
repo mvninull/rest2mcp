@@ -128,9 +128,9 @@
     };
 
     // ─── CONFIGURAÇÃO SUPABASE ─────────────────────────────
-    // Valores por omissão do Supabase Sandbox do projeto
-    const SUPABASE_URL = "https://zcfrbhrqvneomseqmqam.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_mF0UgfLvgZN5OupdpsSa0A_ibOcfzq4";
+    // Defina VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY em rest2mcp/.env
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
     let supabaseClient = null;
     try {
       if (typeof supabase === "undefined") {
@@ -493,9 +493,8 @@
           ? "http://localhost:8080"
           : "https://rest2mcp.fly.dev")
       ).replace(/\/+$/, "");
-      const STRIPE_PUBLISHABLE_KEY =
-        "pk_test_51TbKmaQdlPUKQK2wfBNfhgwltyLsxwfV2smHoPIxyp15rqsEjNbUM0nV1rmyZ2DFQHGm7Ee0RHAy2gzerqGJ5MJA00VAAqjNDO";
-      const STRIPE_PRO_PRICE_ID = "price_1TbKy7QdlPUKQK2wQmXUzWOM";
+      const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
+      const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID || "";
       try {
         const payload = {
           price_id: STRIPE_PRO_PRICE_ID,

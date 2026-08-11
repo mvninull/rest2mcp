@@ -16,8 +16,8 @@
   ).replace(/\/+$/, "");
   const POLL_LOGS_INTERVAL = 5000;
 
-  const SUPABASE_URL = localStorage.getItem("supabase_url") || "https://zcfrbhrqvneomseqmqam.supabase.co";
-  const SUPABASE_ANON_KEY = localStorage.getItem("supabase_anon_key") || "sb_publishable_mF0UgfLvgZN5OupdpsSa0A_ibOcfzq4";
+  const SUPABASE_URL = localStorage.getItem("supabase_url") || import.meta.env.VITE_SUPABASE_URL || "";
+  const SUPABASE_ANON_KEY = localStorage.getItem("supabase_anon_key") || import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
   let activeMenu = null;
   let activeMenuServer = null;
@@ -323,8 +323,8 @@
     if (!currentUser) return;
     const btn = document.getElementById("subUpgradeBtn");
     if (btn) { btn.disabled = true; btn.textContent = "A redirecionar..."; }
-    const STRIPE_PUBLISHABLE_KEY = "pk_test_51TbKmaQdlPUKQK2wfBNfhgwltyLsxwfV2smHoPIxyp15rqsEjNbUM0nV1rmyZ2DFQHGm7Ee0RHAy2gzerqGJ5MJA00VAAqjNDO";
-    const STRIPE_PRO_PRICE_ID = "price_1TbKy7QdlPUKQK2wQmXUzWOM";
+    const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
+    const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID || "";
     try {
       const payload = {
         price_id: STRIPE_PRO_PRICE_ID,

@@ -30,5 +30,14 @@ env/
 skills-lock.json
 opencode.json
 
+# Local MCP client configs (contêm apikeys de dev do gateway local — não versionar)
+.mcp.json
+.vscode/mcp.json
+r2mcp_cli/.mcp.json
+rest2mcp/.opencode.json
+
+# Transcripts/logs de sessão de agentes (podem conter apikeys)
+inspector changes
+
 # Misc artifacts
 nul

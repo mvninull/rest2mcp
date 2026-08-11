@@ -22,7 +22,7 @@ PAYPAL_SANDBOX = os.getenv("PAYPAL_SANDBOX", "true").lower() == "true"
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "price_1TbKy7QdlPUKQK2wQmXUzWOM")
+STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "price_YOUR_PRO_PRICE_ID")
 
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8080"))
@@ -47,3 +47,6 @@ AUTH_CREDENTIALS_RATE_PER_HOUR = int(os.getenv("AUTH_CREDENTIALS_RATE_PER_HOUR",
 # Se True, o gateway confia em Sb-Forwarded-For / X-Forwarded-For para obter o IP real
 # do client quando está atrás de um proxy (mesmo conceito do Supabase). Default: off.
 RATE_LIMIT_TRUST_FORWARDED_HEADERS = os.getenv("RATE_LIMIT_TRUST_FORWARDED_HEADERS", "false").lower() == "true"
+
+# Emails (separados por vírgula) autorizados a chamar POST /v1/reset (zera o banco).
+ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 try:
     from .cloud_models import Base, LogDB, ServerDB, SessionLocal, WebhookEventDB, engine, get_db, init_db
     from .config import (
+        ADMIN_EMAILS,
         AUTH_CREDENTIALS_RATE_PER_HOUR,
         AUTH_LOGIN_RATE_PER_HOUR,
         AUTH_RATE_LIMIT_BURST,
@@ -60,6 +61,7 @@ try:
 except ImportError:
     from cloud_models import Base, LogDB, ServerDB, SessionLocal, WebhookEventDB, engine, get_db, init_db
     from config import (
+        ADMIN_EMAILS,
         AUTH_CREDENTIALS_RATE_PER_HOUR,
         AUTH_LOGIN_RATE_PER_HOUR,
         AUTH_RATE_LIMIT_BURST,
@@ -4031,7 +4033,11 @@ def _compute_store_facets(servers: list) -> dict:
 
 
 @app.post("/v1/reset")
-async def reset_database():
+async def reset_database(request: Request):
+    await require_auth(request)
+    email = (request.state.jwt_payload or {}).get("email", "").strip().lower()
+    if email not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Operação restrita a administradores")
     for key in list(active_servers.keys()):
         await active_servers[key].stop()
         del active_servers[key]
@@ -4138,34 +4144,43 @@ def create_checkout_session(req: CheckoutSessionRequest):
 
 
 @app.post("/v1/checkout-session/verify")
-async def verify_checkout_session(req: VerifyCheckoutSessionRequest):
+async def verify_checkout_session(req: VerifyCheckoutSessionRequest, request: Request):
+    await require_auth(request)
+    user_id = request.state.user_id
+    if req.user_id and req.user_id != user_id:
+        return JSONResponse(status_code=403, content={"detail": "Usuário não autorizado para esta sessão"})
     try:
         session = await asyncio.to_thread(stripe_checkout_session_retrieve, req.session_id)
+        owner_id = stripe_sget(session, "client_reference_id", "") or stripe_sget(
+            stripe_sget(session, "metadata"), "user_id", ""
+        )
+        if owner_id and owner_id != user_id:
+            return JSONResponse(status_code=403, content={"detail": "Sessão de checkout não pertence a este usuário"})
         if session.status != "complete":
             return {"status": "pending", "session_status": session.status}
         if session.mode == "subscription":
             await upsert_supabase_profile(
-                req.user_id,
+                user_id,
                 {
                     "plan_tier": "pro",
                     "status": "active",
-                    "stripe_subscription_id": session.get("subscription", ""),
+                    "stripe_subscription_id": stripe_sget(session, "subscription", ""),
                 },
             )
-            invalidate_profile_cache(req.user_id)
-            await notify_session_termination(req.user_id)
+            invalidate_profile_cache(user_id)
+            await notify_session_termination(user_id)
             return {"status": "upgraded", "payment_status": session.payment_status}
         if session.payment_status == "paid":
             await upsert_supabase_profile(
-                req.user_id,
+                user_id,
                 {
                     "plan_tier": "pro",
                     "status": "active",
-                    "stripe_subscription_id": session.get("subscription", ""),
+                    "stripe_subscription_id": stripe_sget(session, "subscription", ""),
                 },
             )
-            invalidate_profile_cache(req.user_id)
-            await notify_session_termination(req.user_id)
+            invalidate_profile_cache(user_id)
+            await notify_session_termination(user_id)
             return {"status": "upgraded"}
         return {"status": "pending", "payment_status": session.payment_status}
     except Exception as e:
