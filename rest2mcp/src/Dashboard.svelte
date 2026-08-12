@@ -1027,12 +1027,12 @@
     };
     const hostLabels = { "remote-capable": __("store.remote"), "hybrid": __("store.hybrid"), "local-only": __("store.local") };
     bar.innerHTML = _storeFacets.hostingTypes.map(t =>
-      `<button class="store-filter-btn${_storeFilterHosting === t ? " active" : ""}" onclick="setStoreFilterHosting('${_escHtml(t)}')">${hostIcons[t] || ""}<span>${hostLabels[t] || t}</span></button>`
+      `<button class="store-filter-btn${_storeFilterHosting === t ? " active" : ""}" data-store-filter-hosting="${_escHtml(t)}">${hostIcons[t] || ""}<span>${hostLabels[t] || t}</span></button>`
     ).join("");
 
     if (catBar) {
       catBar.innerHTML = _storeFacets.categories.map(c =>
-        `<button class="store-cat-item${_storeFilterCategory === c.id ? " active" : ""}" onclick="setStoreFilterCategory('${_escHtml(c.id)}')"><span class="store-cat-name">${_escHtml(c.name)}</span><span class="store-cat-count">${c.count}</span></button>`
+        `<button class="store-cat-item${_storeFilterCategory === c.id ? " active" : ""}" data-store-filter-category="${_escHtml(c.id)}"><span class="store-cat-name">${_escHtml(c.name)}</span><span class="store-cat-count">${c.count}</span></button>`
       ).join("");
     }
   }
@@ -1114,7 +1114,7 @@
       const toolCount = (s.tools || []).length;
       const stars = s.stars || 0;
       const repoUrl = (s.repository && s.repository.url) || "";
-      return `<div class="store-card" onclick="installFromStore('${_escHtml(s.id || "")}', '${_escHtml(namespace)}', '${_escHtml(s.slug || "")}', '${_escHtml(name)}', '${_escHtml(hostType)}', '${_escHtml(repoUrl)}')">
+      return `<div class="store-card" data-store-id="${_escHtml(s.id || "")}" data-store-namespace="${_escHtml(namespace)}" data-store-slug="${_escHtml(s.slug || "")}" data-store-name="${_escHtml(name)}" data-store-host="${_escHtml(hostType)}" data-store-repo="${_escHtml(repoUrl)}">
         <div class="store-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
         <div class="store-card-body">
           <div class="store-card-name">${_escHtml(name)}</div>
@@ -1396,16 +1396,18 @@
   }
 
   // ─── Edit ──────────────────────────────────────────────
-  function editServer(serverId, name, transportType) {
+  function editServer(serverId, name, transportType, specUrl) {
     editingServerId = serverId;
     const en = document.getElementById("editName");
     const et = document.getElementById("editTransport");
     const es = document.getElementById("editStatus");
+    const esu = document.getElementById("editSpecUrl");
     const ee = document.getElementById("editError");
     const em = document.getElementById("editModal");
     if (en) en.value = name;
     if (et) et.value = transportType === "sse" ? "sse" : "http";
     if (es) es.value = "active";
+    if (esu) esu.value = specUrl || "";
     if (ee) showModalError(ee, "");
     if (em) em.classList.add("open");
   }
@@ -1413,6 +1415,7 @@
     const name = document.getElementById("editName")?.value?.trim();
     const transport = document.getElementById("editTransport")?.value;
     const status = document.getElementById("editStatus")?.value;
+    const specUrl = document.getElementById("editSpecUrl")?.value?.trim();
     const errorEl = document.getElementById("editError");
     const btn = document.getElementById("btnEditConfirm");
     if (errorEl) showModalError(errorEl, "");
@@ -1420,12 +1423,16 @@
       if (errorEl) showModalError(errorEl, __("server.edit_name_required"));
       return;
     }
+    if (!specUrl) {
+      if (errorEl) showModalError(errorEl, __("server.edit_spec_url_required"));
+      return;
+    }
     if (btn) btn.disabled = true;
     if (btn) btn.textContent = "Salvando...";
     try {
       await apiFetch(`/v1/servers/${editingServerId}`, {
         method: "PATCH",
-        body: JSON.stringify({ name, status, transport }),
+        body: JSON.stringify({ name, status, transport, spec_url: specUrl }),
       });
       closeEditModal();
       await loadServers(true);
@@ -2034,6 +2041,35 @@
     window.setStoreFilterHosting = setStoreFilterHosting;
     window.setStoreFilterCategory = setStoreFilterCategory;
 
+    // Store grid/filters use data-* attributes (renderizados com innerHTML) e
+    // event delegation em vez de onclick inline, para evitar XSS via payloads
+    // que quebram as aspas do atributo.
+    document.addEventListener("click", (e) => {
+      const target = e.target;
+      if (!target || !target.closest) return;
+      const card = target.closest("[data-store-id]");
+      if (card) {
+        installFromStore(
+          card.dataset.storeId || "",
+          card.dataset.storeNamespace || "",
+          card.dataset.storeSlug || "",
+          card.dataset.storeName || "",
+          card.dataset.storeHost || "",
+          card.dataset.storeRepo || ""
+        );
+        return;
+      }
+      const hostingBtn = target.closest("[data-store-filter-hosting]");
+      if (hostingBtn) {
+        setStoreFilterHosting(hostingBtn.dataset.storeFilterHosting);
+        return;
+      }
+      const catBtn = target.closest("[data-store-filter-category]");
+      if (catBtn) {
+        setStoreFilterCategory(catBtn.dataset.storeFilterCategory);
+      }
+    });
+
     const mergeModal = document.getElementById("mergeModal");
     if (mergeModal) mergeModal.addEventListener("click", (e) => {
       if (e.target === e.currentTarget) closeMergeModal();
@@ -2437,7 +2473,7 @@
       <button onclick={() => { openInspector(s.server_id); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.2"/><path d="M10.2 10.2L14 14"/></svg></span> {$t('menu.inspect')}
       </button>
-      <button onclick={() => { editServer(s.server_id, s.name || '', s.transport || 'http'); closeAllMenus(); }}>
+      <button onclick={() => { editServer(s.server_id, s.name || '', s.transport || 'http', s.spec_url || ''); closeAllMenus(); }}>
         <span class="menu-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg></span> {$t('menu.edit')}
       </button>
       <button onclick={() => { openMergeModalFromMenu(s.server_id, s.name || ''); closeAllMenus(); }}>
@@ -2719,6 +2755,10 @@
     <div class="form-group">
       <label for="editName">{$t('modal.edit.name_label')}</label>
       <input type="text" id="editName" placeholder={$t('modal.edit.name_placeholder')} />
+    </div>
+    <div class="form-group">
+      <label for="editSpecUrl">{$t('modal.create.spec_url')}</label>
+      <input type="url" id="editSpecUrl" placeholder={$t('modal.create.url_placeholder')} />
     </div>
     <div class="form-group">
       <label for="editTransport">{$t('modal.edit.transport_label')}</label>
