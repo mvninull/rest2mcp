@@ -3,7 +3,8 @@
         --ink: #d4d4d4;
         --paper: #1e1e1e;
         --accent: #4fc1ff;
-        --accent2: #00d4aa;
+        /* --accent2: #00d4aa; */
+        --accent2: #4fc1ff;
         --warn: #ff7b4a;
         --muted: #858585;
         --border: rgba(255, 255, 255, 0.1);

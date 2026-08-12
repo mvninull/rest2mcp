@@ -13,13 +13,17 @@
     --muted-dim: #6d6d76;
 
     /* Supabase green as the primary brand/action color */
-    --accent: #3ecf8e;
-    --accent-hover: #34e0a0;
+    /*--accent: #3ecf8e;*/
+    --accent: #4fc1ff;
+
+    /*--accent-hover: #34e0a0;*/
+    --accent-hover: #4fc1ff;
     --accent-light: rgba(62, 207, 142, 0.14);
     --accent-glow: rgba(62, 207, 142, 0.45);
 
     /* Secondary status/teal accent */
-    --accent2: #00d4aa;
+    /*--accent2: #00d4aa;*/
+    --accent2: #4fc1ff;
     --accent2-light: rgba(0, 212, 170, 0.14);
     --accent2-glow: rgba(0, 212, 170, 0.45);
 
