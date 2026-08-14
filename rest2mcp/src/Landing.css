@@ -68,12 +68,11 @@
         align-items: center;
         gap: 8px;
       }
-      .logo-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--accent);
-        display: inline-block;
+      .logo-img {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+        display: block;
       }
       .nav-links {
         display: flex;
@@ -780,6 +779,15 @@ display: inline-flex;
         font-size: 1.5rem;
         font-weight: 800;
         letter-spacing: -0.04em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .footer-logo-img {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+        display: block;
       }
       .footer-links {
         display: flex;

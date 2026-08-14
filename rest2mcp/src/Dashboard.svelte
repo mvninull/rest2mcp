@@ -4,6 +4,7 @@
   import { servers, serversLoading, serversError, serverHealth, activeServerId, serverCount } from './stores/servers.js';
   import { t } from './stores/lang.js';
   import './Dashboard.css';
+  import r2mcpLogo from './assets/r2mcp_logo.png';
   import { installAppAlert, notifyAppAlert } from './app-alert.js';
 
   const __ = (key) => get(t)(key);
@@ -2188,15 +2189,7 @@
 <nav>
   <div class="nav-inner">
     <a href="index.html" class="logo">
-      <span class="logo-mark">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="1" y="1" width="5" height="5" rx="1.5" fill="white" opacity="0.9" />
-          <rect x="8" y="1" width="5" height="5" rx="1.5" fill="white" opacity="0.6" />
-          <rect x="1" y="8" width="5" height="5" rx="1.5" fill="white" opacity="0.6" />
-          <rect x="8" y="8" width="5" height="5" rx="1.5" fill="white" opacity="0.35" />
-        </svg>
-      </span>
-      rest2mcp
+      <img src={r2mcpLogo} alt="rest2mcp" class="logo-img" />
     </a>
 
     <div class="nav-right" id="navAuth">

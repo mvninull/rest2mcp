@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import "./Landing.css";
+  import r2mcpLogo from "./assets/r2mcp_logo.png";
   import { t } from "./stores/lang.js";
   const __ = (key) => get(t)(key);
 
@@ -580,7 +581,7 @@
 <!-- NAV -->
 <nav>
   <div class="nav-inner">
-    <div class="logo"><span class="logo-dot"></span>rest2mcp</div>
+    <div class="logo"><img src={r2mcpLogo} alt="rest2mcp" class="logo-img" /></div>
     <ul class="nav-links">
       <li>
         <button
@@ -1652,7 +1653,7 @@
 <!-- FOOTER -->
 <footer>
   <div class="footer-inner">
-    <div class="footer-logo">rest2mcp</div>
+    <div class="footer-logo"><img src={r2mcpLogo} alt="rest2mcp" class="footer-logo-img" /></div>
     <p style="color: rgba(255, 255, 255, 0.35); font-size: 0.85rem">
       {$t("footer.desc")}
     </p>

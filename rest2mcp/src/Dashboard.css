@@ -103,17 +103,10 @@ nav {
     gap: 9px;
     text-decoration: none;
 }
-.logo-mark {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-sm);
-    background: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-.logo-mark svg {
+.logo-img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
     display: block;
 }
 
