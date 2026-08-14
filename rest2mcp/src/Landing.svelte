@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
+  import { createClient as createSupabaseClient } from "@supabase/supabase-js";
   import "./Landing.css";
   import r2mcpLogo from "./assets/r2mcp_logo.png";
   import { t } from "./stores/lang.js";
@@ -134,12 +135,12 @@
     const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
     let supabaseClient = null;
     try {
-      if (typeof supabase === "undefined") {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
         throw new Error(
-          "window.supabase indefinido — o SDK do Supabase não foi carregado (verifica o <script> no index.html ou usa import npm).",
+          "VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY não definidos (verifica rest2mcp/.env).",
         );
       }
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      supabaseClient = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (err) {
       console.error("[Landing] Falha ao inicializar Supabase:", err);
     }

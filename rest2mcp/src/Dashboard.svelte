@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
+  import { createClient as createSupabaseClient } from '@supabase/supabase-js';
   import { servers, serversLoading, serversError, serverHealth, activeServerId, serverCount } from './stores/servers.js';
   import { t } from './stores/lang.js';
   import './Dashboard.css';
@@ -87,10 +88,7 @@
 
   if (SUPABASE_URL && SUPABASE_ANON_KEY) {
     try {
-      if (typeof supabase === 'undefined') {
-        throw new Error('window.supabase indefinido — o SDK do Supabase não foi carregado (verifica o <script> no index.html ou usa import npm).');
-      }
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      supabaseClient = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (err) {
       // Isto corre à construção do componente, ANTES de qualquer DOM.
       // Sem este try/catch, uma falha aqui impede o Dashboard inteiro
