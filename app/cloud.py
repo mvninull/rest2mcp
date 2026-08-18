@@ -640,6 +640,9 @@ require_register_rate_limit = rate_limit_dependency(
 require_credentials_rate_limit = rate_limit_dependency(
     TokenBucketLimiter("auth_credentials", AUTH_RATE_LIMIT_BURST, AUTH_CREDENTIALS_RATE_PER_HOUR / 3600)
 )
+require_checkout_rate_limit = rate_limit_dependency(
+    TokenBucketLimiter("checkout", capacity=10, refill_per_sec=10 / 60)
+)
 
 # ─── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -1429,17 +1432,22 @@ async def check_server_health(server_id: str, request: Request, db: Session = De
     user_id = request.state.user_id
     record = db.query(ServerDB).filter(ServerDB.server_id == server_id, ServerDB.user_id == user_id).first()
     if not record:
-        return {"status": "error", "detail": "Servidor não encontrado"}
+        return {"status": "error", "detail": "Server not found"}
 
     url = record.spec_url
+    logger.info(f"URL do servidor: {url}")
     if not url:
-        return {"status": "error", "detail": "Servidor sem spec URL"}
+        return {"status": "error", "detail": "Server has no spec URL"}
 
-    async with httpx.AsyncClient(follow_redirects=True) as hc:
-        resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
-        if resp.is_success:
-            return {"status": "ok"}
-        return {"status": "error", "detail": f"HTTP {resp.status_code}"}
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as hc:
+            resp = await hc.get(url, headers={"User-Agent": "rest2mcp/1.0"})
+            if resp.is_success:
+                return {"status": "ok"}
+            return {"status": "error", "detail": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        logger.warning(f"Health check failed for server {server_id} ({url}): {e}")
+        return {"status": "error", "detail": f"Target API unavailable: {e}"}
 
 
 @app.post("/v1/servers/{server_id}/inspector")
@@ -4064,6 +4072,16 @@ def mark_webhook_processed(event_id: str, source: str) -> bool:
         db.close()
 
 
+def is_webhook_processed(event_id: str, source: str) -> bool:
+    """Verifica se o id do evento de webhook já foi processado no banco de dados."""
+    db = SessionLocal()
+    try:
+        exists = db.query(WebhookEventDB).filter_by(event_id=event_id, source=source).first() is not None
+        return exists
+    finally:
+        db.close()
+
+
 @app.post("/v1/webhooks/paypal")
 async def paypal_webhook(request: Request):
     body = await request.body()
@@ -4125,7 +4143,7 @@ async def paypal_webhook(request: Request):
 # ─── Stripe ───────────────────────────────────────────────────────────────────
 
 
-@app.post("/v1/checkout-session", status_code=201)
+@app.post("/v1/checkout-session", status_code=201, dependencies=[Depends(require_checkout_rate_limit)])
 def create_checkout_session(req: CheckoutSessionRequest):
     try:
         idempotency_key = req.idempotency_key or f"checkout:{req.user_id}:{req.price_id}"
@@ -4143,7 +4161,7 @@ def create_checkout_session(req: CheckoutSessionRequest):
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
 
-@app.post("/v1/checkout-session/verify")
+@app.post("/v1/checkout-session/verify", dependencies=[Depends(require_checkout_rate_limit)])
 async def verify_checkout_session(req: VerifyCheckoutSessionRequest, request: Request):
     await require_auth(request)
     user_id = request.state.user_id
@@ -4201,7 +4219,7 @@ async def stripe_webhook(request: Request):
     if not action:
         return JSONResponse(status_code=200, content={"status": "ignored"})
 
-    if not mark_webhook_processed(event.id, "stripe"):
+    if is_webhook_processed(event.id, "stripe"):
         logger.info(f"Webhook Stripe duplicado ignorado: {event.id}")
         return JSONResponse(status_code=200, content={"status": "already_processed"})
 
@@ -4233,24 +4251,21 @@ async def stripe_webhook(request: Request):
                 sub_details = stripe_sget(parent, "subscription_details")
                 sub_id = stripe_sget(sub_details, "subscription")
             if sub_id:
-                try:
-                    sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
-                    user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
-                    if not user_id:
-                        logger.warning(f"Stripe: subscrição {sub_id} sem user_id em metadata")
-                    if user_id:
-                        await upsert_supabase_profile(
-                            user_id,
-                            {
-                                "plan_tier": "pro",
-                                "status": "active",
-                                "stripe_subscription_id": sub_id,
-                            },
-                        )
-                        invalidate_profile_cache(user_id)
-                        await notify_session_termination(user_id)
-                except Exception as e:
-                    logger.exception(f"Stripe: erro ao buscar subscrição {sub_id}: {e}")
+                sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
+                user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
+                if not user_id:
+                    logger.warning(f"Stripe: subscrição {sub_id} sem user_id em metadata")
+                if user_id:
+                    await upsert_supabase_profile(
+                        user_id,
+                        {
+                            "plan_tier": "pro",
+                            "status": "active",
+                            "stripe_subscription_id": sub_id,
+                        },
+                    )
+                    invalidate_profile_cache(user_id)
+                    await notify_session_termination(user_id)
 
         elif action == "payment_failed":
             invoice = event.data.object
@@ -4260,28 +4275,21 @@ async def stripe_webhook(request: Request):
                 sub_details = stripe_sget(parent, "subscription_details")
                 sub_id = stripe_sget(sub_details, "subscription")
             if sub_id:
-                try:
-                    sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
-                    user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
-                    if user_id:
-                        await upsert_supabase_profile(user_id, {"status": "suspended"})
-                        invalidate_profile_cache(user_id)
-                        await sync_user_servers(user_id)
-                except Exception as e:
-                    logger.exception(f"Stripe: erro ao processar payment_failed: {e}")
+                sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
+                user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
+                if user_id:
+                    await upsert_supabase_profile(user_id, {"status": "suspended"})
+                    invalidate_profile_cache(user_id)
+                    await sync_user_servers(user_id)
 
         elif action == "subscription_deleted":
             sub = event.data.object
             user_id = stripe_sget(stripe_sget(sub, "metadata"), "user_id", "")
             if not user_id:
-                # fallback: metadata pode não vir no evento subscription.deleted
                 sub_id = stripe_sget(sub, "id")
                 if sub_id:
-                    try:
-                        full_sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
-                        user_id = stripe_sget(stripe_sget(full_sub, "metadata"), "user_id", "")
-                    except Exception as e:
-                        logger.exception(f"Stripe: erro ao buscar subscrição deletada {sub_id}: {e}")
+                    full_sub = await asyncio.to_thread(stripe_get_subscription, sub_id)
+                    user_id = stripe_sget(stripe_sget(full_sub, "metadata"), "user_id", "")
             if user_id:
                 await upsert_supabase_profile(
                     user_id,
@@ -4294,8 +4302,11 @@ async def stripe_webhook(request: Request):
                 await sync_user_servers(user_id)
                 await notify_session_termination(user_id)
 
+        mark_webhook_processed(event.id, "stripe")
+
     except Exception as e:
         logger.exception(f"Erro ao processar webhook Stripe: {e}")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 

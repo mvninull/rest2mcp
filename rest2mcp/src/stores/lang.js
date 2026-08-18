@@ -15,7 +15,7 @@ export const lang = writable(getInitialLang());
 export const toggleLang = () => {
   lang.update(v => {
     const next = v === 'pt' ? 'en' : 'pt';
-    try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, next); } catch { }
     return next;
   });
 };
@@ -27,7 +27,7 @@ const dict = {
     'nav.pricing': 'Preços',
     'nav.faq': 'FAQ',
     'nav.contact': 'Contacto',
-    'nav.login': 'Entrar com Google',
+    'nav.login': 'Entrar',
     'nav.enter': 'Entrar',
     'nav.go_to_dashboard': 'Ir para Dashboard',
     'hero.tag': 'v1.0.0 · Matias Fernando',
@@ -451,7 +451,7 @@ const dict = {
     'nav.pricing': 'Pricing',
     'nav.faq': 'FAQ',
     'nav.contact': 'Contact',
-    'nav.login': 'Sign in with Google',
+    'nav.login': 'Sign in',
     'nav.enter': 'Sign In',
     'nav.go_to_dashboard': 'Go to Dashboard',
     'hero.tag': 'v1.0.0 · Matias Fernando',
