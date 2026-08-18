@@ -28,9 +28,10 @@ def create_checkout_session(
     }
     if customer_email:
         params["customer_email"] = customer_email
+    kwargs = {}
     if idempotency_key:
-        params["idempotency_key"] = idempotency_key
-    session = stripe.checkout.Session.create(**params)
+        kwargs["idempotency_key"] = idempotency_key
+    session = stripe.checkout.Session.create(**params, **kwargs)
     return session
 
 
