@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 
 from r2mcp_cli.api_client import APIClient, APIError
-from r2mcp_cli.config import get_token, validate_token
+from r2mcp_cli.config import get_base_url, get_token, validate_token
 
 console = Console()
 link_app = typer.Typer(help="Ligar servidor a editor IA")
@@ -90,7 +90,7 @@ def _read_json(path: Path) -> dict:
 @link_app.callback(invoke_without_command=True)
 def link(
     editor: str = typer.Argument(..., help="Editor: claude-code, cursor, vscode, opencode"),
-    server_id: str = typer.Argument("engine", help="ID do servidor ou 'engine' para o motor de orquestracao"),
+    server_id: str = typer.Argument(..., help="ID do servidor"),
 ):
     _require_auth()
 
@@ -103,29 +103,25 @@ def link(
         console.print(f"[red]Nao foi possivel determinar o caminho de configuracao para '{editor}'.[/red]")
         raise typer.Exit(1)
 
-    if server_id == "engine":
-        url = f"http://localhost:8080/v1/engine/mcp"
-        name = "Engine-MCP"
-    else:
-        server = _find_server(server_id)
-        if not server:
-            console.print(f"[red]Servidor '{server_id}' nao encontrado.[/red]")
-            raise typer.Exit(1)
-        if server["status"] == "active":
-            try:
-                client = APIClient()
-                auth_info = client.get_auth_status(server_id)
-                client.close()
-                if auth_info.get("required_fields") and not auth_info.get("authenticated"):
-                    console.print(
-                        "[red]ERRO: Servidor precisa de autenticacao. Faz o login primeiro com 'r2mcp servers credentials'.[/red]"
-                    )
-                    raise typer.Exit(1)
-            except APIError:
-                pass
-        apikey = server.get("apikey", "")
-        url = f"http://localhost:8080/v1/{server_id}/{apikey}/mcp"
-        name = server.get("name", server_id)
+    server = _find_server(server_id)
+    if not server:
+        console.print(f"[red]Servidor '{server_id}' nao encontrado.[/red]")
+        raise typer.Exit(1)
+    if server["status"] == "active":
+        try:
+            client = APIClient()
+            auth_info = client.get_auth_status(server_id)
+            client.close()
+            if auth_info.get("required_fields") and not auth_info.get("authenticated"):
+                console.print(
+                    "[red]ERRO: Servidor precisa de autenticacao. Faz o login primeiro com 'r2mcp servers credentials'.[/red]"
+                )
+                raise typer.Exit(1)
+        except APIError:
+            pass
+    apikey = server.get("apikey", "")
+    url = f"{get_base_url()}/v1/{server_id}/{apikey}/mcp"
+    name = server.get("name", server_id)
     transport = "streamable-http"
 
     config_path.parent.mkdir(parents=True, exist_ok=True)

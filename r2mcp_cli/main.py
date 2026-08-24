@@ -6,7 +6,6 @@ from r2mcp_cli.commands.servers import servers_app
 from r2mcp_cli.commands.tools import tools_app
 from r2mcp_cli.commands.link import link_app
 from r2mcp_cli.commands.logs import logs_app
-from r2mcp_cli.commands.engine import engine_app
 
 console = Console()
 
@@ -24,7 +23,6 @@ app.add_typer(servers_app, name="servers", help="Gerir servidores MCP")
 app.add_typer(tools_app, name="tools", help="Interagir com ferramentas MCP")
 app.add_typer(link_app, name="link", help="Ligar servidor a editor IA")
 app.add_typer(logs_app, name="logs", help="Ver logs de servidores")
-app.add_typer(engine_app, name="engine", help="Motor de orquestracao: search e run")
 
 
 @app.callback()
