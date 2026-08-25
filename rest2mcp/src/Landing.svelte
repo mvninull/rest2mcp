@@ -9,8 +9,14 @@
   import advImg3 from "./assets/3_run_tool_workflow.svg";
   import advImg4 from "./assets/4_sandbox_execucao_isolada.svg";
   import advImg5 from "./assets/5_auth_sem_expor_credenciaiss.svg";
-  const ADVANTAGE_IMGS = [advImg1, advImg2, advImg3, advImg4, advImg5];
-  import { t } from "./stores/lang.js";
+  const ADVANTAGE_IMGS_PT = [advImg1, advImg2, advImg3, advImg4, advImg5];
+  import advImg1En from "./assets/en/1_two_tools_overview_en.svg";
+  import advImg2En from "./assets/en/2_store_api_search_tool_result_en.svg";
+  import advImg3En from "./assets/en/2_run_tool_workflow_en.svg";
+  import advImg4En from "./assets/en/4_sandbox_isolated_execution_en.svg";
+  import advImg5En from "./assets/en/5_auth_without_exposing_credentials_en.svg";
+  const ADVANTAGE_IMGS_EN = [advImg1En, advImg2En, advImg3En, advImg4En, advImg5En];
+  import { t, lang } from "./stores/lang.js";
   const __ = (key) => get(t)(key);
 
   // ─── Hero CLI: copiar comando de instalação ─────────────────────
@@ -30,27 +36,27 @@
   // ─── Hero CLI: demo de terminal (conteúdo estático) ────────────
   const DEMO_PS = "PS C:\\Users\\dev\\documents\\temp>";
   const psSpan = `<span class="l-ps">${DEMO_PS}</span>`;
-  const cliDemoHtml = [
+  $: cliDemoHtml = [
     `<span class="l-cmd">r2mcp login</span>`,
-    `Introduz o teu JWT do Supabase (obtem em https://rest2mcp.pages.dev/):`,
+    `${$t("cli.login_prompt")}`,
     ``,
-    `  Campo        Valor`,
+    `  ${$t("cli.field").padEnd(10)}${$t("cli.value")}`,
     ` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
     `  Email        m4codexp@gmail.com`,
-    `  Plano        free`,
-    `  Servidores   2 / 4`,
+    `  ${$t("cli.plan").padEnd(10)}free`,
+    `  ${$t("cli.servers").padEnd(11)}2 / 4`,
     ``,
-    `<span class="l-ok">Autenticado com sucesso!</span>`,
+    `<span class="l-ok">${$t("cli.auth_ok")}</span>`,
     `${psSpan} <span class="l-cmd">r2mcp servers list</span>`,
-    `A listar servidores...`,
+    `${$t("cli.listing")}`,
     ``,
-    `  ID             Nome   Status   Transporte   URL MCP`,
+    `  ID             ${$t("cli.name").padEnd(5)} ${$t("cli.status").padEnd(8)} ${$t("cli.transport").padEnd(11)} URL MCP`,
     ` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
     `  srv_tu15j229   pts    active   http         <span class="l-url">https://rest2mcp.fly.dev/v1/srv_tu15j229/r2m_li...</span>`,
     `  srv_0yu0bebe   Pets   active   http         <span class="l-url">https://rest2mcp.fly.dev/v1/srv_0yu0bebe/r2m_li...</span>`,
     ``,
     `${psSpan} <span class="l-cmd">r2mcp link claude-code srv_tu15j229</span>`,
-    `Servidor ligado ao Claude Code! Por favor, reinicia o editor para aplicar as alteracoes.`,
+    `${$t("cli.linked")}`,
     `${psSpan} <span class="l-cmd">cat .mcp.json</span>`,
     `{`,
     `  "mcpServers": {`,
@@ -81,40 +87,42 @@
   const ADVANTAGES_COUNT = 5;
   let advantagesTicking = false;
 
-  const advantages = [
+  $: _t = $t;
+  $: ADVANTAGE_IMGS = $lang === 'en' ? ADVANTAGE_IMGS_EN : ADVANTAGE_IMGS_PT;
+  $: advantages = [
     {
       file: "01_two.tools",
-      tag: "APENAS 2 TOOLS",
-      title: "1. Duas tools em vez de centenas",
-      body: "Os servidores MCP tradicionais expõem dezenas de tools, e executá-las uma a uma — chamada, retorno, raciocínio — gasta tokens a cada ida e volta. Os do rest2mcp expõem apenas duas: search e run. Como as LLMs escrevem bem código, a IA cria um único workflow que encadeia todas as chamadas necessárias e recebe o resultado consolidado numa só resposta. Menos contexto, menos round-trips, respostas mais rápidas e baratas.",
+      tag: _t("adv.01.tag"),
+      title: _t("adv.01.title"),
+      body: _t("adv.01.body"),
       icon: "bolt"
     },
     {
       file: "02_tool.index",
-      tag: "DISCOVERY SEMÂNTICO",
-      title: "2. As tuas APIs indexadas por significado",
-      body: "Ao converter uma API REST em servidor MCP, todos os endpoints viram ferramentas — mas nenhuma chega ao modelo: ficam indexadas numa única tool, search. Ela entende o significado do pedido ('criar fatura' encontra POST /invoices mesmo com outro nome) e devolve só as ferramentas necessárias, com os parâmetros prontos a usar — é com elas que o run monta o workflow. A API continua toda disponível; a IA só vê o que precisa.",
+      tag: _t("adv.02.tag"),
+      title: _t("adv.02.title"),
+      body: _t("adv.02.body"),
       icon: "search"
     },
     {
       file: "03_orchestrator",
-      tag: "EXECUÇÃO NUM ÚNICO PASSO",
-      title: "3. Um workflow, uma só resposta",
-      body: "No ciclo tradicional, a LLM analisa o retorno, pensa, escolhe a tool seguinte e repete até completar o pedido. O workflow elimina isso: a IA descreve de uma vez todas as chamadas, a sua ordem e o que fazer com cada resultado. O rest2mcp valida o script e executa as chamadas reais às tuas APIs — em paralelo quando faz sentido — devolvendo um único resultado consolidado. Dez trocas de mensagens passam a ser uma.",
+      tag: _t("adv.03.tag"),
+      title: _t("adv.03.title"),
+      body: _t("adv.03.body"),
       icon: "layers"
     },
     {
       file: "04_sandbox",
-      tag: "ISOLAMENTO TOTAL",
-      title: "4. Execução isolada na nossa infraestrutura",
-      body: "Nada do código gerado pela IA corre na tua máquina nem no teu servidor: cada workflow executa na infraestrutura do rest2mcp, num ambiente isolado e temporário com limites de tempo e memória. O acesso é mínimo — só as ferramentas registadas da tua API e funções básicas como JSON; operações perigosas são bloqueadas e tudo é apagado no fim. Se falhar, recebes um erro claro para a IA corrigir e repetir.",
+      tag: _t("adv.04.tag"),
+      title: _t("adv.04.title"),
+      body: _t("adv.04.body"),
       icon: "shield"
     },
     {
       file: "05_auth.bridge",
-      tag: "CREDENCIAIS PROTEGIDAS",
-      title: "5. Autenticação sem expor credenciais à IA",
-      body: "As tuas APIs podem exigir login — e isso nunca chega à LLM. Autenticas-te pela CLI (r2mcp login), pelo frontend web ou via REST no endpoint de login da API. As credenciais não ficam guardadas — nem na nossa infraestrutura, nem no chat: o token de sessão vive em memória e é injetado automaticamente nas chamadas reais à tua API. Para a IA, as tools simplesmente funcionam — ela nunca vê passwords ou headers de autorização.",
+      tag: _t("adv.05.tag"),
+      title: _t("adv.05.title"),
+      body: _t("adv.05.body"),
       icon: "lock"
     }
   ];
@@ -648,6 +656,13 @@
       <li>
         <button
           class="nav-link-btn"
+          onclick={() => window.scrollToSection("advantages")}
+          >{$t("nav.about")}</button
+        >
+      </li>
+      <li>
+        <button
+          class="nav-link-btn"
           onclick={() => window.scrollToSection("features")}
           >{$t("nav.features")}</button
         >
@@ -691,11 +706,6 @@
     <p class="hero-sub">
       {$t("hero.sub")}
     </p>
-    <div class="hero-ctas">
-      <a href="#" role="button" class="btn-primary" id="createServerBtn"
-        >{$t("hero.cta")}</a
-      >
-    </div>
     <div class="hero-cli">
       <p class="hero-cli-desc">
         <strong>{$t("hero.cli.label")}</strong>
@@ -785,14 +795,14 @@
 </section>
 
 <!-- ADVANTAGES (Scroll-Storytelling) -->
-<section class="advantages-scroll-container" bind:this={advantagesContainer}>
+<section id="advantages" class="advantages-scroll-container" bind:this={advantagesContainer}>
   <div class="advantages-sticky-wrapper">
   <div class="advantages-stage">
     <div class="advantages-left">
     <div class="advantages-intro">
-      <div class="section-label">// 02 — Vantagens</div>
-      <h2 class="advantages-heading">Por que escolher o rest2mcp?</h2>
-      <p class="advantages-sub">Scroll para percorres cada etapa.</p>
+      <div class="section-label">{$t("advantages.label")}</div>
+      <h2 class="advantages-heading">{$t("advantages.title")}</h2>
+      <p class="advantages-sub">{$t("advantages.sub")}</p>
     </div>
 
     <div class="advantages-window">
@@ -921,11 +931,12 @@
             stroke="rgba(255,255,255,0.7)"
             stroke-width="1.6"
             stroke-linecap="round"
-            ><circle cx="11" cy="11" r="7" /><path d="M16.5 16.5L21 21" /></svg
+            stroke-linejoin="round"
+            ><path d="M13 3 4 14h6l-1 7 9-11h-6l1-7Z"/></svg
           >
         </div>
-        <h3>{$t("feat.logs")}</h3>
-        <p>{$t("feat.logs_desc")}</p>
+        <h3>{$t("feat.engine")}</h3>
+        <p>{$t("feat.engine_desc")}</p>
       </div>
       <div class="feat-card">
         <div class="feat-icon">
@@ -955,15 +966,12 @@
             stroke="rgba(255,255,255,0.7)"
             stroke-width="1.6"
             stroke-linecap="round"
-            ><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle
-              cx="12"
-              cy="7"
-              r="4"
-            /></svg
+            stroke-linejoin="round"
+            ><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg
           >
         </div>
-        <h3>{$t("feat.secure")}</h3>
-        <p>{$t("feat.secure_desc")}</p>
+        <h3>{$t("feat.cli")}</h3>
+        <p>{$t("feat.cli_desc")}</p>
       </div>
       <div class="feat-card">
         <div class="feat-icon">
@@ -975,17 +983,13 @@
             stroke="rgba(255,255,255,0.7)"
             stroke-width="1.6"
             stroke-linecap="round"
-            ><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line
-              x1="3"
-              y1="6"
-              x2="21"
-              y2="6"
-            /><path d="M16 10a4 4 0 01-8 0" /></svg
+            ><circle cx="11" cy="11" r="7" /><path d="M16.5 16.5L21 21" /></svg
           >
         </div>
-        <h3>{$t("feat.stripe")}</h3>
-        <p>{$t("feat.stripe_desc")}</p>
+        <h3>{$t("feat.logs")}</h3>
+        <p>{$t("feat.logs_desc")}</p>
       </div>
+
     </div>
   </div>
 </div>
