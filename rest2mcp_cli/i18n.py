@@ -1,5 +1,6 @@
 import locale
 import os
+import sys
 
 _translations = {
     "pt": {
@@ -252,15 +253,26 @@ _translations = {
 
 
 def _detect_lang() -> str:
-    try:
-        system_locale = locale.getdefaultlocale()[0] or ""
-        if system_locale.startswith("pt"):
-            return "pt"
-    except Exception:
-        pass
     env = os.environ.get("R2MCP_LANG", "").strip().lower()
     if env in ("pt", "en"):
         return env
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+            if lang_id & 0xFF == 0x16:
+                return "pt"
+            return "en"
+        except Exception:
+            pass
+    else:
+        try:
+            system_locale = locale.getdefaultlocale()[0] or ""
+            if system_locale.startswith("pt"):
+                return "pt"
+        except Exception:
+            pass
     return "en"
 
 
