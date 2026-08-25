@@ -86,6 +86,14 @@
   let advantagesProgress = 0; // continuous 0–1, for the thin progress line
   const ADVANTAGES_COUNT = 5;
   let advantagesTicking = false;
+  let mobileMenuOpen = false;
+
+  function toggleMobileMenu() {
+    mobileMenuOpen = !mobileMenuOpen;
+  }
+  function closeMobileMenu() {
+    mobileMenuOpen = false;
+  }
 
   $: _t = $t;
   $: ADVANTAGE_IMGS = $lang === 'en' ? ADVANTAGE_IMGS_EN : ADVANTAGE_IMGS_PT;
@@ -652,38 +660,41 @@
 <nav>
   <div class="nav-inner">
     <div class="logo"><img src={r2mcpLogo} alt="rest2mcp" class="logo-img" /></div>
-    <ul class="nav-links">
+    <button class="nav-hamburger" class:open={mobileMenuOpen} onclick={toggleMobileMenu} aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" class:mobile-open={mobileMenuOpen}>
       <li>
         <button
           class="nav-link-btn"
-          onclick={() => window.scrollToSection("advantages")}
+          onclick={() => { window.scrollToSection("advantages"); closeMobileMenu(); }}
           >{$t("nav.about")}</button
         >
       </li>
       <li>
         <button
           class="nav-link-btn"
-          onclick={() => window.scrollToSection("features")}
+          onclick={() => { window.scrollToSection("features"); closeMobileMenu(); }}
           >{$t("nav.features")}</button
         >
       </li>
       <li>
         <button
           class="nav-link-btn"
-          onclick={() => window.scrollToSection("pricing")}
+          onclick={() => { window.scrollToSection("pricing"); closeMobileMenu(); }}
           >{$t("nav.pricing")}</button
         >
       </li>
       <li>
         <button
           class="nav-link-btn"
-          onclick={() => window.scrollToSection("faq")}>{$t("nav.faq")}</button
+          onclick={() => { window.scrollToSection("faq"); closeMobileMenu(); }}>{$t("nav.faq")}</button
         >
       </li>
       <li>
         <button
           class="nav-link-btn"
-          onclick={() => window.scrollToSection("contacts")}
+          onclick={() => { window.scrollToSection("contacts"); closeMobileMenu(); }}
           >{$t("nav.contact")}</button
         >
       </li>
