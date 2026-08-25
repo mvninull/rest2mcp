@@ -29,7 +29,7 @@ app.add_typer(logs_app, name="logs", help=t("app.logs_help"))
 
 def _banner():
     w = shutil.get_terminal_size().columns
-    line = "r2mcp v0.2.1".center(w)
+    line = "r2mcp v0.2.2".center(w)
     sub = "rest2mcp - Convert any REST API to MCP".center(w)
     console.print(f"[dim]{line}[/dim]")
     console.print(f"[dim]{sub}[/dim]")
