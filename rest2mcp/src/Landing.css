@@ -105,11 +105,11 @@
 
       /* ─── HERO ─── */
       .hero {
-        min-height: 92vh;
+        min-height: 58vh;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        padding: 6rem 2rem 4rem;
+        padding: 0.5rem 0.5rem 1rem;
         position: relative;
         overflow: hidden;
       }
@@ -149,6 +149,15 @@
         position: relative;
         z-index: 1;
       }
+      .hero-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 540px);
+        gap: 3.5rem;
+        align-items: center;
+      }
+      .hero-sub {
+        font-size: 1.05rem;
+      }
       .hero-tag {
 display: inline-flex;
         align-items: center;
@@ -184,11 +193,11 @@ display: inline-flex;
 
       h1 {
         font-family: var(--display);
-        font-size: clamp(3rem, 7vw, 6rem);
+        font-size: clamp(2.3rem, 4vw, 3.4rem);
         font-weight: 800;
-        line-height: 0.95;
-        letter-spacing: -0.04em;
-        margin-bottom: 1.5rem;
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        margin-bottom: 1.25rem;
         animation: fadeUp 0.7s 0.1s ease both;
         color: #e8e8e8;
       }
@@ -264,6 +273,164 @@ display: inline-flex;
       }
       .badge b {
         color: var(--ink);
+      }
+
+      /* ─── HERO CLI ─── */
+      .hero-cli {
+        margin-top: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1.75rem;
+        flex-wrap: wrap;
+        animation: fadeUp 0.7s 0.35s ease both;
+      }
+      .hero-cli-desc {
+        font-size: 0.85rem;
+        color: var(--muted);
+        max-width: 400px;
+        line-height: 1.6;
+        margin: 0;
+      }
+      .hero-cli-desc strong {
+        display: block;
+        font-family: var(--display);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 4px;
+      }
+      .cli-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        background: #0d0d14;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px 16px;
+        box-shadow: var(--shadow-sm);
+      }
+      .cli-prompt {
+        font-family: var(--mono);
+        font-weight: 700;
+        color: var(--accent2);
+        user-select: none;
+      }
+      .cli-box code {
+        font-family: var(--mono);
+        font-size: 0.9rem;
+        background: none;
+        padding: 0;
+        color: #e8e8e8;
+        white-space: nowrap;
+      }
+      .cli-copy-btn {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 5px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .cli-copy-btn:hover {
+        color: var(--ink);
+        border-color: var(--border-strong);
+      }
+      .cli-copy-btn.copied {
+        color: var(--accent2);
+        border-color: var(--accent2);
+      }
+
+      /* ─── HERO CLI: janela de demo ─── */
+      .cli-window {
+        margin-top: 0;
+        width: 100%;
+        background: #0d0d14;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+      }
+      .cli-window-bar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 1.1rem;
+        background: #16161e;
+        border-bottom: 1px solid var(--border);
+      }
+      .win-dots {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .win-dots i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+      }
+      .cli-window-title {
+        font-family: var(--mono);
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.35);
+        letter-spacing: 0.05em;
+      }
+      .cli-window-body {
+        margin: 0;
+        padding: 1.25rem 1.5rem;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        line-height: 1.75;
+        color: var(--muted);
+        overflow-x: auto;
+        white-space: pre;
+      }
+      .cli-window-body .l-ps {
+        color: var(--accent2);
+      }
+      .cli-window-body .l-cmd {
+        color: #ffffff;
+        font-weight: 700;
+      }
+      .cli-window-body .l-ok {
+        color: #00d4aa;
+      }
+      .cli-window-body .l-url {
+        color: var(--accent);
+      }
+      @media (max-width: 768px) {
+        .cli-window-body {
+          font-size: 0.6rem;
+          padding: 1rem;
+        }
+      }
+      @media (max-width: 1080px) {
+        .hero-layout {
+          grid-template-columns: 1fr;
+          gap: 2.5rem;
+        }
+        .cli-window {
+          margin-top: 0;
+        }
+      }
+      @media (max-width: 768px) {
+        .hero-cli {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 1rem;
+        }
+        .hero-cli-desc strong {
+          display: inline;
+          margin-right: 6px;
+        }
       }
 
       .hero-social {
@@ -1335,10 +1502,10 @@ display: inline-flex;
 
 /* ─── Scroll-Storytelling Advantages ─────────────────────── */
 .advantages-scroll-container {
-  height: 300vh;
+  height: 320vh;
   position: relative;
   padding: 4rem 1.5rem 0;
-  max-width: 1100px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -1350,6 +1517,122 @@ display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.advantages-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 2.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.advantages-left {
+  min-width: 0;
+}
+
+.advantages-intro {
+  margin-bottom: 1.5rem;
+}
+
+.advantages-heading {
+  font-family: var(--display);
+  font-size: clamp(1.15rem, 1.6vw, 1.4rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: #e8e8e8;
+  margin-bottom: 0.5rem;
+}
+
+.advantages-sub {
+  color: var(--muted);
+  font-weight: 300;
+  font-size: 0.95rem;
+}
+
+/* janela "editor" que contém as tabs + cards */
+.advantages-window {
+  background: #0d0d14;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+}
+
+.advantages-window-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  background: #16161e;
+  border-bottom: 1px solid var(--border);
+}
+
+.window-dots {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.window-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.advantages-tabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.advantages-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.advantages-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.advantages-tab:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+.advantages-tab.active {
+  color: var(--accent);
+  background: rgba(79, 193, 255, 0.08);
+}
+
+.tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.advantages-progress-track {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.advantages-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.15s linear;
 }
 
 .advantages-cards-stack {
@@ -1365,10 +1648,10 @@ display: inline-flex;
   left: 0;
   width: 100%;
   height: 100%;
-  background: var(--card-bg);
+  background: #0d0d14;
   border-radius: var(--radius);
-  box-shadow: 0 25px 60px rgba(0,0,0,0.08);
-  padding: 3rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+  padding: 2.5rem 2.75rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1385,19 +1668,142 @@ display: inline-flex;
 }
 
 .advantage-card h3 {
-  font-size: 1.8rem;
+  font-family: var(--display);
+  font-size: 1.1rem;
   font-weight: 800;
-  margin-bottom: 1rem;
-  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.9rem;
+  color: #e8e8e8;
 }
 
 .advantage-card p {
-  font-size: 1.1rem;
-  line-height: 1.6;
+  font-size: 0.98rem;
+  line-height: 1.65;
   color: var(--muted);
 }
 
+.advantage-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.advantage-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: rgba(79, 193, 255, 0.08);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.advantage-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.advantage-number {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.12em;
+}
+
+.advantage-tag {
+  align-self: flex-start;
+  margin-top: 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent2);
+  background: rgba(0, 212, 170, 0.08);
+  border: 1px solid rgba(0, 212, 170, 0.18);
+  padding: 4px 10px;
+  border-radius: 100px;
+}
+
+/* coluna direita: ilustração da etapa ativa */
+.advantages-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #0d0d14;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+}
+.advantages-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.75rem;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s ease;
+}
+.advantages-media img.active {
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 1080px) {
+  .advantages-stage {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+    padding-bottom: 2rem;
+  }
+  .advantages-media {
+    max-width: 560px;
+    margin: 0 auto;
+    aspect-ratio: auto;
+    min-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .advantages-media {
+    display: none;
+  }
+}
+
+/* ecrãs pouco altos: encolhe os cards para caber no viewport fixo */
+@media (max-height: 840px) and (min-width: 769px) {
+  .advantages-cards-stack {
+    height: 340px;
+  }
+  .advantage-card {
+    padding: 1.75rem 2rem;
+  }
+  .advantage-card p {
+    font-size: 0.92rem;
+  }
+  .advantages-intro {
+    margin-bottom: 1rem;
+  }
+}
+
 @media (max-width: 640px) {
+  .advantages-scroll-container {
+    padding: 2rem 1.25rem 0;
+  }
+  .advantages-window-bar {
+    gap: 0.75rem;
+  }
+  .advantages-tab {
+    padding: 4px 6px;
+    font-size: 0.58rem;
+  }
+  .tab-file {
+    display: none;
+  }
   .advantages-cards-stack {
     height: 500px;
   }
@@ -1405,7 +1811,7 @@ display: inline-flex;
     padding: 1.8rem;
   }
   .advantage-card h3 {
-    font-size: 1.3rem;
+    font-size: 1rem;
   }
   .advantage-card p {
     font-size: 0.95rem;

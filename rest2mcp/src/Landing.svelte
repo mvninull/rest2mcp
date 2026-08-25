@@ -4,8 +4,69 @@
   import { createClient as createSupabaseClient } from "@supabase/supabase-js";
   import "./Landing.css";
   import r2mcpLogo from "./assets/r2mcp_logo.png";
+  import advImg1 from "./assets/1_duas_tools_search_run_overview.svg";
+  import advImg2 from "./assets/2_loja_api_search_tool_result.svg";
+  import advImg3 from "./assets/3_run_tool_workflow.svg";
+  import advImg4 from "./assets/4_sandbox_execucao_isolada.svg";
+  import advImg5 from "./assets/5_auth_sem_expor_credenciaiss.svg";
+  const ADVANTAGE_IMGS = [advImg1, advImg2, advImg3, advImg4, advImg5];
   import { t } from "./stores/lang.js";
   const __ = (key) => get(t)(key);
+
+  // ─── Hero CLI: copiar comando de instalação ─────────────────────
+  let cliCopied = false;
+  let cliCopyTimer;
+  function copyCliCmd() {
+    try {
+      navigator.clipboard?.writeText("pipx install r2mcp");
+    } catch {
+      return;
+    }
+    cliCopied = true;
+    clearTimeout(cliCopyTimer);
+    cliCopyTimer = setTimeout(() => (cliCopied = false), 1600);
+  }
+
+  // ─── Hero CLI: demo de terminal (conteúdo estático) ────────────
+  const DEMO_PS = "PS C:\\Users\\dev\\documents\\temp>";
+  const psSpan = `<span class="l-ps">${DEMO_PS}</span>`;
+  const cliDemoHtml = [
+    `<span class="l-cmd">r2mcp login</span>`,
+    `Introduz o teu JWT do Supabase (obtem em https://rest2mcp.pages.dev/):`,
+    ``,
+    `  Campo        Valor`,
+    ` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+    `  Email        m4codexp@gmail.com`,
+    `  Plano        free`,
+    `  Servidores   2 / 4`,
+    ``,
+    `<span class="l-ok">Autenticado com sucesso!</span>`,
+    `${psSpan} <span class="l-cmd">r2mcp servers list</span>`,
+    `A listar servidores...`,
+    ``,
+    `  ID             Nome   Status   Transporte   URL MCP`,
+    ` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+    `  srv_tu15j229   pts    active   http         <span class="l-url">https://rest2mcp.fly.dev/v1/srv_tu15j229/r2m_li...</span>`,
+    `  srv_0yu0bebe   Pets   active   http         <span class="l-url">https://rest2mcp.fly.dev/v1/srv_0yu0bebe/r2m_li...</span>`,
+    ``,
+    `${psSpan} <span class="l-cmd">r2mcp link claude-code srv_tu15j229</span>`,
+    `Servidor ligado ao Claude Code! Por favor, reinicia o editor para aplicar as alteracoes.`,
+    `${psSpan} <span class="l-cmd">cat .mcp.json</span>`,
+    `{`,
+    `  "mcpServers": {`,
+    `    "pts": {`,
+    `      "command": "npx",`,
+    `      "args": [`,
+    `        "-y",`,
+    `        "mcp-remote",`,
+    `        "<span class="l-url">https://rest2mcp.fly.dev/v1/srv_tu15j229/r2m_live_\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022/mcp</span>"`,
+    `      ]`,
+    `    }`,
+    `  }`,
+    `}`,
+    `${psSpan} <span class="l-cmd">claude</span>`
+  ].join("\n");
+
 
   // ─── Scroll-Storytelling: Advantages section ───────────────────
   // Cards are stacked with position:absolute in the same spot inside a
@@ -22,39 +83,39 @@
 
   const advantages = [
     {
-      file: "01_instant.setup",
-      tag: "SEM CÓDIGO",
-      title: "1. Do Zero Código à IA em Segundos",
-      body: "Esqueça a complexidade de configurar servidores, gerir dependências e escrever código de integração. Basta colar o link da documentação da sua API na nossa interface e clicar em criar. Transformamos qualquer API numa ferramenta pronta para a Inteligência Artificial, de forma instantânea, sem que você precise escrever uma única linha de código.",
+      file: "01_two.tools",
+      tag: "APENAS 2 TOOLS",
+      title: "1. Duas tools em vez de centenas",
+      body: "Os servidores MCP tradicionais expõem dezenas de tools, e executá-las uma a uma — chamada, retorno, raciocínio — gasta tokens a cada ida e volta. Os do rest2mcp expõem apenas duas: search e run. Como as LLMs escrevem bem código, a IA cria um único workflow que encadeia todas as chamadas necessárias e recebe o resultado consolidado numa só resposta. Menos contexto, menos round-trips, respostas mais rápidas e baratas.",
       icon: "bolt"
     },
     {
-      file: "02_auth.guard",
-      tag: "AUTENTICAÇÃO ISOLADA",
-      title: "2. Autenticação Segura e Multiusuário",
-      body: "Proteja as credenciais dos seus clientes e da sua empresa. Em vez de delegar logins e senhas para a IA — o que gera riscos graves de segurança —, a nossa plataforma gere a autenticação de forma isolada. O login é feito diretamente pela nossa interface web, e o token de acesso é injetado de forma invisível e segura nas chamadas subsequentes. A IA apenas executa as ações, mas nunca \"vê\" nem armazena as suas senhas.",
-      icon: "lock"
+      file: "02_tool.index",
+      tag: "DISCOVERY SEMÂNTICO",
+      title: "2. As tuas APIs indexadas por significado",
+      body: "Ao converter uma API REST em servidor MCP, todos os endpoints viram ferramentas — mas nenhuma chega ao modelo: ficam indexadas numa única tool, search. Ela entende o significado do pedido ('criar fatura' encontra POST /invoices mesmo com outro nome) e devolve só as ferramentas necessárias, com os parâmetros prontos a usar — é com elas que o run monta o workflow. A API continua toda disponível; a IA só vê o que precisa.",
+      icon: "search"
     },
     {
-      file: "03_logs.stream",
-      tag: "LOGS EM TEMPO REAL",
-      title: "3. Transparência Total e Observabilidade",
-      body: "Diga adeus às \"caixas pretas\". Saber exatamente o que a IA está a fazer é fundamental para a confiança do negócio. A nossa plataforma oferece um painel de logs em tempo real onde você pode visualizar exatamente qual ferramenta foi chamada, quais dados foram enviados, o tempo de resposta e o status de cada requisição. Tenha controle e auditoria total sobre as ações da Inteligência Artificial.",
-      icon: "activity"
-    },
-    {
-      file: "04_gateway.proxy",
-      tag: "GATEWAY SEGURO",
-      title: "4. Gateway Inteligente e Isolamento de Rede",
-      body: "Pare de lutar contra erros de CORS, bloqueios de firewall ou limites de requisições. A nossa plataforma atua como um Gateway seguro entre a IA e as suas APIs. O tráfego é roteado e gerido pelos nossos servidores, garantindo que a Inteligência Artificial consiga aceder a serviços internos ou corporativos de forma fluida, sem expor a sua infraestrutura diretamente à internet.",
-      icon: "network"
-    },
-    {
-      file: "05_merge.apis",
-      tag: "MULTI-API",
-      title: "5. Ecossistema Unificado (Merge de APIs)",
-      body: "Não se limite a conectar uma API de cada vez. A nossa plataforma permite fundir múltiplas APIs e serviços diferentes numa única interface conectada à IA. Crie ecossistemas complexos de ferramentas com organização inteligente, permitindo que a Inteligência Artificial tenha acesso a um leque completo de capacidades do seu negócio num só lugar, trabalhando de forma integrada.",
+      file: "03_orchestrator",
+      tag: "EXECUÇÃO NUM ÚNICO PASSO",
+      title: "3. Um workflow, uma só resposta",
+      body: "No ciclo tradicional, a LLM analisa o retorno, pensa, escolhe a tool seguinte e repete até completar o pedido. O workflow elimina isso: a IA descreve de uma vez todas as chamadas, a sua ordem e o que fazer com cada resultado. O rest2mcp valida o script e executa as chamadas reais às tuas APIs — em paralelo quando faz sentido — devolvendo um único resultado consolidado. Dez trocas de mensagens passam a ser uma.",
       icon: "layers"
+    },
+    {
+      file: "04_sandbox",
+      tag: "ISOLAMENTO TOTAL",
+      title: "4. Execução isolada na nossa infraestrutura",
+      body: "Nada do código gerado pela IA corre na tua máquina nem no teu servidor: cada workflow executa na infraestrutura do rest2mcp, num ambiente isolado e temporário com limites de tempo e memória. O acesso é mínimo — só as ferramentas registadas da tua API e funções básicas como JSON; operações perigosas são bloqueadas e tudo é apagado no fim. Se falhar, recebes um erro claro para a IA corrigir e repetir.",
+      icon: "shield"
+    },
+    {
+      file: "05_auth.bridge",
+      tag: "CREDENCIAIS PROTEGIDAS",
+      title: "5. Autenticação sem expor credenciais à IA",
+      body: "As tuas APIs podem exigir login — e isso nunca chega à LLM. Autenticas-te pela CLI (r2mcp login), pelo frontend web ou via REST no endpoint de login da API. As credenciais não ficam guardadas — nem na nossa infraestrutura, nem no chat: o token de sessão vive em memória e é injetado automaticamente nas chamadas reais à tua API. Para a IA, as tools simplesmente funcionam — ela nunca vê passwords ou headers de autorização.",
+      icon: "lock"
     }
   ];
 
@@ -587,13 +648,6 @@
       <li>
         <button
           class="nav-link-btn"
-          onclick={() => window.scrollToSection("about")}
-          >{$t("nav.about")}</button
-        >
-      </li>
-      <li>
-        <button
-          class="nav-link-btn"
           onclick={() => window.scrollToSection("features")}
           >{$t("nav.features")}</button
         >
@@ -630,6 +684,8 @@
   <div class="hero-bg"></div>
   <div class="hero-grid"></div>
   <div class="hero-inner">
+   <div class="hero-layout">
+    <div class="hero-copy">
     <div class="hero-tag"><span></span>{$t("hero.tag")}</div>
     <h1>{$t("hero.title")}</h1>
     <p class="hero-sub">
@@ -640,6 +696,34 @@
         >{$t("hero.cta")}</a
       >
     </div>
+    <div class="hero-cli">
+      <p class="hero-cli-desc">
+        <strong>{$t("hero.cli.label")}</strong>
+        {$t("hero.cli.desc")}
+      </p>
+      <div class="cli-box">
+        <span class="cli-prompt">$</span>
+        <code>pipx install r2mcp</code>
+        <button
+          type="button"
+          class="cli-copy-btn"
+          class:copied={cliCopied}
+          onclick={copyCliCmd}
+          >{cliCopied ? $t("hero.cli.copied") : $t("hero.cli.copy")}</button
+        >
+      </div>
+    </div>
+    </div>
+    <div class="hero-demo">
+    <div class="cli-window">
+      <div class="cli-window-bar">
+        <div class="win-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <span class="cli-window-title">r2mcp — terminal</span>
+      </div>
+      <pre class="cli-window-body" aria-hidden="true">{@html cliDemoHtml}</pre>
+    </div>
+    </div>
+   </div>
     <div class="hero-badges">
       <div class="badge">
         <span class="svg-icon"
@@ -700,142 +784,15 @@
   </div>
 </section>
 
-<!-- ABOUT -->
-<section class="section" id="about">
-  <div class="section-label">{$t("about.label")}</div>
-  <h2>{$t("about.title")}</h2>
-  <div class="about-layout">
-    <div>
-      <p style="color: var(--muted); margin-bottom: 1rem; font-weight: 300">
-        {$t("about.p1")}
-      </p>
-      <p style="color: var(--muted); margin-bottom: 1.5rem; font-weight: 300">
-        <strong style="color: var(--ink)">rest2mcp</strong>
-        {$t("about.p2")}
-      </p>
-
-      <div class="callout problem">
-        <strong
-          ><span style="display:inline-flex;align-items:center;gap:5px;"
-            ><svg
-              width="12"
-              height="12"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="var(--warn)"
-              stroke-width="2.2"
-              stroke-linecap="round"
-              ><line x1="3" y1="3" x2="13" y2="13" /><line
-                x1="13"
-                y1="3"
-                x2="3"
-                y2="13"
-              /></svg
-            > Problema</span
-          ></strong
-        >
-        {$t("about.problem")}
-      </div>
-      <div class="callout solution">
-        <strong
-          ><span style="display:inline-flex;align-items:center;gap:5px;"
-            ><svg
-              width="12"
-              height="12"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="#00d4aa"
-              stroke-width="2.2"
-              stroke-linecap="round"
-              stroke-linejoin="round"><path d="M2 8l4 4 8-8" /></svg
-            > Solução</span
-          ></strong
-        >
-        {$t("about.solution")}
-      </div>
-    </div>
-
-    <div class="how-it-works">
-      <h3>{$t("about.how")}</h3>
-      {$t("about.how_desc")}
-    </div>
-  </div>
-</section>
-
-<!-- ARCHITECTURE & SECURITY -->
-<section class="section" id="security">
-  <div class="section-label">{$t("security.label")}</div>
-  <h2>{$t("security.title")}</h2>
-  <div style="margin-bottom: 2rem;">
-    <span class="zk-badge"
-      ><span style="display:inline-flex;align-items:center;gap:5px;"
-        ><svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"
-          ><path
-            d="M6 0l1.2 4.8L12 6l-4.8 1.2L6 12 4.8 7.2 0 6l4.8-1.2z"
-          /></svg
-        >
-        {$t("security.badge")}</span
-      ></span
-    >
-  </div>
-  <div
-    class="sec-grid"
-    style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;"
-  >
-    <div class="callout solution" style="margin: 0;">
-      <strong>{$t("security.stateless")}</strong>
-      {$t("security.stateless_desc")}
-    </div>
-    <div class="callout solution" style="margin: 0;">
-      <strong>{$t("security.e2e")}</strong>
-      {$t("security.e2e_desc")}
-    </div>
-    <div class="callout solution" style="margin: 0;">
-      <strong>{$t("security.audit")}</strong>
-      {$t("security.audit_desc")}
-    </div>
-  </div>
-
-  <!-- Human-in-the-loop Auth Explanation -->
-  <div style="margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--border);">
-    <h3 style="font-size: 1.15rem; margin-bottom: 0.75rem;">{$t("auth.why_title")}</h3>
-    <p style="color: var(--muted); margin-bottom: 1.5rem; font-weight: 300;">
-      {$t("auth.why_desc")}
-    </p>
-    <div class="how-it-works" style="margin-top: 0;">
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 1.5rem;">
-        <div class="callout solution" style="margin: 0;">
-          <strong>{$t("auth.step1_title")}</strong>
-          {$t("auth.step1_desc")}
-        </div>
-        <div class="callout solution" style="margin: 0;">
-          <strong>{$t("auth.step2_title")}</strong>
-          {$t("auth.step2_desc")}
-        </div>
-        <div class="callout solution" style="margin: 0;">
-          <strong>{$t("auth.step3_title")}</strong>
-          {$t("auth.step3_desc")}
-        </div>
-      </div>
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <span class="zk-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> {$t("auth.zero_exposure")}</span>
-        <span class="zk-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> {$t("auth.full_control")}</span>
-      </div>
-    </div>
-    <div style="margin-top: 1.25rem; padding: 1rem 1.25rem; background: rgba(0, 212, 170, 0.06); border-radius: 12px; border: 1px solid rgba(0, 212, 170, 0.12);">
-      <p style="margin: 0; font-size: 0.85rem; color: var(--muted);">
-        <strong style="color: var(--accent2);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:3px;"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg> {$t("auth.token_management")}</strong>
-      </p>
-    </div>
-  </div>
-</section>
-
 <!-- ADVANTAGES (Scroll-Storytelling) -->
 <section class="advantages-scroll-container" bind:this={advantagesContainer}>
   <div class="advantages-sticky-wrapper">
+  <div class="advantages-stage">
+    <div class="advantages-left">
     <div class="advantages-intro">
       <div class="section-label">// 02 — Vantagens</div>
       <h2 class="advantages-heading">Por que escolher o rest2mcp?</h2>
+      <p class="advantages-sub">Scroll para percorres cada etapa.</p>
     </div>
 
     <div class="advantages-window">
@@ -858,9 +815,6 @@
             </button>
           {/each}
         </div>
-        <div class="window-status" aria-hidden="true">
-          <span class="status-dot"></span>live
-        </div>
       </div>
 
       <div class="advantages-progress-track" aria-hidden="true">
@@ -874,6 +828,10 @@
               <span class="advantage-icon">
                 {#if adv.icon === "bolt"}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 4 14h6l-1 7 9-11h-6l1-7Z"/></svg>
+                {:else if adv.icon === "search"}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+                {:else if adv.icon === "shield"}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.8-3.4 8.4-8 10-4.6-1.6-8-5.2-8-10V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
                 {:else if adv.icon === "lock"}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
                 {:else if adv.icon === "activity"}
@@ -893,6 +851,14 @@
         {/each}
       </div>
     </div>
+    </div>
+
+    <div class="advantages-media" aria-hidden="true">
+      {#each advantages as adv, i}
+        <img src={ADVANTAGE_IMGS[i]} alt="" class:active={activeAdvantage === i} />
+      {/each}
+    </div>
+  </div>
   </div>
 </section>
 
@@ -943,43 +909,8 @@
         <h3>{$t("feat.auth")}</h3>
         <p>{$t("feat.auth_desc")}</p>
       </div>
-      <div class="feat-card">
-        <div class="feat-icon">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgba(255,255,255,0.7)"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            ><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0115-6.7L21 8" /><path
-              d="M3 22v-6h6"
-            /><path d="M21 12a9 9 0 01-15 6.7L3 16" /></svg
-          >
-        </div>
-        <h3>{$t("feat.merge")}</h3>
-        <p>{$t("feat.merge_desc")}</p>
-      </div>
-      <div class="feat-card">
-        <div class="feat-icon">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgba(255,255,255,0.7)"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            ><rect x="2" y="3" width="20" height="14" rx="2" /><path
-              d="M8 21h8M12 17v4"
-            /></svg
-          >
-        </div>
-        <h3>{$t("feat.compat")}</h3>
-        <p>{$t("feat.compat_desc")}</p>
-      </div>
+      
+      
       <div class="feat-card">
         <div class="feat-icon">
           <svg
@@ -1663,14 +1594,6 @@
         <a
           href="#"
           role="button"
-          onclick={() => window.scrollToSection("about")}
-          >{$t("footer.about")}</a
-        >
-      </li>
-      <li>
-        <a
-          href="#"
-          role="button"
           onclick={() => window.scrollToSection("features")}
           >{$t("nav.features")}</a
         >
@@ -1921,272 +1844,3 @@
     alt="Buy Me a Coffee at ko-fi.com"
   />
 </a>
-
-<style>
-  /* ─── ADVANTAGES: Scroll-Storytelling ─────────────────────── */
-
-  /* Tall container that provides the scroll distance for the effect.
-     100vh per card gives each one a full screen of scroll to "own"
-     before the next one takes over. */
-  .advantages-scroll-container {
-    height: 500vh;
-    position: relative;
-  }
-
-  /* Pinned viewport-height window while scrolling through the section */
-  .advantages-sticky-wrapper {
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    padding: 2rem 1.5rem;
-  }
-
-  .advantages-intro {
-    text-align: center;
-    margin-bottom: 2rem;
-  }
-
-  .advantages-intro .section-label {
-    margin-bottom: 0.75rem;
-  }
-
-  .advantages-heading {
-    font-size: 2.2rem;
-    font-weight: 800;
-    margin: 0;
-  }
-
-  /* The whole thing reads as a single "code editor" window: dark
-     chrome on top, light content pane below — echoing the dashboard
-     mockup used elsewhere on the page, so the section feels native to
-     the product rather than a generic card grid. */
-  .advantages-window {
-    width: 100%;
-    max-width: 820px;
-border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
-    border: 1px solid var(--border);
-  }
-
-  .advantages-window-bar {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-    background: #0d0d14;
-    padding: 0.85rem 1.1rem;
-  }
-
-  .window-dots {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .window-dots span {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.15);
-  }
-
-  .advantages-tabs {
-    display: flex;
-    flex: 1;
-    gap: 0.35rem;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .advantages-tabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .advantages-tab {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    padding: 0.4rem 0.7rem;
-    cursor: pointer;
-    font-family: var(--mono, monospace);
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.4);
-    white-space: nowrap;
-    transition: background 0.3s ease, color 0.3s ease;
-  }
-
-  .advantages-tab:hover {
-    color: rgba(255, 255, 255, 0.7);
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  .advantages-tab.active {
-    color: white;
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .tab-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
-    flex-shrink: 0;
-    transition: background 0.3s ease;
-  }
-
-  .advantages-tab.active .tab-dot {
-    background: var(--accent2, #00d4aa);
-  }
-
-  .window-status {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: var(--mono, monospace);
-    font-size: 0.65rem;
-    color: rgba(255, 255, 255, 0.35);
-    flex-shrink: 0;
-  }
-
-  .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent2, #00d4aa);
-    box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.5);
-    animation: advantages-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes advantages-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.4); }
-    50% { box-shadow: 0 0 0 4px rgba(0, 212, 170, 0); }
-  }
-
-  .advantages-progress-track {
-    height: 2px;
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .advantages-progress-fill {
-    height: 100%;
-    background: var(--accent, #2f6fed);
-    transition: width 0.1s linear;
-  }
-
-  .advantages-cards-stack {
-    position: relative;
-    width: 100%;
-    height: 380px;
-    background: var(--card-bg);
-  }
-
-  .advantage-card {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    padding: 2.75rem 3rem;
-    display: flex;
-    flex-direction: column;
-    background: var(--card-bg);
-    opacity: 0;
-    transform: translateY(28px) scale(0.97);
-    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    pointer-events: none;
-  }
-
-  .advantage-card.is-visible {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-  }
-
-  .advantage-card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-  }
-
-  .advantage-icon {
-    width: 44px;
-    height: 44px;
-border-radius: var(--radius-sm);
-    background: rgba(0, 212, 170, 0.1);
-    color: var(--accent2, #00d4aa);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .advantage-icon svg {
-    width: 22px;
-    height: 22px;
-  }
-
-  .advantage-number {
-    font-family: var(--mono, monospace);
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.25);
-    letter-spacing: 0.05em;
-  }
-
-  .advantage-card h3 {
-    font-size: 1.6rem;
-    font-weight: 800;
-    margin: 0 0 0.85rem;
-    color: var(--ink);
-  }
-
-  .advantage-card p {
-    font-size: 1.02rem;
-    line-height: 1.6;
-    color: var(--muted);
-    margin: 0;
-    flex: 1;
-  }
-
-  .advantage-tag {
-    align-self: flex-start;
-    margin-top: 1.5rem;
-    font-family: var(--mono, monospace);
-    font-size: 0.65rem;
-    letter-spacing: 0.03em;
-    color: var(--accent2, #00d4aa);
-    background: rgba(0, 212, 170, 0.1);
-    padding: 4px 10px;
-    border-radius: 100px;
-  }
-
-  @media (max-width: 640px) {
-    .advantages-window-bar {
-      gap: 0.75rem;
-    }
-    .tab-file {
-      display: none;
-    }
-    .advantages-cards-stack {
-      height: 460px;
-    }
-    .advantage-card {
-      padding: 2rem 1.5rem;
-    }
-    .advantage-card h3 {
-      font-size: 1.3rem;
-    }
-    .advantage-card p {
-      font-size: 0.95rem;
-    }
-  }
-</style>
