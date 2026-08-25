@@ -1,4 +1,4 @@
-"""Script para preparar o package r2mcp-cli para publicacao no PyPI.
+"""Script para preparar o package r2mcp para publicacao no PyPI.
 Copia o source do CLI do diretorio raiz para dentro de r2mcp-cli/.
 
 Uso:
@@ -9,8 +9,6 @@ Uso:
 """
 
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "r2mcp-cli"
-version = "1.0.0"
+name = "r2mcp"
+version = "0.1.0"
 description = "CLI para gestao de servidores MCP via rest2mcp gateway"
 readme = "README.md"
 requires-python = ">=3.10"

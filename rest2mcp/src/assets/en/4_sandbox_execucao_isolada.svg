@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 680 760" role="img">
+<title>Isolated execution on rest2mcp infrastructure</title>
+<desc>Código gerado pela IA é executado apenas na infraestrutura do rest2mcp, dentro de um temporary and isolated sandbox, com limites de tempo e memória, minimal access às ferramentas registadas e bloqueio de dangerous operations. No fim, everything is deleted. Em caso de falha, um erro claro volta para a IA para correção e nova tentativa.</desc>
+<defs>
+  <marker id="arrowW" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M2 1L8.5 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arrowR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M2 1L8.5 5L2 9" fill="none" stroke="#ff6b6b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arrowG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M2 1L8.5 5L2 9" fill="none" stroke="#4fd18f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+<g font-family="DM Sans, sans-serif" fill="none" stroke-linecap="round" stroke-linejoin="round">
+
+  <!-- IA / workflow -->
+  <rect x="205" y="25" width="270" height="62" rx="16" stroke="#FFFFFF" stroke-width="1.8"/>
+  <text x="340" y="49" fill="#FFFFFF" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="middle">AI-generated workflow</text>
+  <text x="340" y="70" fill="#4fc1ff" font-size="10.5" font-weight="600" text-anchor="middle" dominant-baseline="middle">temporary code</text>
+
+  <path d="M340 87 L340 120" stroke="#4fc1ff" stroke-width="1.5" marker-end="url(#arrowW)"/>
+  <text x="366" y="105" fill="#4fc1ff" font-size="9.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">execute</text>
+
+  <!-- infrastructure -->
+  <rect x="70" y="120" width="540" height="520" rx="20" stroke="#FFFFFF" stroke-width="1.8"/>
+  <text x="96" y="148" fill="#FFFFFF" font-size="14" font-weight="700" text-anchor="start" dominant-baseline="middle">rest2mcp infrastructure</text>
+  <text x="96" y="169" fill="#4fc1ff" font-size="10.5" font-weight="600" text-anchor="start" dominant-baseline="middle">doesn't run on your machine or server</text>
+
+  <!-- sandbox -->
+  <rect x="100" y="195" width="480" height="325" rx="18" stroke="#4fc1ff" stroke-width="1.7" stroke-dasharray="6 4"/>
+  <text x="122" y="222" fill="#4fc1ff" font-size="11.5" font-weight="700" text-anchor="start" dominant-baseline="middle">temporary and isolated sandbox</text>
+
+  <!-- execution core -->
+  <rect x="225" y="245" width="230" height="58" rx="16" stroke="#FFFFFF" stroke-width="1.8"/>
+  <text x="340" y="269" fill="#FFFFFF" font-size="12.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">AI-generated code</text>
+  <text x="340" y="288" fill="#4fc1ff" font-size="10" font-weight="600" text-anchor="middle" dominant-baseline="middle">executed here</text>
+
+  <!-- limits -->
+  <rect x="125" y="330" width="150" height="62" rx="14" stroke="#4fc1ff" stroke-width="1.5"/>
+  <text x="200" y="353" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">time limit</text>
+  <text x="200" y="373" fill="#4fc1ff" font-size="9.5" font-weight="600" text-anchor="middle" dominant-baseline="middle">controlled execution</text>
+
+  <rect x="405" y="330" width="150" height="62" rx="14" stroke="#4fc1ff" stroke-width="1.5"/>
+  <text x="480" y="353" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">memory limit</text>
+  <text x="480" y="373" fill="#4fc1ff" font-size="9.5" font-weight="600" text-anchor="middle" dominant-baseline="middle">controlled resources</text>
+
+  <path d="M275 274 L275 310 L200 310 L200 330" stroke="#4fc1ff" stroke-width="1.3" marker-end="url(#arrowW)"/>
+  <path d="M405 274 L405 310 L480 310 L480 330" stroke="#4fc1ff" stroke-width="1.3" marker-end="url(#arrowW)"/>
+
+  <!-- minimal access -->
+  <rect x="125" y="415" width="150" height="78" rx="14" stroke="#4fc1ff" stroke-width="1.5"/>
+  <text x="200" y="438" fill="#FFFFFF" font-size="10.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">minimal access</text>
+  <text x="200" y="457" fill="#4fc1ff" font-size="9.5" font-weight="600" text-anchor="middle" dominant-baseline="middle">registered tools</text>
+  <text x="200" y="476" fill="#4fc1ff" font-size="9.5" font-weight="600" text-anchor="middle" dominant-baseline="middle">+ JSON functions</text>
+
+  <rect x="405" y="415" width="150" height="78" rx="14" stroke="#ff6b6b" stroke-width="1.5"/>
+  <text x="480" y="438" fill="#FFFFFF" font-size="10.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">dangerous operations</text>
+  <text x="480" y="458" fill="#ff6b6b" font-size="9.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">blocked</text>
+  <text x="480" y="477" fill="#ff6b6b" font-size="9.5" font-weight="600" text-anchor="middle" dominant-baseline="middle">before starting</text>
+
+  <path d="M200 392 L200 415" stroke="#4fc1ff" stroke-width="1.3" marker-end="url(#arrowW)"/>
+  <path d="M480 392 L480 415" stroke="#ff6b6b" stroke-width="1.3" marker-end="url(#arrowR)"/>
+
+  <!-- cleanup / result -->
+  <rect x="235" y="540" width="210" height="58" rx="16" stroke="#4fd18f" stroke-width="1.6"/>
+  <text x="340" y="564" fill="#FFFFFF" font-size="11.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">execution finished</text>
+  <text x="340" y="583" fill="#4fd18f" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle">everything is deleted</text>
+  <path d="M340 520 L340 540" stroke="#4fd18f" stroke-width="1.5" marker-end="url(#arrowG)"/>
+
+  <!-- failure path -->
+  <path d="M555 362 L625 362 L625 590 L445 590" stroke="#ff6b6b" stroke-width="1.4" marker-end="url(#arrowR)"/>
+  <text x="616" y="474" fill="#ff6b6b" font-size="9.5" font-weight="700" text-anchor="middle" dominant-baseline="middle" transform="rotate(90 616 474)">falha</text>
+
+  <!-- outside feedback -->
+  <rect x="115" y="665" width="450" height="68" rx="16" stroke="#FFFFFF" stroke-width="1.8"/>
+  <text x="340" y="689" fill="#FFFFFF" font-size="11.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">Se falhar, a IA recebe um erro claro</text>
+  <text x="340" y="710" fill="#4fc1ff" font-size="10.5" font-weight="600" text-anchor="middle" dominant-baseline="middle">corrige e tenta novamente</text>
+  <path d="M340 640 L340 665" stroke="#4fc1ff" stroke-width="1.5" marker-end="url(#arrowW)"/>
+
+</g>
+</svg>
