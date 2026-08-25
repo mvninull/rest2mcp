@@ -252,15 +252,15 @@ _translations = {
 
 
 def _detect_lang() -> str:
-    env = os.environ.get("R2MCP_LANG", "").strip().lower()
-    if env in ("pt", "en"):
-        return env
     try:
         system_locale = locale.getdefaultlocale()[0] or ""
         if system_locale.startswith("pt"):
             return "pt"
     except Exception:
         pass
+    env = os.environ.get("R2MCP_LANG", "").strip().lower()
+    if env in ("pt", "en"):
+        return env
     return "en"
 
 
