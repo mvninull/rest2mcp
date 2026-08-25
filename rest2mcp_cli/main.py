@@ -7,23 +7,24 @@ from r2mcp_cli.commands.servers import servers_app
 from r2mcp_cli.commands.tools import tools_app
 from r2mcp_cli.commands.link import link_app
 from r2mcp_cli.commands.logs import logs_app
+from r2mcp_cli.i18n import t
 
 console = Console()
 
 app = typer.Typer(
     name="r2mcp",
-    help="CLI para gestao de servidores MCP via rest2mcp gateway",
+    help=t("app.help"),
     add_completion=False,
 )
 
 app.command()(login)
 app.command()(logout)
 app.command()(me)
-app.add_typer(config_app, name="config", help="Gerir configuracao local")
-app.add_typer(servers_app, name="servers", help="Gerir servidores MCP")
-app.add_typer(tools_app, name="tools", help="Interagir com ferramentas MCP")
-app.add_typer(link_app, name="link", help="Ligar servidor a editor IA")
-app.add_typer(logs_app, name="logs", help="Ver logs de servidores")
+app.add_typer(config_app, name="config", help=t("app.config_help"))
+app.add_typer(servers_app, name="servers", help=t("app.servers_help"))
+app.add_typer(tools_app, name="tools", help=t("app.tools_help"))
+app.add_typer(link_app, name="link", help=t("app.link_help"))
+app.add_typer(logs_app, name="logs", help=t("app.logs_help"))
 
 
 def _banner():

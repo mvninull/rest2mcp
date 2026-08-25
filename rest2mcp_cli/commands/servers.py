@@ -11,58 +11,59 @@ from rich.prompt import Confirm, Prompt
 
 from r2mcp_cli.api_client import APIClient, APIError
 from r2mcp_cli.config import get_token, validate_token
+from r2mcp_cli.i18n import t
 
 console = Console()
-servers_app = typer.Typer(help="Comandos de gestao de servidores")
+servers_app = typer.Typer(help=t("app.servers_help"))
 
 
 def _require_auth():
     token = get_token()
     if not token:
         console.print(Panel(
-            "[bold red]Nao autenticado[/bold red]\nObtem um token em [bold]https://rest2mcp.pages.dev/[/bold] e corre [bold]r2mcp login[/bold]",
-            border_style="red", title="Erro", padding=(0, 1),
+            f"[bold red]{t('not_auth')}[/bold red]\n{t('get_token_at')}",
+            border_style="red", title=t("error"), padding=(0, 1),
         ))
         raise typer.Exit(1)
     ok, msg = validate_token(token)
     if not ok:
         console.print(Panel(
-            f"[bold red]{msg}[/bold red]\nObtem um token novo em [bold]https://rest2mcp.pages.dev/[/bold]",
-            border_style="red", title="Token invalido", padding=(0, 1),
+            f"[bold red]{msg}[/bold red]\n{t('get_new_token_at')}",
+            border_style="red", title=t("token_invalid"), padding=(0, 1),
         ))
         raise typer.Exit(1)
 
 
 def _server_table(result: dict) -> Table:
-    table = Table(box=box.ROUNDED, border_style="cyan", title="[bold]Servidor criado[/bold]", title_style="bold green")
-    table.add_column("Campo", style="bold cyan", no_wrap=True)
-    table.add_column("Valor")
+    table = Table(box=box.ROUNDED, border_style="cyan", title=f"[bold]{t('servers.created')}[/bold]", title_style="bold green")
+    table.add_column(t("field"), style="bold cyan", no_wrap=True)
+    table.add_column(t("value"))
     table.add_row("ID", result["server_id"])
-    table.add_row("Nome", result["name"])
-    table.add_row("Status", result["status"])
-    table.add_row("Transporte", result["transport"])
-    table.add_row("URL MCP", result["url_sse"])
-    table.add_row("API Key", result["apikey"])
+    table.add_row(t("servers.name"), result["name"])
+    table.add_row(t("me.status"), result["status"])
+    table.add_row(t("servers.transport"), result["transport"])
+    table.add_row(t("servers.url_mcp"), result["url_sse"])
+    table.add_row(t("servers.api_key"), result["apikey"])
     return table
 
 
 @servers_app.command()
 def create(
-    name: str = typer.Option(..., "--name", "-n", help="Nome do servidor"),
-    spec_url: str = typer.Option(..., "--spec-url", "-u", help="URL do spec OpenAPI"),
-    transport: str = typer.Option("sse", "--transport", "-t", help="Transporte (sse ou http)"),
+    name: str = typer.Option(..., "--name", "-n", help=t("servers.create_help_name")),
+    spec_url: str = typer.Option(..., "--spec-url", "-u", help=t("servers.create_help_spec")),
+    transport: str = typer.Option("sse", "--transport", "-t", help=t("servers.create_help_transport")),
 ):
     _require_auth()
-    with console.status(f"[bold green]A criar servidor '{name}'...", spinner="dots"):
+    with console.status(f"[bold green]{t('servers.creating', name=name)}[/bold green]", spinner="dots"):
         try:
             client = APIClient()
             result = client.create_server(name, spec_url, transport)
             client.close()
         except APIError as e:
-            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
             raise typer.Exit(1)
         except Exception as e:
-            console.print(Panel(f"[red]{e}[/red]", border_style="red", title="Erro de conexao"))
+            console.print(Panel(f"[red]{e}[/red]", border_style="red", title=t("error_connection")))
             raise typer.Exit(1)
 
     console.print(_server_table(result))
@@ -71,33 +72,33 @@ def create(
 @servers_app.command()
 def list():
     _require_auth()
-    console.print("[bold green]A listar servidores...[/bold green]")
+    console.print(f"[bold green]{t('servers.listing')}[/bold green]")
 
     try:
         client = APIClient()
         servers = client.list_servers()
         client.close()
     except APIError as e:
-        console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+        console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
         raise typer.Exit(1)
     except Exception as e:
-        console.print(Panel(f"[red]{e}[/red]", border_style="red", title="Erro de conexao"))
+        console.print(Panel(f"[red]{e}[/red]", border_style="red", title=t("error_connection")))
         raise typer.Exit(1)
 
     if not servers:
-        console.print(Panel("[yellow]Nenhum servidor encontrado.[/yellow]", border_style="yellow"))
+        console.print(Panel(f"[yellow]{t('servers.none')}[/yellow]", border_style="yellow"))
         return
 
     cols = shutil.get_terminal_size().columns
     sys.stdout.write(f"\r{' ' * cols}\r")
     sys.stdout.flush()
 
-    table = Table(box=box.ROUNDED, border_style="cyan", title=f"[bold]{len(servers)} servidor(es)[/bold]", title_style="bold")
+    table = Table(box=box.ROUNDED, border_style="cyan", title=f"[bold]{t('servers.count', count=len(servers))}[/bold]", title_style="bold")
     table.add_column("ID", style="cyan", no_wrap=True)
-    table.add_column("Nome", no_wrap=True)
-    table.add_column("Status", no_wrap=True)
-    table.add_column("Transporte", no_wrap=True)
-    table.add_column("URL MCP", no_wrap=True)
+    table.add_column(t("servers.name"), no_wrap=True)
+    table.add_column(t("me.status"), no_wrap=True)
+    table.add_column(t("servers.transport"), no_wrap=True)
+    table.add_column(t("servers.url_mcp"), no_wrap=True)
     for s in servers:
         status_style = "green" if s["status"] == "active" else "red"
         sid = s["server_id"]
@@ -116,68 +117,68 @@ def list():
 
 
 @servers_app.command()
-def delete(server_id: str = typer.Argument(..., help="ID do servidor")):
+def delete(server_id: str = typer.Argument(..., help=t("servers.id_help"))):
     _require_auth()
-    if not Confirm.ask(f"[yellow]Tens a certeza que queres apagar o servidor '{server_id}'?[/yellow]"):
-        console.print("[yellow]Operacao cancelada.[/yellow]")
+    if not Confirm.ask(f"[yellow]{t('servers.delete_confirm', id=server_id)}[/yellow]"):
+        console.print(f"[yellow]{t('servers.delete_cancel')}[/yellow]")
         return
 
-    with console.status(f"[bold red]A apagar servidor '{server_id}'...", spinner="dots"):
+    with console.status(f"[bold red]{t('servers.deleting', id=server_id)}[/bold red]", spinner="dots"):
         try:
             client = APIClient()
             client.delete_server(server_id)
             client.close()
         except APIError as e:
-            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
             raise typer.Exit(1)
         except Exception as e:
-            console.print(Panel(f"[red]{e}[/red]", border_style="red", title="Erro de conexao"))
+            console.print(Panel(f"[red]{e}[/red]", border_style="red", title=t("error_connection")))
             raise typer.Exit(1)
 
-    console.print(Panel(f"[green]Servidor '{server_id}' apagado.[/green]", border_style="green"))
+    console.print(Panel(f"[green]{t('servers.deleted', id=server_id)}[/green]", border_style="green"))
 
 
 @servers_app.command()
-def pause(server_id: str = typer.Argument(..., help="ID do servidor")):
+def pause(server_id: str = typer.Argument(..., help=t("servers.id_help"))):
     _require_auth()
-    with console.status(f"[bold yellow]A pausar servidor '{server_id}'...", spinner="dots"):
+    with console.status(f"[bold yellow]{t('servers.pausing', id=server_id)}[/bold yellow]", spinner="dots"):
         try:
             client = APIClient()
             client.update_server(server_id, {"status": "inactive"})
             client.close()
         except APIError as e:
-            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
             raise typer.Exit(1)
         except Exception as e:
-            console.print(Panel(f"[red]{e}[/red]", border_style="red", title="Erro de conexao"))
+            console.print(Panel(f"[red]{e}[/red]", border_style="red", title=t("error_connection")))
             raise typer.Exit(1)
 
-    console.print(Panel(f"[yellow]Servidor '{server_id}' pausado.[/yellow]", border_style="yellow"))
+    console.print(Panel(f"[yellow]{t('servers.paused', id=server_id)}[/yellow]", border_style="yellow"))
 
 
 @servers_app.command()
-def resume(server_id: str = typer.Argument(..., help="ID do servidor")):
+def resume(server_id: str = typer.Argument(..., help=t("servers.id_help"))):
     _require_auth()
-    with console.status(f"[bold green]A retomar servidor '{server_id}'...", spinner="dots"):
+    with console.status(f"[bold green]{t('servers.resuming', id=server_id)}[/bold green]", spinner="dots"):
         try:
             client = APIClient()
             client.update_server(server_id, {"status": "active"})
             client.close()
         except APIError as e:
-            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
             raise typer.Exit(1)
         except Exception as e:
-            console.print(Panel(f"[red]{e}[/red]", border_style="red", title="Erro de conexao"))
+            console.print(Panel(f"[red]{e}[/red]", border_style="red", title=t("error_connection")))
             raise typer.Exit(1)
 
-    console.print(Panel(f"[green]Servidor '{server_id}' retomado.[/green]", border_style="green"))
+    console.print(Panel(f"[green]{t('servers.resumed', id=server_id)}[/green]", border_style="green"))
 
 
 @servers_app.command()
 def credentials(
-    server_id: str = typer.Argument(..., help="ID do servidor"),
+    server_id: str = typer.Argument(..., help=t("servers.id_help")),
     key_value: List[str] = typer.Option(
-        [], "--set", "-s", help="Par chave=valor (ex: -s username=admin -s password=123456)"
+        [], "--set", "-s", help=t("servers.creds_help")
     ),
 ):
     _require_auth()
@@ -187,17 +188,17 @@ def credentials(
         creds = {}
         for kv in key_value:
             if "=" not in kv:
-                console.print(Panel(f"[red]Formato invalido: '{kv}'. Use chave=valor.[/red]", border_style="red"))
+                console.print(Panel(f"[red]{t('servers.creds_invalid', kv=kv)}[/red]", border_style="red"))
                 raise typer.Exit(1)
             k, v = kv.split("=", 1)
             creds[k] = v
         try:
             result = client.set_credentials(server_id, creds)
             client.close()
-            console.print(Panel(f"[green]Credenciais salvas para '{server_id}'.[/green]", border_style="green"))
+            console.print(Panel(f"[green]{t('servers.creds_saved', id=server_id)}[/green]", border_style="green"))
         except APIError as e:
             client.close()
-            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
             raise typer.Exit(1)
     else:
         try:
@@ -205,12 +206,12 @@ def credentials(
             client.close()
         except APIError as e:
             client.close()
-            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+            console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
             raise typer.Exit(1)
         if info.get("has_credentials"):
-            console.print(Panel(f"[green]Servidor '{server_id}' tem credenciais configuradas.[/green]", border_style="green"))
+            console.print(Panel(f"[green]{t('servers.creds_yes', id=server_id)}[/green]", border_style="green"))
         else:
-            console.print(Panel(f"[yellow]Servidor '{server_id}' nao tem credenciais configuradas.[/yellow]", border_style="yellow"))
+            console.print(Panel(f"[yellow]{t('servers.creds_no', id=server_id)}[/yellow]", border_style="yellow"))
 
 
 PASSWORD_KEYS = {"password", "senha", "pwd", "pass", "secret", "palavra-passe", "passwd"}
@@ -218,7 +219,7 @@ PASSWORD_KEYS = {"password", "senha", "pwd", "pass", "secret", "palavra-passe", 
 
 @servers_app.command()
 def login(
-    server_id: str = typer.Argument(..., help="ID do servidor"),
+    server_id: str = typer.Argument(..., help=t("servers.id_help")),
 ):
     _require_auth()
     client = APIClient()
@@ -226,23 +227,23 @@ def login(
         auth_info = client.get_auth_status(server_id)
     except APIError as e:
         client.close()
-        console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+        console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
         raise typer.Exit(1)
 
     fields = auth_info.get("required_fields", [])
     if not fields:
-        console.print(Panel("[yellow]Este servidor nao requer autenticacao.[/yellow]", border_style="yellow"))
+        console.print(Panel(f"[yellow]{t('servers.login_no_auth')}[/yellow]", border_style="yellow"))
         client.close()
         return
 
     if auth_info.get("authenticated"):
-        console.print(Panel("[green]Servidor ja esta autenticado.[/green]", border_style="green"))
+        console.print(Panel(f"[green]{t('servers.login_already')}[/green]", border_style="green"))
         client.close()
         return
 
     console.print(Panel(
-        f"[bold]Login no servidor [cyan]{server_id}[/cyan][/bold]\n[dim]Campos necessarios: {', '.join(fields)}[/dim]",
-        border_style="cyan", title="Autenticacao", padding=(0, 1),
+        f"[bold]{t('servers.login_header', id=server_id)}[/bold]\n[dim]{t('servers.login_fields', fields=', '.join(fields))}[/dim]",
+        border_style="cyan", title=t("servers.login_auth"), padding=(0, 1),
     ))
     console.print()
 
@@ -255,16 +256,16 @@ def login(
         result = client.login_server(server_id, values)
         client.close()
         if result.get("token"):
-            console.print(Panel("[green]Autenticado com sucesso![/green]", border_style="green"))
+            console.print(Panel(f"[green]{t('servers.login_ok')}[/green]", border_style="green"))
         else:
-            console.print(Panel("[red]Resposta inesperada do servidor.[/red]", border_style="red"))
+            console.print(Panel(f"[red]{t('servers.login_unexpected')}[/red]", border_style="red"))
     except APIError as e:
         client.close()
         if "Internal Server Error" in e.detail or e.status_code == 500:
             console.print(Panel(
-                "[red]API do servidor nao esta acessivel ou recusou o login.\nVerifica se a API esta online.[/red]",
-                border_style="red", title="Erro",
+                f"[red]{t('servers.login_api_down')}[/red]",
+                border_style="red", title=t("error"),
             ))
         else:
-            console.print(Panel(f"[red]Erro no login: {e.detail}[/red]", border_style="red", title="Erro"))
+            console.print(Panel(f"[red]{t('servers.login_error', detail=e.detail)}[/red]", border_style="red", title=t("error")))
         raise typer.Exit(1)

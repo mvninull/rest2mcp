@@ -10,9 +10,10 @@ from rich import box
 
 from r2mcp_cli.api_client import APIClient, APIError
 from r2mcp_cli.config import get_base_url, get_token, validate_token
+from r2mcp_cli.i18n import t
 
 console = Console()
-link_app = typer.Typer(help="Ligar servidor a editor IA")
+link_app = typer.Typer(help=t("app.link_help"))
 
 
 EDITOR_CONFIGS = {
@@ -46,15 +47,15 @@ def _require_auth():
     token = get_token()
     if not token:
         console.print(Panel(
-            "[bold red]Nao autenticado[/bold red]\nObtem um token em [bold]https://rest2mcp.pages.dev/[/bold] e corre [bold]r2mcp login[/bold]",
-            border_style="red", title="Erro", padding=(0, 1),
+            f"[bold red]{t('not_auth')}[/bold red]\n{t('get_token_at')}",
+            border_style="red", title=t("error"), padding=(0, 1),
         ))
         raise typer.Exit(1)
     ok, msg = validate_token(token)
     if not ok:
         console.print(Panel(
-            f"[bold red]{msg}[/bold red]\nObtem um token novo em [bold]https://rest2mcp.pages.dev/[/bold]",
-            border_style="red", title="Token invalido", padding=(0, 1),
+            f"[bold red]{msg}[/bold red]\n{t('get_new_token_at')}",
+            border_style="red", title=t("token_invalid"), padding=(0, 1),
         ))
         raise typer.Exit(1)
 
@@ -66,11 +67,11 @@ def _find_server(server_id: str) -> Optional[dict]:
         client.close()
     except APIError as e:
         client.close()
-        console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title="Erro"))
+        console.print(Panel(f"[red]{e.detail}[/red]", border_style="red", title=t("error")))
         raise typer.Exit(1)
     except Exception as e:
         client.close()
-        console.print(Panel(f"[red]{e}[/red]", border_style="red", title="Erro de conexao"))
+        console.print(Panel(f"[red]{e}[/red]", border_style="red", title=t("error_connection")))
         raise typer.Exit(1)
 
     for s in servers:
@@ -100,32 +101,32 @@ def _read_json(path: Path) -> dict:
 
 @link_app.command(name="add")
 def link_add(
-    editor: str = typer.Argument(..., help="Editor: claude-code, cursor, vscode, opencode"),
-    server_id: str = typer.Argument(..., help="ID do servidor"),
+    editor: str = typer.Argument(..., help=t("link.editor_help")),
+    server_id: str = typer.Argument(..., help=t("link.server_help")),
 ):
     _require_auth()
 
     if editor not in EDITOR_CONFIGS:
         supported = ", ".join(EDITOR_CONFIGS.keys())
         console.print(Panel(
-            f"[red]Editor '{editor}' nao suportado[/red]\nOpcoes: [bold]{supported}[/bold]",
-            border_style="red", title="Erro",
+            f"[red]{t('link.unsupported', editor=editor, supported=supported)}[/red]",
+            border_style="red", title=t("error"),
         ))
         raise typer.Exit(1)
 
     config_path = _resolve_config_path(editor)
     if not config_path:
         console.print(Panel(
-            f"[red]Nao foi possivel determinar o caminho de configuracao para '{editor}'.[/red]",
-            border_style="red", title="Erro",
+            f"[red]{t('link.no_path', editor=editor)}[/red]",
+            border_style="red", title=t("error"),
         ))
         raise typer.Exit(1)
 
     server = _find_server(server_id)
     if not server:
         console.print(Panel(
-            f"[red]Servidor '{server_id}' nao encontrado.[/red]",
-            border_style="red", title="Erro",
+            f"[red]{t('link.not_found', id=server_id)}[/red]",
+            border_style="red", title=t("error"),
         ))
         raise typer.Exit(1)
     if server["status"] == "active":
@@ -135,8 +136,8 @@ def link_add(
             client.close()
             if auth_info.get("required_fields") and not auth_info.get("authenticated"):
                 console.print(Panel(
-                    "[red]Servidor precisa de autenticacao.\nFaz o login primeiro com [bold]r2mcp servers login[/bold].[/red]",
-                    border_style="red", title="Erro",
+                    f"[red]{t('link.needs_auth')}[/red]",
+                    border_style="red", title=t("error"),
                 ))
                 raise typer.Exit(1)
         except APIError:
@@ -191,21 +192,21 @@ def link_add(
 
     editor_label = EDITOR_CONFIGS[editor]["label"]
 
-    table = Table(box=box.ROUNDED, border_style="green", title="[bold]Servidor ligado![/bold]", title_style="bold green")
-    table.add_column("Campo", style="bold cyan", no_wrap=True)
-    table.add_column("Valor")
-    table.add_row("Editor", editor_label)
-    table.add_row("Servidor", name)
-    table.add_row("Ficheiro", str(config_path))
+    table = Table(box=box.ROUNDED, border_style="green", title=f"[bold]{t('link.connected')}[/bold]", title_style="bold green")
+    table.add_column(t("field"), style="bold cyan", no_wrap=True)
+    table.add_column(t("value"))
+    table.add_row(t("link.editor"), editor_label)
+    table.add_row(t("link.server"), name)
+    table.add_row(t("link.file"), str(config_path))
     console.print(table)
 
     if editor == "claude-code":
         console.print(Panel(
-            "[yellow]O Claude Code usa 'mcp-remote' como bridge.\nCertifica-te de que o Node.js esta instalado e disponivel no PATH para correr npx.[/yellow]",
+            f"[yellow]{t('link.claude_note')}[/yellow]",
             border_style="yellow", title="Nota",
         ))
     else:
         console.print(Panel(
-            f"[green]Reinicia o {editor_label} para aplicar as alteracoes.[/green]",
+            f"[green]{t('link.restart', editor=editor_label)}[/green]",
             border_style="green",
         ))
