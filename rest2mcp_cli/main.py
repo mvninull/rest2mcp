@@ -1,7 +1,6 @@
+import shutil
 import typer
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
 from r2mcp_cli.commands.auth import login, logout, me, config_app
 from r2mcp_cli.commands.servers import servers_app
@@ -28,21 +27,11 @@ app.add_typer(logs_app, name="logs", help="Ver logs de servidores")
 
 
 def _banner():
-    banner = Text()
-    banner.append("  _   _ ____  ____  ____  ", style="bold cyan")
-    banner.append(" ____   ", style="dim")
-    banner.append(" ____ ___ _   _ ____  ", style="bold blue")
-    banner.append(" ____  ", style="dim")
-    banner.append("__  __", style="bold blue")
-
-    subtitle = Text()
-    subtitle.append("   v0.2.0  ", style="dim")
-    subtitle.append("rest2mcp  ", style="cyan")
-    subtitle.append(" - Convert any REST API to MCP", style="dim")
-
-    console.print()
-    console.print(Panel(banner, border_style="cyan", padding=(0, 1)))
-    console.print(subtitle)
+    w = shutil.get_terminal_size().columns
+    line = "r2mcp v0.2.0".center(w)
+    sub = "rest2mcp - Convert any REST API to MCP".center(w)
+    console.print(f"[dim]{line}[/dim]")
+    console.print(f"[dim]{sub}[/dim]")
     console.print()
 
 
