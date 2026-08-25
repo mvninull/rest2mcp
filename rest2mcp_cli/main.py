@@ -36,7 +36,7 @@ def _banner():
     banner.append("__  __", style="bold blue")
 
     subtitle = Text()
-    subtitle.append("   v0.1.2  ", style="dim")
+    subtitle.append("   v0.2.0  ", style="dim")
     subtitle.append("rest2mcp  ", style="cyan")
     subtitle.append(" - Convert any REST API to MCP", style="dim")
 
