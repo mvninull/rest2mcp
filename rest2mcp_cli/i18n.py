@@ -54,6 +54,8 @@ _translations = {
         "config.base_changed": "URL base alterada para: [bold]{url}[/bold]",
 
         "servers.creating": "A criar servidor '{name}'...",
+        "servers.spec_invalid": "URL de spec invalida: '{url}'. Deve ser http:// ou https://",
+        "servers.using_env": "A usar ambiente {env} ({url})",
         "servers.created": "Servidor criado",
         "servers.name": "Nome",
         "servers.transport": "Transporte",
@@ -177,6 +179,8 @@ _translations = {
         "config.base_changed": "Base URL changed to: [bold]{url}[/bold]",
 
         "servers.creating": "Creating server '{name}'...",
+        "servers.spec_invalid": "Invalid spec URL: '{url}'. Must be http:// or https://",
+        "servers.using_env": "Using {env} environment ({url})",
         "servers.created": "Server created",
         "servers.name": "Name",
         "servers.transport": "Transport",

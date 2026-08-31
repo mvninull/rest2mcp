@@ -10,7 +10,7 @@ from rich.table import Table
 from rich.prompt import Confirm, Prompt
 
 from r2mcp_cli.api_client import APIClient, APIError
-from r2mcp_cli.config import get_token, validate_token
+from r2mcp_cli.config import get_base_url, get_token, validate_token
 from r2mcp_cli.i18n import t
 
 console = Console()
@@ -52,11 +52,50 @@ def create(
     name: str = typer.Option(..., "--name", "-n", help=t("servers.create_help_name")),
     spec_url: str = typer.Option(..., "--spec-url", "-u", help=t("servers.create_help_spec")),
     transport: str = typer.Option("sse", "--transport", "-t", help=t("servers.create_help_transport")),
+    force_env: str = typer.Option(None, "--env", help="Forcar ambiente: local ou prod (auto se omitido)"),
 ):
     _require_auth()
+
+    from urllib.parse import urlparse
+    from r2mcp_cli.config import LOCAL_GATEWAY_URL
+
+    parsed = urlparse(spec_url)
+    scheme = parsed.scheme
+
+    if not scheme or scheme not in ("http", "https"):
+        console.print(Panel(f"[red]{t('servers.spec_invalid', url=spec_url)}[/red]", border_style="red", title=t("error")))
+        raise typer.Exit(1)
+
+    if force_env and force_env not in ("local", "prod"):
+        console.print(Panel(f"[red]{t('config.env_invalid', env=force_env)}[/red]", border_style="red", title=t("error")))
+        raise typer.Exit(1)
+
+    is_https = scheme == "https"
+    current_base = get_base_url()
+
+    if force_env == "local":
+        base = LOCAL_GATEWAY_URL
+        env_label = t("config.local")
+    elif force_env == "prod":
+        base = None  # default from config
+        env_label = t("config.prod")
+    else:
+        if is_https:
+            base = None  # default (prod by default)
+            env_label = t("config.prod")
+        else:
+            base = LOCAL_GATEWAY_URL
+            env_label = t("config.local")
+
+    if base is not None and base != current_base:
+        console.print(Panel(
+            f"[yellow]{t('servers.using_env', env=env_label, url=base)}[/yellow]",
+            border_style="yellow", padding=(0, 1),
+        ))
+
     with console.status(f"[bold green]{t('servers.creating', name=name)}[/bold green]", spinner="dots"):
         try:
-            client = APIClient()
+            client = APIClient(base_url=base if base else None)
             result = client.create_server(name, spec_url, transport)
             client.close()
         except APIError as e:

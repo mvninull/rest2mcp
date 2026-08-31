@@ -6,7 +6,8 @@ from pathlib import Path
 
 CONFIG_DIR = Path.home() / ".r2mcp"
 CONFIG_FILE = CONFIG_DIR / "config.json"
-DEFAULT_BASE_URL = "http://localhost:8080"
+DEFAULT_BASE_URL = "https://rest2mcp.fly.dev"
+LOCAL_GATEWAY_URL = "http://localhost:8080"
 
 
 def _ensure_config_dir():
